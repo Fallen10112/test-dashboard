@@ -1,0 +1,889 @@
+
+let allData = null; // Store all data globally for reports
+let allLogs = null; // Store all logs globally for reports
+let allAuditTrail = null; // Store all audit trail entries globally
+let currentSortColumn = null; // Track current sort column
+let currentSortOrder = 'asc'; // Track sort order (asc/desc)
+
+
+$(document).ready(function() {
+	initializeTheme();
+	setupResetButtonHandler();
+
+	if ($('#data-container').length > 0) {
+		loadData();
+		setupDataPageHandlers();
+	}
+
+	if ($('#report-container').length > 0) {
+		setupReportsPageHandlers();
+	}
+
+	if ($('#audit-container').length > 0) {
+		loadAuditTrail();
+		setupAuditTrailPageHandlers();
+	}
+});
+
+
+function initializeTheme() {
+	const isDarkMode = localStorage.getItem('theme-mode') === 'dark';
+	const themeToggle = $('#theme-toggle-checkbox');
+	
+	if (isDarkMode) {
+		$('body').addClass('dark-mode');
+		themeToggle.prop('checked', true);
+		$('#theme-label').text('Dark');
+	}
+	
+	themeToggle.on('change', function() {
+		toggleTheme();
+	});
+}
+
+
+function toggleTheme() {
+	const isDarkMode = $('#theme-toggle-checkbox').is(':checked');
+	
+	if (isDarkMode) {
+		$('body').addClass('dark-mode');
+		localStorage.setItem('theme-mode', 'dark');
+		$('#theme-label').text('Dark');
+	} else {
+		$('body').removeClass('dark-mode');
+		localStorage.setItem('theme-mode', 'light');
+		$('#theme-label').text('Light');
+	}
+}
+
+
+function setupResetButtonHandler() {
+	$('#reset-data-btn').on('click', function() {
+		if (confirm('Are you sure you want to reset all data? This will clear all entries, logs, and audit trail, and restore 3 test entries. This action cannot be undone.')) {
+			$.ajax({
+				url: '../api.php',
+				type: 'POST',
+				contentType: 'application/json',
+				data: JSON.stringify({ action: 'reset_data' }),
+				success: function(response) {
+					alert('Data reset successfully!');
+					
+					const currentPage = window.location.pathname.split('/').pop() || 'home.php';
+					window.location.href = '../pages/' + currentPage;
+				},
+				error: function(xhr, status, error) {
+					alert('Error resetting data: ' + error);
+				}
+			});
+		}
+	});
+}
+
+
+function setupDataPageHandlers() {
+	$('#add-record-btn').on('click', function() {
+		openAddModal();
+	});
+	
+	$('#search-input').on('keyup', function() {
+		filterAndSortTable();
+	});
+	
+	$('.modal-close').on('click', function() {
+		closeModal();
+	});
+	
+	$('#modal-cancel').on('click', function() {
+		closeModal();
+	});
+	
+	$('#record-form').on('submit', function(e) {
+		e.preventDefault();
+		saveRecord();
+	});
+	
+	$('#record-modal').on('click', function(e) {
+		if (e.target.id === 'record-modal') {
+			closeModal();
+		}
+	});
+}
+
+
+function setupAuditTrailPageHandlers() {
+	$('#search-input').on('keyup', function() {
+		filterAuditTrail();
+	});
+}
+
+
+function setupReportsPageHandlers() {
+	loadData();
+	loadLogs();
+	
+	$('#generate-report-btn').on('click', function() {
+		generateReport();
+	});
+	
+	$('#download-pdf-btn').on('click', function() {
+		downloadReportAsPDF();
+	});
+	
+	$('#download-csv-btn').on('click', function() {
+		downloadReportAsCSV();
+	});
+	
+	$('#dataset-selector').on('change', function() {
+		$('#report-container').empty();
+		$('#download-pdf-btn').addClass('hidden');
+		$('#download-csv-btn').addClass('hidden');
+	});
+}
+
+
+function loadData(callback) {
+	$.ajax({
+		url: '../api.php',
+		type: 'GET',
+		dataType: 'json',
+		success: function(data) {
+			console.log("Data loaded successfully:", data);
+			allData = data;
+			if ($('#data-container').length > 0) {
+				displayDataTable(data);
+			}
+			if (callback && typeof callback === 'function') {
+				callback();
+			}
+		},
+		error: function(error) {
+			console.error("Error loading data:", error);
+			if ($('#data-container').length > 0) {
+				$('#data-container').html('<p class="error">Error loading data. Please refresh the page.</p>');
+			}
+		}
+	});
+}
+
+
+function loadLogs(callback) {
+	$.ajax({
+		url: '../api.php?action=logs',
+		type: 'GET',
+		dataType: 'json',
+		success: function(data) {
+			console.log("Logs loaded successfully:", data);
+			if (data && typeof data === 'object') {
+				allLogs = data.logs ? data : (data.entries ? { logs: data.entries } : { logs: [] });
+			} else {
+				allLogs = { logs: [] };
+			}
+			if (callback && typeof callback === 'function') {
+				callback();
+			}
+		},
+		error: function(error) {
+			console.error("Error loading logs:", error);
+			allLogs = { logs: [] };
+		}
+	});
+}
+
+
+function convertToLocalTime(timeString, dateString) {
+	try {
+		const serverDate = new Date(`${dateString}T${timeString}`);
+		
+		const localDate = new Date(serverDate.getTime());
+		
+		const adjustedHours = String(localDate.getHours()).padStart(2, '0');
+		const adjustedMinutes = String(localDate.getMinutes()).padStart(2, '0');
+		const adjustedSeconds = String(localDate.getSeconds()).padStart(2, '0');
+		
+		return `${adjustedHours}:${adjustedMinutes}:${adjustedSeconds}`;
+	} catch (e) {
+		console.error("Error converting time:", e);
+		return timeString;
+	}
+}
+
+
+function displayDataTable(data) {
+	const container = $('#data-container');
+	container.empty();
+	
+	if (data.items && data.items.length > 0) {
+		let tableHTML = `
+			<table class="data-table">
+				<thead>
+					<tr>
+						<th class="sortable" data-column="id">ID <span class="sort-indicator"></span></th>
+						<th class="sortable" data-column="title">Title <span class="sort-indicator"></span></th>
+						<th class="sortable" data-column="description">Description <span class="sort-indicator"></span></th>
+						<th>Actions</th>
+					</tr>
+				</thead>
+				<tbody>
+		`;
+		
+		data.items.forEach(function(item) {
+			tableHTML += `
+				<tr>
+					<td>${item.id}</td>
+					<td>${item.title}</td>
+					<td>${item.description}</td>
+					<td>
+						<button class="btn btn-sm btn-secondary edit-btn" data-id="${item.id}">Edit</button>
+						<button class="btn btn-sm btn-danger delete-btn" data-id="${item.id}">Delete</button>
+					</td>
+				</tr>
+			`;
+		});
+		
+		tableHTML += `
+				</tbody>
+			</table>
+		`;
+		
+		container.html(tableHTML);
+		
+		$('.sortable').on('click', function() {
+			const column = $(this).data('column');
+			if (currentSortColumn === column) {
+				currentSortOrder = currentSortOrder === 'asc' ? 'desc' : 'asc';
+			} else {
+				currentSortColumn = column;
+				currentSortOrder = 'asc';
+			}
+			filterAndSortTable();
+		});
+		
+		$('.edit-btn').on('click', function() {
+			const id = $(this).data('id');
+			openEditModal(id);
+		});
+		
+		$('.delete-btn').on('click', function() {
+			const id = $(this).data('id');
+			deleteRecord(id);
+		});
+	} else {
+		container.html('<p>No data available.</p>');
+	}
+}
+
+
+function filterAndSortTable() {
+	if (!allData || !allData.items) return;
+	
+	const searchValue = $('#search-input').val().toLowerCase();
+	
+	let filteredItems = allData.items.filter(function(item) {
+		return item.title.toLowerCase().includes(searchValue) || 
+			   item.description.toLowerCase().includes(searchValue);
+	});
+	
+	if (currentSortColumn) {
+		filteredItems.sort(function(a, b) {
+			let aVal = a[currentSortColumn];
+			let bVal = b[currentSortColumn];
+			
+			if (currentSortColumn === 'id') {
+				aVal = parseInt(aVal);
+				bVal = parseInt(bVal);
+			}
+			
+			if (currentSortOrder === 'asc') {
+				return aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+			} else {
+				return aVal > bVal ? -1 : aVal < bVal ? 1 : 0;
+			}
+		});
+	}
+	
+	const container = $('#data-container');
+	container.empty();
+	
+	if (filteredItems.length > 0) {
+		let tableHTML = `
+			<table class="data-table">
+				<thead>
+					<tr>
+						<th class="sortable ${currentSortColumn === 'id' ? 'sorted' : ''}" data-column="id">
+							ID 
+							<span class="sort-indicator">${currentSortColumn === 'id' ? (currentSortOrder === 'asc' ? '▲' : '▼') : ''}</span>
+						</th>
+						<th class="sortable ${currentSortColumn === 'title' ? 'sorted' : ''}" data-column="title">
+							Title 
+							<span class="sort-indicator">${currentSortColumn === 'title' ? (currentSortOrder === 'asc' ? '▲' : '▼') : ''}</span>
+						</th>
+						<th class="sortable ${currentSortColumn === 'description' ? 'sorted' : ''}" data-column="description">
+							Description 
+							<span class="sort-indicator">${currentSortColumn === 'description' ? (currentSortOrder === 'asc' ? '▲' : '▼') : ''}</span>
+						</th>
+						<th>Actions</th>
+					</tr>
+				</thead>
+				<tbody>
+		`;
+		
+		filteredItems.forEach(function(item) {
+			tableHTML += `
+				<tr>
+					<td>${item.id}</td>
+					<td>${item.title}</td>
+					<td>${item.description}</td>
+					<td>
+						<button class="btn btn-sm btn-secondary edit-btn" data-id="${item.id}">Edit</button>
+						<button class="btn btn-sm btn-danger delete-btn" data-id="${item.id}">Delete</button>
+					</td>
+				</tr>
+			`;
+		});
+		
+		tableHTML += `
+				</tbody>
+			</table>
+		`;
+		
+		container.html(tableHTML);
+		
+		$('.sortable').on('click', function() {
+			const column = $(this).data('column');
+			if (currentSortColumn === column) {
+				currentSortOrder = currentSortOrder === 'asc' ? 'desc' : 'asc';
+			} else {
+				currentSortColumn = column;
+				currentSortOrder = 'asc';
+			}
+			filterAndSortTable();
+		});
+		
+		$('.edit-btn').on('click', function() {
+			const id = $(this).data('id');
+			openEditModal(id);
+		});
+		
+		$('.delete-btn').on('click', function() {
+			const id = $(this).data('id');
+			deleteRecord(id);
+		});
+	} else {
+		container.html('<p>No records match your search.</p>');
+	}
+}
+
+
+function openAddModal() {
+	$('#modal-title').text('Add New Record');
+	$('#record-form').attr('data-record-id', '');
+	$('#record-form').attr('data-edit-mode', 'false');
+	$('#record-title').val('');
+	$('#record-description').val('');
+	$('#record-modal').removeClass('hidden');
+}
+
+
+function openEditModal(id) {
+	const item = allData.items.find(i => i.id == id);
+	
+	if (item) {
+		$('#modal-title').text('Edit Record');
+		$('#record-form').attr('data-record-id', item.id);
+		$('#record-form').attr('data-edit-mode', 'true');
+		$('#record-title').val(item.title);
+		$('#record-description').val(item.description);
+		$('#record-modal').removeClass('hidden');
+	}
+}
+
+
+function closeModal() {
+	$('#record-modal').addClass('hidden');
+}
+
+
+function addAuditTrailEntry(changeType, recordId, fieldName, oldValue, newValue) {
+	$.ajax({
+		url: '../api.php?action=audit_trail',
+		type: 'POST',
+		contentType: 'application/json',
+		data: JSON.stringify({
+			action: 'add_audit_entry',
+			changeType: changeType,
+			recordId: recordId,
+			fieldName: fieldName,
+			oldValue: oldValue,
+			newValue: newValue
+		}),
+		success: function(response) {
+			console.log("Audit trail entry added");
+		},
+		error: function(error) {
+			console.error("Error adding audit entry:", error);
+		}
+	});
+}
+
+
+function saveRecord() {
+	const id = $('#record-form').attr('data-record-id');
+	const title = $('#record-title').val().trim();
+	const description = $('#record-description').val().trim();
+	const editMode = $('#record-form').attr('data-edit-mode') === 'true';
+	
+	if (title.length < 1) {
+		alert('Title is required (minimum 1 character)');
+		return;
+	}
+	
+	if (description.length < 1) {
+		alert('Description is required (minimum 1 character)');
+		return;
+	}
+	
+	let eventMessage = '';
+	
+	if (editMode) {
+		const index = allData.items.findIndex(i => i.id == id);
+		if (index !== -1) {
+			const oldTitle = allData.items[index].title;
+			const oldDescription = allData.items[index].description;
+			
+			if (oldTitle !== title) {
+				addAuditTrailEntry('EDIT', id, 'title', oldTitle, title);
+			}
+			if (oldDescription !== description) {
+				addAuditTrailEntry('EDIT', id, 'description', oldDescription, description);
+			}
+			
+			allData.items[index].title = title;
+			allData.items[index].description = description;
+			eventMessage = `An entry has been edited; ID ${id} with title: "${title}", and description: "${description}"`;
+		}
+	} else {
+		const newId = allData.items.length > 0 
+			? Math.max(...allData.items.map(i => i.id)) + 1 
+			: 1;
+		allData.items.push({
+			id: newId,
+			title: title,
+			description: description
+		});
+		
+		addAuditTrailEntry('ADD', newId, 'title', '', title);
+		addAuditTrailEntry('ADD', newId, 'description', '', description);
+		
+		eventMessage = `A new entry has been added; ID ${newId} with title: "${title}", and description: "${description}"`;
+	}
+	
+	saveDataToFileWithLog(eventMessage, editMode ? 'edit' : 'add');
+	
+	closeModal();
+	displayDataTable(allData);
+}
+
+
+function deleteRecord(id) {
+	if (confirm('Are you sure you want to delete this record?')) {
+		const item = allData.items.find(i => i.id == id);
+		
+		addAuditTrailEntry('DELETE', id, 'title', item.title, '');
+		addAuditTrailEntry('DELETE', id, 'description', item.description, '');
+		
+		const eventMessage = `An entry has been deleted; ID ${item.id} with title: "${item.title}", and description: "${item.description}"`;
+		
+		allData.items = allData.items.filter(item => item.id != id);
+		saveDataToFileWithLog(eventMessage, 'delete');
+		displayDataTable(allData);
+	}
+}
+
+
+function saveDataToFileWithLog(eventMessage, action) {
+	$.ajax({
+		url: '../api.php?action=' + action,
+		type: 'POST',
+		contentType: 'application/json',
+		data: JSON.stringify({
+			data: allData,
+			event: eventMessage
+		}),
+		dataType: 'json',
+		success: function(response) {
+			console.log("Data saved successfully:", response);
+			if (response && response.success === false) {
+				alert('Error saving data: ' + (response.message || 'Unknown error'));
+				return;
+			}
+			loadLogs();
+		},
+		error: function(xhr, status, error) {
+			console.error("Error saving data:", {status, error, responseText: xhr.responseText});
+			alert('Error saving data. Please try again.');
+		}
+	});
+}
+
+
+
+function generateReport() {
+	const datasetType = $('#dataset-selector').val();
+	
+	if (datasetType === 'data') {
+		loadData(function() {
+			generateDataReport();
+			logEvent('A report has been generated for: Data');
+		});
+	} else if (datasetType === 'logs') {
+		loadLogs(function() {
+			generateLogsReport();
+			logEvent('A report has been generated for: Logs');
+		});
+	}
+}
+
+
+function generateDataReport() {
+	if (!allData || !allData.items) {
+		alert('No data available for report');
+		return;
+	}
+	
+	const container = $('#report-container');
+	container.empty();
+	
+	const totalRecords = allData.items.length;
+	const reportDate = new Date().toLocaleDateString();
+	
+	let reportHTML = `
+		<div id="report-content" class="report">
+			<div class="report-header">
+				<h3>Data Report</h3>
+				<p><strong>Generated:</strong> ${reportDate}</p>
+				<p><strong>Total Records:</strong> ${totalRecords}</p>
+			</div>
+			
+			<table class="report-table">
+				<thead>
+					<tr>
+						<th>ID</th>
+						<th>Title</th>
+						<th>Description</th>
+					</tr>
+				</thead>
+				<tbody>
+	`;
+	
+	allData.items.forEach(function(item) {
+		reportHTML += `
+			<tr>
+				<td>${item.id}</td>
+				<td>${item.title}</td>
+				<td>${item.description}</td>
+			</tr>
+		`;
+	});
+	
+	reportHTML += `
+				</tbody>
+			</table>
+			
+			<div class="report-footer">
+				<p>End of Report</p>
+			</div>
+		</div>
+	`;
+	
+	container.html(reportHTML);
+	$('#download-pdf-btn').removeClass('hidden');
+	$('#download-csv-btn').removeClass('hidden');
+}
+
+
+function generateLogsReport() {
+	if (!allLogs || !allLogs.logs) {
+		alert('No logs available for report');
+		return;
+	}
+	
+	const container = $('#report-container');
+	container.empty();
+	
+	const totalLogs = allLogs.logs.length;
+	const reportDate = new Date().toLocaleDateString();
+	
+	let reportHTML = `
+		<div id="report-content" class="report">
+			<div class="report-header">
+				<h3>Logs Report</h3>
+				<p><strong>Generated:</strong> ${reportDate}</p>
+				<p><strong>Total Log Entries:</strong> ${totalLogs}</p>
+			</div>
+			
+			<table class="report-table">
+				<thead>
+					<tr>
+						<th>ID</th>
+						<th>Date</th>
+						<th>Time</th>
+						<th>Event</th>
+					</tr>
+				</thead>
+				<tbody>
+	`;
+	
+	allLogs.logs.forEach(function(log) {
+		const localTime = convertToLocalTime(log.time, log.date);
+		reportHTML += `
+			<tr>
+				<td>${log.id}</td>
+				<td>${log.date}</td>
+				<td>${localTime}</td>
+				<td>${log.event}</td>
+			</tr>
+		`;
+	});
+	
+	reportHTML += `
+				</tbody>
+			</table>
+			
+			<div class="report-footer">
+				<p>End of Report</p>
+			</div>
+		</div>
+	`;
+	
+	container.html(reportHTML);
+	$('#download-pdf-btn').removeClass('hidden');
+	$('#download-csv-btn').removeClass('hidden');
+}
+
+
+function downloadReportAsPDF() {
+	const element = document.getElementById('report-content');
+	const datasetType = $('#dataset-selector').val();
+	
+	if (!element) {
+		alert('No report generated. Please generate a report first.');
+		return;
+	}
+	
+	const opt = {
+		margin: 10,
+		filename: 'report-' + datasetType + '-' + new Date().toISOString().split('T')[0] + '.pdf',
+		image: { type: 'jpeg', quality: 0.98 },
+		html2canvas: { scale: 2 },
+		jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
+	};
+	
+	html2pdf().set(opt).from(element).save();
+	
+	logEvent('A PDF report has been downloaded for: ' + (datasetType === 'data' ? 'Data' : 'Logs'));
+}
+
+
+function downloadReportAsCSV() {
+	const datasetType = $('#dataset-selector').val();
+	let csv = '';
+	let filename = '';
+	
+	if (datasetType === 'data') {
+		if (!allData || !allData.items) {
+			alert('No data available for export');
+			return;
+		}
+		
+		csv = 'ID,Title,Description\n';
+		allData.items.forEach(function(item) {
+			const title = '"' + item.title.replace(/"/g, '""') + '"';
+			const desc = '"' + item.description.replace(/"/g, '""') + '"';
+			csv += item.id + ',' + title + ',' + desc + '\n';
+		});
+		
+		filename = 'report-data-' + new Date().toISOString().split('T')[0] + '.csv';
+	} else if (datasetType === 'logs') {
+		if (!allLogs || !allLogs.logs) {
+			alert('No logs available for export');
+			return;
+		}
+		
+		csv = 'ID,Date,Time,Event\n';
+		allLogs.logs.forEach(function(log) {
+			const localTime = convertToLocalTime(log.time, log.date);
+			const event = '"' + log.event.replace(/"/g, '""') + '"';
+			csv += log.id + ',' + log.date + ',' + localTime + ',' + event + '\n';
+		});
+		
+		filename = 'report-logs-' + new Date().toISOString().split('T')[0] + '.csv';
+	}
+	
+	const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+	const link = document.createElement('a');
+	const url = URL.createObjectURL(blob);
+	
+	link.setAttribute('href', url);
+	link.setAttribute('download', filename);
+	link.style.visibility = 'hidden';
+	
+	document.body.appendChild(link);
+	link.click();
+	document.body.removeChild(link);
+	
+	logEvent('A CSV report has been downloaded for: ' + (datasetType === 'data' ? 'Data' : 'Logs'));
+}
+
+
+function logEvent(eventMessage) {
+	$.ajax({
+		url: '../api.php?action=report_' + (eventMessage.includes('downloaded') ? 'downloaded' : 'generated'),
+		type: 'POST',
+		contentType: 'application/json',
+		data: JSON.stringify({
+			dataset: eventMessage.includes('Data') ? 'Data' : 'Logs',
+			event: eventMessage
+		}),
+		success: function(response) {
+			console.log("Event logged successfully");
+			loadLogs();
+		},
+		error: function(error) {
+			console.error("Error logging event:", error);
+		}
+	});
+}
+
+
+function loadAuditTrail() {
+	$.ajax({
+		url: '../api.php?action=audit_trail',
+		type: 'GET',
+		dataType: 'json',
+		success: function(data) {
+			console.log("Audit trail loaded successfully:", data);
+			allAuditTrail = data;
+			displayAuditTrail(data);
+		},
+		error: function(error) {
+			console.error("Error loading audit trail:", error);
+			$('#audit-container').html('<p class="error">Error loading audit trail. Please refresh the page.</p>');
+		}
+	});
+}
+
+
+function displayAuditTrail(data) {
+	const container = $('#audit-container');
+	container.empty();
+	
+	if (data.entries && data.entries.length > 0) {
+		let tableHTML = `
+			<table class="data-table">
+				<thead>
+					<tr>
+						<th>ID</th>
+						<th>Date</th>
+						<th>Time</th>
+						<th>Record ID</th>
+						<th>Change Type</th>
+						<th>Field Name</th>
+						<th>Old Value</th>
+						<th>New Value</th>
+					</tr>
+				</thead>
+				<tbody>
+		`;
+		
+		data.entries.forEach(function(entry) {
+			tableHTML += `
+				<tr>
+					<td>${entry.id}</td>
+					<td>${entry.date}</td>
+					<td>${entry.time}</td>
+					<td>${entry.record_id}</td>
+					<td><span class="badge badge-${entry.change_type.toLowerCase()}">${entry.change_type}</span></td>
+					<td>${entry.field_name}</td>
+					<td><code>${entry.old_value || '(empty)'}</code></td>
+					<td><code>${entry.new_value || '(empty)'}</code></td>
+				</tr>
+			`;
+		});
+		
+		tableHTML += `
+				</tbody>
+			</table>
+		`;
+		
+		container.html(tableHTML);
+	} else {
+		container.html('<p>No audit trail entries yet.</p>');
+	}
+}
+
+
+function filterAuditTrail() {
+	if (!allAuditTrail || !allAuditTrail.entries) return;
+	
+	const searchValue = $('#search-input').val().toLowerCase();
+	
+	let filteredEntries = allAuditTrail.entries.filter(function(entry) {
+				const oldValue = String(entry.old_value || '').toLowerCase();
+				const newValue = String(entry.new_value || '').toLowerCase();
+
+		return entry.record_id.toString().includes(searchValue) || 
+			   entry.change_type.toLowerCase().includes(searchValue) ||
+			   entry.field_name.toLowerCase().includes(searchValue) ||
+							 oldValue.includes(searchValue) ||
+							 newValue.includes(searchValue) ||
+			   entry.date.includes(searchValue) ||
+			   entry.time.includes(searchValue);
+	});
+	
+	const container = $('#audit-container');
+	container.empty();
+	
+	if (filteredEntries.length > 0) {
+		let tableHTML = `
+			<table class="data-table">
+				<thead>
+					<tr>
+						<th>ID</th>
+						<th>Date</th>
+						<th>Time</th>
+						<th>Record ID</th>
+						<th>Change Type</th>
+						<th>Field Name</th>
+						<th>Old Value</th>
+						<th>New Value</th>
+					</tr>
+				</thead>
+				<tbody>
+		`;
+		
+		filteredEntries.forEach(function(entry) {
+			tableHTML += `
+				<tr>
+					<td>${entry.id}</td>
+					<td>${entry.date}</td>
+					<td>${entry.time}</td>
+					<td>${entry.record_id}</td>
+					<td><span class="badge badge-${entry.change_type.toLowerCase()}">${entry.change_type}</span></td>
+					<td>${entry.field_name}</td>
+					<td><code>${entry.old_value || '(empty)'}</code></td>
+					<td><code>${entry.new_value || '(empty)'}</code></td>
+				</tr>
+			`;
+		});
+		
+		tableHTML += `
+				</tbody>
+			</table>
+		`;
+		
+		container.html(tableHTML);
+	} else {
+		container.html('<p>No audit trail entries match your search.</p>');
+	}
+}
+
