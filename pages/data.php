@@ -6,13 +6,13 @@
 		<section class="content-section active">
 			<h2>Data</h2>
 			<div class="data-controls">
+				<div class="search-container">
+					<input type="text" id="search-input" class="search-box" placeholder="Search by Title or Description...">
+				</div>
 				<button id="add-record-btn" class="btn btn-primary">+ Add New Record</button>
 				<button id="bulk-delete-btn" class="btn btn-danger" disabled>Delete Selected (0)</button>
 				<button id="export-filtered-pdf-btn" class="btn btn-info">Export Filtered PDF</button>
 				<button id="export-filtered-csv-btn" class="btn btn-info">Export Filtered CSV</button>
-				<div class="search-container">
-					<input type="text" id="search-input" class="search-box" placeholder="Search by Title or Description...">
-				</div>
 			</div>
 			<div id="data-container">Loading data...</div>
 			
