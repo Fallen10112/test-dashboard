@@ -86,8 +86,18 @@ test-dashboard/
 - **Reset Button**: Located in navigation sidebar, below the theme toggle
 - **Complete Reset**: Clears all entries, logs, and audit trail
 - **Fresh Start**: Restores 3 sample test entries for demonstration
-- **Confirmation Dialog**: Prevents accidental data loss
+- **Toast Confirmation Prompt**: Uses custom top-center prompt with action buttons (Cancel/Reset)
 - **Safe Operation**: Immediately reloads page with fresh data
+
+### 🔔 Custom Toast Notification System
+- **Top-Center Toasts**: Small notifications shown at the top-center of the page
+- **Consistent Styling**: Matches the dashboard visual design in both light and dark mode
+- **Interactive Option**: Toasts can include action buttons (for example, confirmation prompts)
+- **Dismiss Option**: Success/error toasts support an `Okay` button or auto-fade after 3 seconds
+- **Implemented Flows**:
+  - Reset Data confirmation prompt now uses custom toast actions instead of browser confirm
+  - Data Add success now shows a confirmation toast
+  - Data Edit success now shows a confirmation toast
 
 ### ♻️ Automatic Reset on Entry
 - **Index Visit Reset**: Visiting `index.php` automatically resets all 3 encrypted JSON files
@@ -164,6 +174,7 @@ test-dashboard/
   - Report generation
   - PDF and CSV export
   - Dark mode theme switching and persistence
+  - Custom toast prompts and timed notifications
 
 #### Data Storage
 - **data/data.json**: Main data storage (encrypted)
@@ -197,10 +208,15 @@ test-dashboard/
 
 ### Reset Data
 1. Click the "Reset Data" button in the navigation sidebar (below the theme toggle)
-2. Confirm the action when prompted
+2. Confirm the action in the custom top-center toast prompt
 3. All entries, logs, and audit trail are cleared
 4. Dashboard restores 3 sample test entries for a fresh start
 5. Page automatically reloads with reset data
+
+### Toast Notifications
+1. Add or edit a record on the Data page
+2. A custom top-center success toast appears
+3. You can click `Okay` to dismiss immediately, or allow it to auto-fade after 3 seconds
 
 ## Data Structures
 
@@ -294,6 +310,7 @@ test-dashboard/
 - ✅ Data search works on title and description fields
 - ✅ Dark mode fully supported across all components
 - ✅ Visiting `index.php` resets the JSON data files before redirecting to the Home page
+- ✅ Reset confirmation and add/edit success messages use custom in-app toast notifications
 
 ## Maintenance & Customization
 

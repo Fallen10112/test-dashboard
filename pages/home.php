@@ -17,6 +17,7 @@
 				<li><strong>Reports</strong> - Generate comprehensive reports and export data as PDF or CSV</li>
 				<li><strong>Search & Sort</strong> - Quickly find data with powerful search and sorting capabilities</li>
 				<li><strong>Dark Mode</strong> - Toggle between light and dark themes with persistent settings</li>
+				<li><strong>Custom Toast Notifications</strong> - Top-center prompts for confirmations and success messages with action buttons or timed fade-out</li>
 			</ul>
 			
 			<h3 style="margin-top: 30px; color: #2c3e50; font-size: 1.3em;">Getting Started</h3>
@@ -25,6 +26,7 @@
 				<li><strong>Reports Page</strong> - Generate reports from your data or system logs. Export reports as PDF or CSV files for sharing and analysis.</li>
 				<li><strong>Audit Trail Page</strong> - View the complete history of all data modifications. Search for specific changes or record IDs to see exactly what changed and when.</li>
 				<li><strong>Theme Toggle</strong> - Use the toggle in the bottom left of the navigation to switch between light and dark mode.</li>
+				<li><strong>Toast Prompts</strong> - Reset Data now uses a custom confirmation toast, and successful add/edit actions show auto-fading confirmation toasts.</li>
 			</ul>
 			
 			<h3 style="margin-top: 30px; color: #2c3e50; font-size: 1.3em;">Technical Stack</h3>
