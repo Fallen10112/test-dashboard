@@ -52,6 +52,7 @@ test-dashboard/
 - **Add Records**: Modal form to add new entries with auto-incrementing IDs
 - **Edit Records**: Full editing capability for existing records
 - **Delete Records**: Remove records with confirmation dialogs
+- **Bulk Delete Records**: Select multiple records and delete them in one action (Data page only)
 - **Search & Filter**: Real-time search by title and description
 - **Column Sorting**: Click column headers to sort (ascending/descending)
 - **Auto-Save**: All changes immediately saved to encrypted storage
@@ -98,6 +99,14 @@ test-dashboard/
   - Reset Data confirmation prompt now uses custom toast actions instead of browser confirm
   - Data Add success now shows a confirmation toast
   - Data Edit success now shows a confirmation toast
+  - Bulk Delete confirmation prompt now uses custom toast actions
+
+### 🧹 Bulk Actions (Data Page Only)
+- **Multi-Select Support**: Use row checkboxes and Select All in the Data table
+- **Single Bulk Action**: Bulk delete selected records from the Data page
+- **Scope**: Applies to Data records and data JSON updates only
+- **Confirmation Required**: Bulk delete always asks for confirmation via custom toast prompt
+- **Audit Logging**: Each deleted record still generates DELETE audit trail entries, plus one dedicated bulk-action summary entry
 
 ### ♻️ Automatic Reset on Entry
 - **Index Visit Reset**: Visiting `index.php` automatically resets all 3 encrypted JSON files
@@ -142,6 +151,7 @@ test-dashboard/
 - **index.php**: Entry point that resets `data.json`, `logs.json`, and `audit_trail.json`, then redirects to `home.php`
 - **pages/home.php**: Comprehensive welcome with feature overview
 - **pages/data.php**: Data management interface with CRUD operations
+- **pages/data.php**: Data management interface with CRUD operations and bulk delete selection
 - **pages/reports.php**: Report generation with multiple export options
 - **pages/audit.php**: Audit trail viewer with search functionality
 
@@ -171,6 +181,7 @@ test-dashboard/
   - Table rendering with search and sorting
   - Modal form management
   - CRUD operations
+  - Data-page bulk selection and bulk delete logic
   - Report generation
   - PDF and CSV export
   - Dark mode theme switching and persistence
@@ -188,6 +199,13 @@ test-dashboard/
 2. Click "Add New Record" button
 3. Enter title and description
 4. Click "Save" - record is added, logged, and tracked
+
+### Bulk Delete Records
+1. Navigate to Data page
+2. Select records using row checkboxes (or use Select All)
+3. Click "Delete Selected"
+4. Confirm in the custom toast prompt
+5. Selected records are removed, saved to data JSON, and logged in audit trail (including a bulk-action summary line)
 
 ### View Changes
 1. Go to Audit Trail page
@@ -299,6 +317,8 @@ test-dashboard/
 - ✅ **Dark Mode Theme** with persistent settings  
 - ✅ **Fixed JSON Response Handling** for reliable operations  
 - ✅ **Reset Data Functionality** for fresh starts
+- ✅ **Bulk Delete Actions (Data Page)** with checkbox selection and confirmation prompt
+- ✅ **Bulk Delete Audit Summary Entry** added for each batch delete action
 
 ## Important Notes
 
@@ -311,6 +331,7 @@ test-dashboard/
 - ✅ Dark mode fully supported across all components
 - ✅ Visiting `index.php` resets the JSON data files before redirecting to the Home page
 - ✅ Reset confirmation and add/edit success messages use custom in-app toast notifications
+- ✅ Bulk actions are currently limited to bulk delete on the Data page only
 
 ## Maintenance & Customization
 

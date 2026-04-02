@@ -9,6 +9,7 @@
 				<div class="search-container">
 					<input type="text" id="search-input" class="search-box" placeholder="Search by Title or Description...">
 				</div>
+				<button id="bulk-delete-btn" class="btn btn-danger" disabled>Delete Selected (0)</button>
 				<button id="add-record-btn" class="btn btn-primary">+ Add New Record</button>
 			</div>
 			<div id="data-container">Loading data...</div>

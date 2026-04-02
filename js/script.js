@@ -4,6 +4,7 @@ let allLogs = null; // Store all logs globally for reports
 let allAuditTrail = null; // Store all audit trail entries globally
 let currentSortColumn = null; // Track current sort column
 let currentSortOrder = 'asc'; // Track sort order (asc/desc)
+let selectedRecordIds = new Set(); // Track selected records for bulk actions
 
 
 function ensureToastHost() {
@@ -238,6 +239,10 @@ function setupDataPageHandlers() {
 	$('#add-record-btn').on('click', function() {
 		openAddModal();
 	});
+
+	$('#bulk-delete-btn').on('click', function() {
+		bulkDeleteSelectedRecords();
+	});
 	
 	$('#search-input').on('keyup', function() {
 		filterAndSortTable();
@@ -260,6 +265,183 @@ function setupDataPageHandlers() {
 		if (e.target.id === 'record-modal') {
 			closeModal();
 		}
+	});
+}
+
+
+function syncSelectedRecordIdsWithData() {
+	if (!allData || !Array.isArray(allData.items)) {
+		selectedRecordIds.clear();
+		return;
+	}
+
+	const existingIds = new Set(allData.items.map(function(item) {
+		return String(item.id);
+	}));
+
+	selectedRecordIds.forEach(function(id) {
+		if (!existingIds.has(String(id))) {
+			selectedRecordIds.delete(id);
+		}
+	});
+}
+
+
+function updateBulkDeleteButtonState() {
+	const selectedCount = selectedRecordIds.size;
+	const $bulkButton = $('#bulk-delete-btn');
+
+	if ($bulkButton.length === 0) {
+		return;
+	}
+
+	$bulkButton.prop('disabled', selectedCount === 0);
+	$bulkButton.text('Delete Selected (' + selectedCount + ')');
+}
+
+
+function updateSelectAllCheckboxState() {
+	const $visibleCheckboxes = $('.record-select-checkbox');
+	const $selectAll = $('#select-all-records');
+
+	if ($selectAll.length === 0) {
+		return;
+	}
+
+	if ($visibleCheckboxes.length === 0) {
+		$selectAll.prop('checked', false);
+		$selectAll.prop('indeterminate', false);
+		return;
+	}
+
+	let checkedCount = 0;
+	$visibleCheckboxes.each(function() {
+		if ($(this).is(':checked')) {
+			checkedCount += 1;
+		}
+	});
+
+	$selectAll.prop('checked', checkedCount === $visibleCheckboxes.length);
+	$selectAll.prop('indeterminate', checkedCount > 0 && checkedCount < $visibleCheckboxes.length);
+}
+
+
+function bindSelectionHandlers() {
+	$('#select-all-records').off('change').on('change', function() {
+		const isChecked = $(this).is(':checked');
+
+		$('.record-select-checkbox').each(function() {
+			const id = String($(this).data('id'));
+			$(this).prop('checked', isChecked);
+			if (isChecked) {
+				selectedRecordIds.add(id);
+			} else {
+				selectedRecordIds.delete(id);
+			}
+		});
+
+		updateBulkDeleteButtonState();
+		updateSelectAllCheckboxState();
+	});
+
+	$('.record-select-checkbox').off('change').on('change', function() {
+		const id = String($(this).data('id'));
+		if ($(this).is(':checked')) {
+			selectedRecordIds.add(id);
+		} else {
+			selectedRecordIds.delete(id);
+		}
+
+		updateBulkDeleteButtonState();
+		updateSelectAllCheckboxState();
+	});
+}
+
+
+function bulkDeleteSelectedRecords() {
+	const selectedIds = Array.from(selectedRecordIds);
+
+	if (selectedIds.length === 0) {
+		showToast({
+			type: 'warning',
+			title: 'No Records Selected',
+			message: 'Select at least one record to use bulk delete.',
+			showOkayButton: true,
+			autoCloseMs: 3000
+		});
+		return;
+	}
+
+	showToast({
+		type: 'warning',
+		title: 'Delete Selected Records?',
+		message: 'This will permanently delete ' + selectedIds.length + ' selected record(s).',
+		autoCloseMs: 0,
+		buttons: [
+			{
+				label: 'Cancel',
+				className: 'btn-secondary'
+			},
+			{
+				label: 'Delete Selected',
+				className: 'btn-danger',
+				onClick: function() {
+					const idSet = new Set(selectedIds.map(String));
+					const deletedItems = allData.items.filter(function(item) {
+						return idSet.has(String(item.id));
+					});
+					const deletedIdsSummary = deletedItems.map(function(item) {
+						return item.id;
+					}).join(', ');
+					const auditEntries = [];
+
+					deletedItems.forEach(function(item) {
+						auditEntries.push({
+							changeType: 'DELETE',
+							recordId: item.id,
+							fieldName: 'title',
+							oldValue: item.title,
+							newValue: ''
+						});
+						auditEntries.push({
+							changeType: 'DELETE',
+							recordId: item.id,
+							fieldName: 'description',
+							oldValue: item.description,
+							newValue: ''
+						});
+					});
+
+					auditEntries.push({
+						changeType: 'DELETE',
+						recordId: 'BULK',
+						fieldName: 'bulk_action',
+						oldValue: 'Selected IDs: ' + deletedIdsSummary,
+						newValue: 'Deleted ' + deletedItems.length + ' records'
+					});
+
+					addAuditTrailEntries(auditEntries);
+
+					allData.items = allData.items.filter(function(item) {
+						return !idSet.has(String(item.id));
+					});
+
+					selectedRecordIds.clear();
+					displayDataTable(allData);
+
+					const eventMessage = 'Bulk delete completed for ' + deletedItems.length + ' records (IDs: ' + deletedIdsSummary + ')';
+					saveDataToFileWithLog(eventMessage, 'delete', {
+						successToast: {
+							type: 'success',
+							title: 'Bulk Delete Complete',
+							message: deletedItems.length + ' record(s) deleted successfully.',
+							showOkayButton: true,
+							autoCloseMs: 3000
+						}
+					});
+				}
+			}
+		]
 	});
 }
 
@@ -363,14 +545,16 @@ function convertToLocalTime(timeString, dateString) {
 
 
 function displayDataTable(data) {
+	syncSelectedRecordIdsWithData();
 	const container = $('#data-container');
 	container.empty();
 	
 	if (data.items && data.items.length > 0) {
 		let tableHTML = `
-			<table class="data-table">
+			<table class="data-table data-records-table">
 				<thead>
 					<tr>
+						<th class="select-column"><input type="checkbox" id="select-all-records" aria-label="Select all records"></th>
 						<th class="sortable" data-column="id">ID <span class="sort-indicator"></span></th>
 						<th class="sortable" data-column="title">Title <span class="sort-indicator"></span></th>
 						<th class="sortable" data-column="description">Description <span class="sort-indicator"></span></th>
@@ -381,8 +565,10 @@ function displayDataTable(data) {
 		`;
 		
 		data.items.forEach(function(item) {
+			const isSelected = selectedRecordIds.has(String(item.id));
 			tableHTML += `
 				<tr>
+					<td class="select-column"><input type="checkbox" class="record-select-checkbox" data-id="${item.id}" ${isSelected ? 'checked' : ''} aria-label="Select record ${item.id}"></td>
 					<td>${item.id}</td>
 					<td>${item.title}</td>
 					<td>${item.description}</td>
@@ -421,14 +607,22 @@ function displayDataTable(data) {
 			const id = $(this).data('id');
 			deleteRecord(id);
 		});
+
+		bindSelectionHandlers();
+		updateBulkDeleteButtonState();
+		updateSelectAllCheckboxState();
 	} else {
 		container.html('<p>No data available.</p>');
+		selectedRecordIds.clear();
+		updateBulkDeleteButtonState();
 	}
 }
 
 
 function filterAndSortTable() {
 	if (!allData || !allData.items) return;
+
+	syncSelectedRecordIdsWithData();
 	
 	const searchValue = $('#search-input').val().toLowerCase();
 	
@@ -460,9 +654,10 @@ function filterAndSortTable() {
 	
 	if (filteredItems.length > 0) {
 		let tableHTML = `
-			<table class="data-table">
+			<table class="data-table data-records-table">
 				<thead>
 					<tr>
+						<th class="select-column"><input type="checkbox" id="select-all-records" aria-label="Select all records"></th>
 						<th class="sortable ${currentSortColumn === 'id' ? 'sorted' : ''}" data-column="id">
 							ID 
 							<span class="sort-indicator">${currentSortColumn === 'id' ? (currentSortOrder === 'asc' ? '▲' : '▼') : ''}</span>
@@ -482,8 +677,10 @@ function filterAndSortTable() {
 		`;
 		
 		filteredItems.forEach(function(item) {
+			const isSelected = selectedRecordIds.has(String(item.id));
 			tableHTML += `
 				<tr>
+					<td class="select-column"><input type="checkbox" class="record-select-checkbox" data-id="${item.id}" ${isSelected ? 'checked' : ''} aria-label="Select record ${item.id}"></td>
 					<td>${item.id}</td>
 					<td>${item.title}</td>
 					<td>${item.description}</td>
@@ -522,8 +719,13 @@ function filterAndSortTable() {
 			const id = $(this).data('id');
 			deleteRecord(id);
 		});
+
+		bindSelectionHandlers();
+		updateBulkDeleteButtonState();
+		updateSelectAllCheckboxState();
 	} else {
 		container.html('<p>No records match your search.</p>');
+		updateBulkDeleteButtonState();
 	}
 }
 
@@ -575,6 +777,29 @@ function addAuditTrailEntry(changeType, recordId, fieldName, oldValue, newValue)
 		},
 		error: function(error) {
 			console.error("Error adding audit entry:", error);
+		}
+	});
+}
+
+
+function addAuditTrailEntries(entries) {
+	if (!Array.isArray(entries) || entries.length === 0) {
+		return;
+	}
+
+	$.ajax({
+		url: '../api.php?action=audit_trail',
+		type: 'POST',
+		contentType: 'application/json',
+		data: JSON.stringify({
+			action: 'add_audit_entries',
+			entries: entries
+		}),
+		success: function() {
+			console.log('Audit trail entries added');
+		},
+		error: function(error) {
+			console.error('Error adding audit entries:', error);
 		}
 	});
 }
@@ -648,13 +873,16 @@ function deleteRecord(id) {
 		const eventMessage = `An entry has been deleted; ID ${item.id} with title: "${item.title}", and description: "${item.description}"`;
 		
 		allData.items = allData.items.filter(item => item.id != id);
+		selectedRecordIds.delete(String(id));
 		saveDataToFileWithLog(eventMessage, 'delete');
 		displayDataTable(allData);
 	}
 }
 
 
-function saveDataToFileWithLog(eventMessage, action) {
+function saveDataToFileWithLog(eventMessage, action, options) {
+	const settings = options || {};
+
 	$.ajax({
 		url: '../api.php?action=' + action,
 		type: 'POST',
@@ -693,6 +921,8 @@ function saveDataToFileWithLog(eventMessage, action) {
 					showOkayButton: true,
 					autoCloseMs: 3000
 				});
+				} else if (settings.successToast) {
+					showToast(settings.successToast);
 			}
 
 			loadLogs();

@@ -74,7 +74,7 @@ function addLog($event) {
 	return file_put_contents($logsFile, $encryptedContent) !== false;
 }
 
-function addAuditEntry($changeType, $recordId, $fieldName, $oldValue, $newValue) {
+function addAuditEntries($entries) {
 	global $encryptionKey, $encryptionCipher;
 	
 	$auditFile = DATA_DIR . '/audit_trail.json';
@@ -104,24 +104,43 @@ function addAuditEntry($changeType, $recordId, $fieldName, $oldValue, $newValue)
 			$newId = max($ids) + 1;
 		}
 	}
-	
-	$auditEntry = [
-		'id' => $newId,
-		'date' => $date,
-		'time' => $time,
-		'change_type' => $changeType,
-		'record_id' => $recordId,
-		'field_name' => $fieldName,
-		'old_value' => $oldValue,
-		'new_value' => $newValue
-	];
-	
-	$auditEntries[] = $auditEntry;
+
+	if (!is_array($entries) || empty($entries)) {
+		return false;
+	}
+
+	foreach ($entries as $entry) {
+		$auditEntry = [
+			'id' => $newId,
+			'date' => $date,
+			'time' => $time,
+			'change_type' => $entry['changeType'] ?? '',
+			'record_id' => $entry['recordId'] ?? '',
+			'field_name' => $entry['fieldName'] ?? '',
+			'old_value' => $entry['oldValue'] ?? '',
+			'new_value' => $entry['newValue'] ?? ''
+		];
+
+		$auditEntries[] = $auditEntry;
+		$newId++;
+	}
 	
 	$auditData = ['entries' => $auditEntries];
 	$jsonContent = json_encode($auditData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
 	$encryptedContent = encryptData($jsonContent, $encryptionKey, $encryptionCipher);
 	return file_put_contents($auditFile, $encryptedContent) !== false;
+}
+
+function addAuditEntry($changeType, $recordId, $fieldName, $oldValue, $newValue) {
+	$entries = [[
+		'changeType' => $changeType,
+		'recordId' => $recordId,
+		'fieldName' => $fieldName,
+		'oldValue' => $oldValue,
+		'newValue' => $newValue
+	]];
+
+	return addAuditEntries($entries);
 }
 
 $method = $_SERVER['REQUEST_METHOD'];
@@ -209,6 +228,20 @@ if ($method === 'POST') {
 			} else {
 				http_response_code(500);
 				echo json_encode(['success' => false, 'message' => 'Failed to save audit entry']);
+			}
+			exit;
+		}
+
+		if (($data['action'] ?? '') === 'add_audit_entries') {
+			$entries = $data['entries'] ?? [];
+
+			$success = addAuditEntries($entries);
+			if ($success) {
+				http_response_code(200);
+				echo json_encode(['success' => true, 'message' => 'Audit entries added']);
+			} else {
+				http_response_code(500);
+				echo json_encode(['success' => false, 'message' => 'Failed to save audit entries']);
 			}
 			exit;
 		}else {
