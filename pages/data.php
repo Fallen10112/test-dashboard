@@ -11,8 +11,8 @@
 				</div>
 				<button id="add-record-btn" class="btn btn-primary">+ Add New Record</button>
 				<button id="bulk-delete-btn" class="btn btn-danger" disabled>Delete Selected (0)</button>
-				<button id="export-filtered-pdf-btn" class="btn btn-info">Export Filtered PDF</button>
-				<button id="export-filtered-csv-btn" class="btn btn-info">Export Filtered CSV</button>
+				<button id="export-filtered-pdf-btn" class="btn btn-info">Export filtered lines to PDF</button>
+				<button id="export-filtered-csv-btn" class="btn btn-info">Export filtered lines to CSV</button>
 			</div>
 			<div id="data-container">Loading data...</div>
 			
