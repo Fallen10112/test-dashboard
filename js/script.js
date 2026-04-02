@@ -167,7 +167,8 @@ function loadHeaderMetrics() {
 
 
 function getTodayDateString() {
-	const now = new Date();
+	// Keep client-side "today" aligned with backend timestamp generation (fixed one-hour offset).
+	const now = new Date(Date.now() - 3600 * 1000);
 	const year = now.getFullYear();
 	const month = String(now.getMonth() + 1).padStart(2, '0');
 	const day = String(now.getDate()).padStart(2, '0');
@@ -967,7 +968,7 @@ function closeModal() {
 
 
 function addAuditTrailEntry(changeType, recordId, fieldName, oldValue, newValue) {
-	$.ajax({
+	return $.ajax({
 		url: '../api.php?action=audit_trail',
 		type: 'POST',
 		contentType: 'application/json',
@@ -991,10 +992,10 @@ function addAuditTrailEntry(changeType, recordId, fieldName, oldValue, newValue)
 
 function addAuditTrailEntries(entries) {
 	if (!Array.isArray(entries) || entries.length === 0) {
-		return;
+		return $.Deferred().resolve().promise();
 	}
 
-	$.ajax({
+	return $.ajax({
 		url: '../api.php?action=audit_trail',
 		type: 'POST',
 		contentType: 'application/json',
@@ -1079,19 +1080,27 @@ function saveRecord() {
 		if (index !== -1) {
 			const oldTitle = allData.items[index].title;
 			const oldDescription = allData.items[index].description;
+			const auditRequests = [];
 
 			if (oldTitle !== title) {
-				addAuditTrailEntry('EDIT', id, 'title', oldTitle, title);
+				auditRequests.push(addAuditTrailEntry('EDIT', id, 'title', oldTitle, title));
 			}
 			if (oldDescription !== description) {
-				addAuditTrailEntry('EDIT', id, 'description', oldDescription, description);
+				auditRequests.push(addAuditTrailEntry('EDIT', id, 'description', oldDescription, description));
 			}
 
 			allData.items[index].title = title;
 			allData.items[index].description = description;
 
 			const eventMessage = `An entry has been edited; ID ${id} with title: "${title}", and description: "${description}"`;
-			finalizeSave(eventMessage, 'edit');
+
+			if (auditRequests.length > 0) {
+				$.when.apply($, auditRequests).always(function() {
+					finalizeSave(eventMessage, 'edit');
+				});
+			} else {
+				finalizeSave(eventMessage, 'edit');
+			}
 		}
 		return;
 	}
@@ -1103,11 +1112,14 @@ function saveRecord() {
 			description: description
 		});
 
-		addAuditTrailEntry('ADD', newId, 'title', '', title);
-		addAuditTrailEntry('ADD', newId, 'description', '', description);
+		const addTitleAuditRequest = addAuditTrailEntry('ADD', newId, 'title', '', title);
+		const addDescriptionAuditRequest = addAuditTrailEntry('ADD', newId, 'description', '', description);
 
 		const eventMessage = `A new entry has been added; ID ${newId} with title: "${title}", and description: "${description}"`;
-		finalizeSave(eventMessage, 'add');
+
+		$.when(addTitleAuditRequest, addDescriptionAuditRequest).always(function() {
+			finalizeSave(eventMessage, 'add');
+		});
 	});
 }
 
@@ -1132,22 +1144,23 @@ function deleteRecord(id) {
 				label: 'Delete',
 				className: 'btn-danger',
 				onClick: function() {
-					addAuditTrailEntry('DELETE', id, 'record', 'Title: "' + item.title + '", Description: "' + item.description + '"', '');
-
 					const eventMessage = `An entry has been deleted; ID ${item.id} with title: "${item.title}", and description: "${item.description}"`;
 
-					allData.items = allData.items.filter(item => item.id != id);
-					selectedRecordIds.delete(String(id));
-					saveDataToFileWithLog(eventMessage, 'delete', {
-						successToast: {
-							type: 'success',
-							title: 'Record Deleted',
-							message: 'The record has been deleted successfully.',
-							showOkayButton: true,
-							autoCloseMs: 3000
-						}
-					});
-					displayDataTable(allData);
+					addAuditTrailEntry('DELETE', id, 'record', 'Title: "' + item.title + '", Description: "' + item.description + '"', '')
+						.always(function() {
+							allData.items = allData.items.filter(item => item.id != id);
+							selectedRecordIds.delete(String(id));
+							saveDataToFileWithLog(eventMessage, 'delete', {
+								successToast: {
+									type: 'success',
+									title: 'Record Deleted',
+									message: 'The record has been deleted successfully.',
+									showOkayButton: true,
+									autoCloseMs: 3000
+								}
+							});
+							displayDataTable(allData);
+						});
 				}
 			}
 		]
