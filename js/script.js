@@ -1463,6 +1463,27 @@ function loadAuditTrail() {
 	});
 }
 
+// Scroll to Top Button Functionality
+$(document).ready(function() {
+	const scrollTopBtn = $('#scroll-to-top');
+	const scrollThreshold = 300;
+
+	// Show/hide scroll-to-top button based on scroll position
+	$(window).scroll(function() {
+		if ($('.main-content').scrollTop() > scrollThreshold) {
+			scrollTopBtn.addClass('show');
+		} else {
+			scrollTopBtn.removeClass('show');
+		}
+	});
+
+	// Scroll to top smoothly when button is clicked
+	scrollTopBtn.on('click', function(e) {
+		e.preventDefault();
+		$('.main-content').animate({ scrollTop: 0 }, 'smooth');
+	});
+});
+
 
 function renderAuditTrail(entries, emptyMessage) {
 	const container = $('#audit-container');

@@ -18,5 +18,7 @@
 		</section>
 	</main>
 	
+	<button id="scroll-to-top" class="scroll-to-top" title="Back to top">↑ Top</button>
+
 	<?php include '../includes/footer.php'; ?>
 
