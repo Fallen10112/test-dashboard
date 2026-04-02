@@ -6,6 +6,98 @@ let currentSortColumn = null; // Track current sort column
 let currentSortOrder = 'asc'; // Track sort order (asc/desc)
 
 
+function ensureToastHost() {
+	if ($('#toast-host').length === 0) {
+		$('body').append('<div id="toast-host" class="toast-host" aria-live="polite" aria-atomic="true"></div>');
+	}
+}
+
+
+function closeToast($toast, onClose) {
+	if (!$toast || $toast.length === 0 || $toast.data('isClosing') === true) {
+		return;
+	}
+
+	$toast.data('isClosing', true);
+	$toast.addClass('is-closing');
+
+	setTimeout(function() {
+		$toast.remove();
+		if (typeof onClose === 'function') {
+			onClose();
+		}
+	}, 260);
+}
+
+
+function showToast(options) {
+	ensureToastHost();
+
+	const settings = Object.assign({
+		type: 'info',
+		title: '',
+		message: '',
+		autoCloseMs: 3000,
+		showOkayButton: false,
+		onClose: null,
+		buttons: []
+	}, options || {});
+
+	const $host = $('#toast-host');
+	$host.empty();
+
+	const $toast = $('<div class="custom-toast" role="status"></div>');
+	$toast.addClass('custom-toast-' + settings.type);
+
+	const $content = $('<div class="custom-toast-content"></div>');
+	if (settings.title) {
+		$content.append($('<h4 class="custom-toast-title"></h4>').text(settings.title));
+	}
+	if (settings.message) {
+		$content.append($('<p class="custom-toast-message"></p>').text(settings.message));
+	}
+	$toast.append($content);
+
+	const hasCustomButtons = Array.isArray(settings.buttons) && settings.buttons.length > 0;
+	if (hasCustomButtons || settings.showOkayButton) {
+		const $actions = $('<div class="custom-toast-actions"></div>');
+
+		if (hasCustomButtons) {
+			settings.buttons.forEach(function(btn) {
+				const $button = $('<button type="button" class="btn btn-sm"></button>')
+					.addClass(btn.className || 'btn-secondary')
+					.text(btn.label || 'Action')
+					.on('click', function() {
+						closeToast($toast, settings.onClose);
+						if (typeof btn.onClick === 'function') {
+							btn.onClick();
+						}
+					});
+				$actions.append($button);
+			});
+		}
+
+		if (settings.showOkayButton && !hasCustomButtons) {
+			$actions.append(
+				$('<button type="button" class="btn btn-sm btn-primary">Okay</button>').on('click', function() {
+					closeToast($toast, settings.onClose);
+				})
+			);
+		}
+
+		$toast.append($actions);
+	}
+
+	$host.append($toast);
+
+	if (!hasCustomButtons && settings.autoCloseMs > 0) {
+		setTimeout(function() {
+			closeToast($toast, settings.onClose);
+		}, settings.autoCloseMs);
+	}
+}
+
+
 $(document).ready(function() {
 	initializeTheme();
 	setupResetButtonHandler();
@@ -59,23 +151,52 @@ function toggleTheme() {
 
 function setupResetButtonHandler() {
 	$('#reset-data-btn').on('click', function() {
-		if (confirm('Are you sure you want to reset all data? This will clear all entries, logs, and audit trail, and restore 3 test entries. This action cannot be undone.')) {
-			$.ajax({
-				url: '../api.php',
-				type: 'POST',
-				contentType: 'application/json',
-				data: JSON.stringify({ action: 'reset_data' }),
-				success: function(response) {
-					alert('Data reset successfully!');
-					
-					const currentPage = window.location.pathname.split('/').pop() || 'home.php';
-					window.location.href = '../pages/' + currentPage;
+		showToast({
+			type: 'warning',
+			title: 'Reset Dashboard Data?',
+			message: 'This will clear all entries, logs, and audit trail, then restore 3 sample entries.',
+			autoCloseMs: 0,
+			buttons: [
+				{
+					label: 'Cancel',
+					className: 'btn-secondary'
 				},
-				error: function(xhr, status, error) {
-					alert('Error resetting data: ' + error);
+				{
+					label: 'Reset Data',
+					className: 'btn-danger',
+					onClick: function() {
+						$.ajax({
+							url: '../api.php',
+							type: 'POST',
+							contentType: 'application/json',
+							data: JSON.stringify({ action: 'reset_data' }),
+							success: function() {
+								showToast({
+									type: 'success',
+									title: 'Data Reset Complete',
+									message: 'Your dashboard has been reset to the sample test state.',
+									showOkayButton: true,
+									autoCloseMs: 3000,
+									onClose: function() {
+										const currentPage = window.location.pathname.split('/').pop() || 'home.php';
+										window.location.href = '../pages/' + currentPage;
+									}
+								});
+							},
+							error: function(xhr, status, error) {
+								showToast({
+									type: 'error',
+									title: 'Reset Failed',
+									message: 'Error resetting data: ' + error,
+									showOkayButton: true,
+									autoCloseMs: 3000
+								});
+							}
+						});
+					}
 				}
-			});
-		}
+			]
+		});
 	});
 }
 
@@ -513,14 +634,45 @@ function saveDataToFileWithLog(eventMessage, action) {
 		success: function(response) {
 			console.log("Data saved successfully:", response);
 			if (response && response.success === false) {
-				alert('Error saving data: ' + (response.message || 'Unknown error'));
+				showToast({
+					type: 'error',
+					title: 'Save Failed',
+					message: 'Error saving data: ' + (response.message || 'Unknown error'),
+					showOkayButton: true,
+					autoCloseMs: 3000
+				});
 				return;
 			}
+
+			if (action === 'add') {
+				showToast({
+					type: 'success',
+					title: 'Record Added',
+					message: 'The new record has been added successfully.',
+					showOkayButton: true,
+					autoCloseMs: 3000
+				});
+			} else if (action === 'edit') {
+				showToast({
+					type: 'success',
+					title: 'Record Updated',
+					message: 'The record has been edited successfully.',
+					showOkayButton: true,
+					autoCloseMs: 3000
+				});
+			}
+
 			loadLogs();
 		},
 		error: function(xhr, status, error) {
 			console.error("Error saving data:", {status, error, responseText: xhr.responseText});
-			alert('Error saving data. Please try again.');
+			showToast({
+				type: 'error',
+				title: 'Save Failed',
+				message: 'Error saving data. Please try again.',
+				showOkayButton: true,
+				autoCloseMs: 3000
+			});
 		}
 	});
 }
