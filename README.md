@@ -6,7 +6,7 @@ A comprehensive web-based dashboard built with PHP, jQuery, HTML, CSS, and moder
 
 ```
 test-dashboard/
-├── index.php              # Entry point (redirects to home.php)
+├── index.php              # Entry point (resets JSON files, then redirects to home.php)
 ├── pages/
 │   ├── home.php           # Home/Welcome page with project overview
 │   ├── data.php           # Data management page (CRUD operations)
@@ -89,6 +89,11 @@ test-dashboard/
 - **Confirmation Dialog**: Prevents accidental data loss
 - **Safe Operation**: Immediately reloads page with fresh data
 
+### ♻️ Automatic Reset on Entry
+- **Index Visit Reset**: Visiting `index.php` automatically resets all 3 encrypted JSON files
+- **Reset Happens First**: Data reset runs before forwarding to `pages/home.php`
+- **Clean Test Environment**: Each user starts with a predictable, fresh demo state
+
 ### 📝 Administrative Logging System
 - **Automatic Tracking**: Logs all user actions with timestamps
 - **Event Types Tracked**:
@@ -124,7 +129,7 @@ test-dashboard/
 ### 3. File Descriptions
 
 #### Main Pages
-- **index.php**: Entry point that redirects to `home.php`
+- **index.php**: Entry point that resets `data.json`, `logs.json`, and `audit_trail.json`, then redirects to `home.php`
 - **pages/home.php**: Comprehensive welcome with feature overview
 - **pages/data.php**: Data management interface with CRUD operations
 - **pages/reports.php**: Report generation with multiple export options
@@ -288,6 +293,7 @@ test-dashboard/
 - ✅ Theme preference persists across pages
 - ✅ Data search works on title and description fields
 - ✅ Dark mode fully supported across all components
+- ✅ Visiting `index.php` resets the JSON data files before redirecting to the Home page
 
 ## Maintenance & Customization
 
