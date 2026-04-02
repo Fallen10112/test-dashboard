@@ -148,7 +148,7 @@ test-dashboard/
 - **Timezone Handling**: Uses a fixed one-hour offset when generating log timestamps
 - **Searchable**: Logs are available through the Reports page dataset selector
 
-### � API Reliability (Lock + Retry)
+### 🔒 API Reliability (Lock + Retry)
 - **Write Locking**: API file writes use exclusive file locks to reduce concurrent write collisions
 - **Retry Logic**: Failed lock/write attempts are retried automatically with short delay
 - **Coverage**: Data, logs, audit trail, reset operations, and initialization writes use lock+retry path
