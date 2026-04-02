@@ -14,13 +14,15 @@
 				<li><strong>Bulk Delete (Data Page)</strong> - Select multiple records and remove them in a single action from the Data page, with a dedicated bulk-action audit entry</li>
 				<li><strong>Filtered View Export</strong> - Export only the currently visible Data page results as PDF or CSV, with export logging</li>
 				<li><strong>Header Analytics Widgets</strong> - Quick KPI pills in the header for total entries, total edits, adds today, and deletes today</li>
+				<li><strong>Fixed Header Height</strong> - The top title bar uses a consistent fixed height for stable layout across resolutions and window sizes</li>
 				<li><strong>Encryption</strong> - All data and logs are encrypted using AES-256-CBC for security</li>
 				<li><strong>Audit Trail</strong> - Complete tracking of every data change with timestamps, record IDs, and field-level modifications, available in both table and timeline views</li>
 				<li><strong>Write Safety</strong> - API write operations use file locking with retry logic for improved reliability during concurrent actions</li>
 				<li><strong>Event Logging</strong> - Automatic event logging for all operations performed on the system</li>
 				<li><strong>Reports</strong> - Generate comprehensive reports and export data as PDF or CSV</li>
 				<li><strong>Search & Sort</strong> - Quickly find data with powerful search and sorting capabilities</li>
-				<li><strong>Dark Mode</strong> - Toggle between light and dark themes with persistent settings</li>
+				<li><strong>Dark Mode</strong> - Toggle between light and dark themes with persistent settings from the dedicated bottom utility area in the sidebar</li>
+				<li><strong>Scroll-Safe Sidebar Utilities</strong> - Navigation links scroll independently, while the theme toggle and Reset Data controls remain separated by a divider and never overlap links</li>
 				<li><strong>Custom Toast Notifications</strong> - Top-center prompts for confirmations and success messages with action buttons or timed fade-out</li>
 			</ul>
 			
@@ -30,7 +32,7 @@
 				<li><strong>Reports Page</strong> - Generate reports from your data or system logs. Export reports as PDF or CSV files for sharing and analysis.</li>
 				<li><strong>Audit Trail Page</strong> - View the complete history of all data modifications in table or timeline view. Search for specific changes or record IDs to see exactly what changed and when.</li>
 				<li><strong>Header Widgets</strong> - Use the top-right analytics pills for quick daily and total activity counts.</li>
-				<li><strong>Theme Toggle</strong> - Use the toggle in the bottom left of the navigation to switch between light and dark mode.</li>
+				<li><strong>Theme Toggle</strong> - Use the toggle in the bottom utility area of the navigation to switch between light and dark mode.</li>
 				<li><strong>Toast Prompts</strong> - Reset Data now uses a custom confirmation toast, and successful add/edit actions show auto-fading confirmation toasts.</li>
 			</ul>
 			

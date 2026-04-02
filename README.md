@@ -13,8 +13,8 @@ test-dashboard/
 │   ├── reports.php        # Reports & analytics with PDF/CSV export
 │   └── audit.php          # Audit trail history viewer
 ├── includes/
-│   ├── header.php         # HTML head and fixed title bar
-│   ├── navigation.php     # Fixed left sidebar navigation with dark mode toggle
+│   ├── header.php         # HTML head and fixed-height title bar
+│   ├── navigation.php     # Fixed left sidebar with scroll-safe navigation and utility controls
 │   └── footer.php         # Closing HTML tags and script includes
 ├── config/
 │   ├── config.php         # Configuration, app mode, and security settings
@@ -88,6 +88,8 @@ test-dashboard/
 
 ### 🎨 Dark Mode Theme
 - **Theme Toggle**: Toggle switch in the bottom-left area of navigation
+- **Small-Window Safe Layout**: Navigation links scroll independently so bottom controls never overlap page links
+- **Visual Separation**: Subtle divider line separates navigation links from utility controls
 - **Persistent Settings**: Theme preference saved via localStorage
 - **Light Mode**: Original clean white interface
 - **Dark Mode**: Professional dark color palette for reduced eye strain
@@ -105,6 +107,7 @@ test-dashboard/
 
 ### 🔄 Reset Data Functionality
 - **Reset Button**: Located in navigation sidebar, below the theme toggle
+- **Bottom Utility Area**: Anchored with the theme toggle in a dedicated sidebar footer section
 - **Complete Reset**: Clears all entries, logs, and audit trail
 - **Fresh Start**: Restores 3 sample test entries for demonstration
 - **Toast Confirmation Prompt**: Uses custom top-center prompt with action buttons (Cancel/Reset)
@@ -154,8 +157,9 @@ test-dashboard/
 - **Coverage**: Data, logs, audit trail, reset operations, and initialization writes use lock+retry path
 
 ### 🎯 Layout & Design
-- **Fixed Title Bar**: 5% viewport height with a gradient background
+- **Fixed Title Bar**: Consistent fixed height (72px) with a gradient background
 - **Fixed Left Navigation**: 250px sidebar with active page highlighting
+- **Scroll-Safe Sidebar**: Menu area scrolls while bottom utility controls remain visible and non-overlapping
 - **Responsive Main Content**: Scrollable content area that adapts to the active theme
 - **Professional Styling**: Modern UI with smooth transitions and hover effects
 - **Consistent Design**: Unified look across all pages
@@ -183,8 +187,8 @@ test-dashboard/
 - **pages/audit.php**: Audit trail viewer with search, plus table/timeline display toggle
 
 #### Include Files (Reusable Components)
-- **includes/header.php**: HTML head tags and fixed title bar
-- **includes/navigation.php**: Fixed left sidebar with dark mode toggle
+- **includes/header.php**: HTML head tags and fixed-height title bar
+- **includes/navigation.php**: Fixed left sidebar with independent menu scrolling and bottom utility controls
 - **includes/footer.php**: Closing HTML tags and shared script includes, including PDF library loading for Reports and Data pages
 
 #### Backend

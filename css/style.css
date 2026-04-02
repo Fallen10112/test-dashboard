@@ -48,6 +48,7 @@ body.dark-mode .scroll-to-top:hover {
 }
 
 body {
+    --header-height: 72px;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background: #f5f5f5;
     color: #333;
@@ -61,7 +62,7 @@ body {
     top: 0;
     left: 0;
     right: 0;
-    height: 5vh;
+    height: var(--header-height);
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
     display: flex;
@@ -109,20 +110,23 @@ body {
 .sidebar {
     position: fixed;
     left: 0;
-    top: 5vh;
+    top: var(--header-height);
     width: 250px;
-    height: calc(100vh - 5vh);
+    height: calc(100vh - var(--header-height));
     background: #2c3e50;
     box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
     z-index: 999;
-    overflow-y: auto;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
 }
 
 .nav-menu {
     list-style: none;
-    padding: 20px 0;
+    padding: 20px 0 12px;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
 }
 
 .nav-link {
@@ -151,10 +155,10 @@ body {
 
 .main-content {
     position: fixed;
-    top: 5vh;
+    top: var(--header-height);
     left: 250px;
     right: 0;
-    height: calc(100vh - 5vh);
+    height: calc(100vh - var(--header-height));
     overflow-y: auto;
     padding: 40px;
     background: white;
@@ -634,7 +638,7 @@ body {
 
 .toast-host {
     position: fixed;
-    top: calc(5vh + 16px);
+    top: calc(var(--header-height) + 16px);
     left: 50%;
     transform: translateX(-50%);
     z-index: 3000;
@@ -939,11 +943,11 @@ code {
 
 
 .reset-button-container {
-    position: absolute;
-    bottom: 20px;
+    position: static;
     left: 0;
     right: 0;
-    padding: 0 10px;
+    padding: 0 10px 16px;
+    flex-shrink: 0;
 }
 
 .btn-reset {
@@ -1132,14 +1136,16 @@ body.dark-mode .success {
 
 
 .theme-toggle-container {
-    position: absolute;
-    bottom: 70px;
+    position: static;
     left: 0;
     right: 0;
-    padding: 0 20px;
+    margin-top: auto;
+    padding: 8px 20px 10px;
+    border-top: 1px solid rgba(236, 240, 241, 0.18);
     display: flex;
     align-items: center;
     gap: 12px;
+    flex-shrink: 0;
 }
 
 .theme-toggle {
@@ -1194,6 +1200,10 @@ body.dark-mode .success {
 
 body.dark-mode .theme-label {
     color: #b0b0b0;
+}
+
+body.dark-mode .theme-toggle-container {
+    border-top-color: rgba(255, 255, 255, 0.14);
 }
 
 body.dark-mode .metric-pill {
