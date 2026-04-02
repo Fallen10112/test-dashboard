@@ -14,5 +14,15 @@ $pageTitle = "Dashboard Showcase";
 	
 	<header class="title-bar">
 		<h1><?php echo $pageTitle; ?></h1>
+		<div class="header-metrics" aria-label="Dashboard analytics">
+			<div class="metric-pill" id="metric-total-entries">
+				<span class="metric-label">Entries</span>
+				<span class="metric-value">--</span>
+			</div>
+			<div class="metric-pill" id="metric-total-edits">
+				<span class="metric-label">Edits</span>
+				<span class="metric-value">--</span>
+			</div>
+		</div>
 	</header>
 

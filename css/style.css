@@ -25,6 +25,7 @@ body {
     color: white;
     display: flex;
     align-items: center;
+    justify-content: space-between;
     padding: 0 30px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     z-index: 1000;
@@ -33,6 +34,34 @@ body {
 .title-bar h1 {
     font-size: 1.8em;
     font-weight: 600;
+}
+
+.header-metrics {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.metric-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.18);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 999px;
+    padding: 6px 12px;
+    min-width: 96px;
+}
+
+.metric-label {
+    font-size: 0.8em;
+    font-weight: 500;
+    opacity: 0.9;
+}
+
+.metric-value {
+    font-size: 0.95em;
+    font-weight: 700;
 }
 
 
@@ -956,6 +985,11 @@ body.dark-mode .theme-label {
     color: #b0b0b0;
 }
 
+body.dark-mode .metric-pill {
+    background: rgba(0, 0, 0, 0.24);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
 body.dark-mode .custom-toast {
     background: #2a2a2a;
     border-color: #3b3b3b;
@@ -968,4 +1002,23 @@ body.dark-mode .custom-toast-title {
 
 body.dark-mode .custom-toast-message {
     color: #d0d0d0;
+}
+
+@media (max-width: 900px) {
+    .title-bar h1 {
+        font-size: 1.3em;
+    }
+
+    .header-metrics {
+        gap: 6px;
+    }
+
+    .metric-pill {
+        min-width: 80px;
+        padding: 5px 9px;
+    }
+
+    .metric-label {
+        display: none;
+    }
 }

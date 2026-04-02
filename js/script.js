@@ -101,6 +101,7 @@ function showToast(options) {
 $(document).ready(function() {
 	initializeTheme();
 	setupResetButtonHandler();
+	loadHeaderMetrics();
 
 	if ($('#data-container').length > 0) {
 		loadData();
@@ -116,6 +117,38 @@ $(document).ready(function() {
 		setupAuditTrailPageHandlers();
 	}
 });
+
+
+function loadHeaderMetrics() {
+	$.when(
+		$.ajax({
+			url: '../api.php',
+			type: 'GET',
+			dataType: 'json'
+		}),
+		$.ajax({
+			url: '../api.php?action=audit_trail',
+			type: 'GET',
+			dataType: 'json'
+		})
+	).done(function(dataResponse, auditResponse) {
+		const dataPayload = dataResponse[0] || {};
+		const auditPayload = auditResponse[0] || {};
+
+		const totalEntries = Array.isArray(dataPayload.items) ? dataPayload.items.length : 0;
+		const totalEdits = Array.isArray(auditPayload.entries)
+			? auditPayload.entries.filter(function(entry) {
+				return String(entry.change_type || '').toUpperCase() === 'EDIT';
+			}).length
+			: 0;
+
+		$('#metric-total-entries .metric-value').text(totalEntries);
+		$('#metric-total-edits .metric-value').text(totalEdits);
+	}).fail(function() {
+		$('#metric-total-entries .metric-value').text('--');
+		$('#metric-total-edits .metric-value').text('--');
+	});
+}
 
 
 function initializeTheme() {
@@ -663,6 +696,7 @@ function saveDataToFileWithLog(eventMessage, action) {
 			}
 
 			loadLogs();
+			loadHeaderMetrics();
 		},
 		error: function(xhr, status, error) {
 			console.error("Error saving data:", {status, error, responseText: xhr.responseText});
