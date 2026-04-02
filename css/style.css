@@ -470,6 +470,29 @@ body {
     margin: 4px 0;
 }
 
+.timeline-line code {
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.diff-unchanged {
+    opacity: 0.9;
+}
+
+.diff-added {
+    background: #d5f4e6;
+    color: #1e7e43;
+    border-radius: 3px;
+    padding: 0 2px;
+}
+
+.diff-removed {
+    background: #fadbd8;
+    color: #a93226;
+    border-radius: 3px;
+    padding: 0 2px;
+}
+
 .reports-controls .form-group {
     margin-bottom: 0;
     flex: 0 0 200px;
@@ -1014,6 +1037,16 @@ body.dark-mode .timeline-card {
 body.dark-mode .timeline-time,
 body.dark-mode .timeline-id {
     color: #a0a0a0;
+}
+
+body.dark-mode .diff-added {
+    background: #1f3d2c;
+    color: #81e1aa;
+}
+
+body.dark-mode .diff-removed {
+    background: #4a2a2a;
+    color: #ff9f9f;
 }
 
 body.dark-mode .report {
