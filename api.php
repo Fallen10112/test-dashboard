@@ -28,6 +28,8 @@ function decryptData($encryptedData, $key, $cipher) {
 	return openssl_decrypt($encrypted, $cipher, $key, 0, $iv);
 }
 
+
+
 function writeFileWithLockRetry($filePath, $content, $maxRetries = 3, $retryDelayMicros = 120000) {
 	$attempt = 0;
 
@@ -207,6 +209,8 @@ if ($method === 'POST') {
 	$data = json_decode($input, true);
 	
 	if ($data !== null) {
+		$postAction = $data['action'] ?? ($action ? 'post_' . $action : 'save_data');
+
 		if (!is_dir(DATA_DIR)) {
 			mkdir(DATA_DIR, 0755, true);
 		}
@@ -320,7 +324,6 @@ if ($method === 'POST') {
 	}
 	exit;
 } else if ($method === 'GET') {
-
 	if ($action === 'audit_trail') {
 		$file = DATA_DIR . '/audit_trail.json';
 		

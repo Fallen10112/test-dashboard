@@ -17,7 +17,7 @@ test-dashboard/
 │   ├── navigation.php     # Fixed left sidebar navigation with dark mode toggle
 │   └── footer.php         # Closing HTML tags and script includes
 ├── config/
-│   ├── config.php         # Configuration & security settings
+│   ├── config.php         # Configuration, app mode, and security settings
 │   └── .env.example       # Environment variables template
 ├── css/
 │   └── style.css          # Main stylesheet with light & dark mode support
@@ -93,6 +93,16 @@ test-dashboard/
 - **Dark Mode**: Professional dark color palette for reduced eye strain
 - **Full Coverage**: Dark mode applies to all pages and components
 
+### ⚙️ Environment Configuration
+- **APP_MODE**: Set to `demo` (default) or `production`
+  - Demo mode: Auto-resets all data when `index.php` is loaded (fresh start for testing)
+  - Production mode: Preserves all data across application restarts
+- **RESET_ON_INDEX_VISIT**: Override auto-reset behavior (true/false)
+  - Can be set to `true` in production mode if manual resets are needed
+  - Can be set to `false` in demo mode if data persistence is desired for testing
+- **Configuration Location**: Edit `.env` file in the `config/` directory or use system environment variables
+- **Default Behavior**: Demo mode resets on index visit; production mode does not
+
 ### 🔄 Reset Data Functionality
 - **Reset Button**: Located in navigation sidebar, below the theme toggle
 - **Complete Reset**: Clears all entries, logs, and audit trail
@@ -119,9 +129,11 @@ test-dashboard/
 - **Audit Logging**: Each deleted record still generates DELETE audit trail entries, plus one dedicated bulk-action summary entry
 
 ### ♻️ Automatic Reset on Entry
-- **Index Visit Reset**: Visiting `index.php` automatically resets all 3 encrypted JSON files
-- **Reset Happens First**: Data reset runs before forwarding to `pages/home.php`
-- **Clean Test Environment**: Each user starts with a predictable, fresh demo state
+- **Configurable Reset**: Reset-on-index behavior is controlled by environment mode/settings
+- **Demo Mode Default**: `APP_MODE=demo` enables reset on index by default
+- **Production Mode Default**: `APP_MODE=production` disables reset on index by default
+- **Override Available**: `RESET_ON_INDEX_VISIT=true|false` can explicitly control behavior
+- **Clean Test Environment**: Demo mode provides predictable showcase startup
 
 ### 📝 Administrative Logging System
 - **Automatic Tracking**: Logs all user actions with timestamps
@@ -136,7 +148,7 @@ test-dashboard/
 - **Timezone Handling**: Uses a fixed one-hour offset when generating log timestamps
 - **Searchable**: Logs are available through the Reports page dataset selector
 
-### 🔒 API Reliability (Lock + Retry)
+### � API Reliability (Lock + Retry)
 - **Write Locking**: API file writes use exclusive file locks to reduce concurrent write collisions
 - **Retry Logic**: Failed lock/write attempts are retried automatically with short delay
 - **Coverage**: Data, logs, audit trail, reset operations, and initialization writes use lock+retry path
@@ -173,7 +185,6 @@ test-dashboard/
 #### Include Files (Reusable Components)
 - **includes/header.php**: HTML head tags and fixed title bar
 - **includes/navigation.php**: Fixed left sidebar with dark mode toggle
-- **includes/footer.php**: Closing HTML tags, shared script includes, and reports-only PDF library include
 - **includes/footer.php**: Closing HTML tags and shared script includes, including PDF library loading for Reports and Data pages
 
 #### Backend
@@ -355,6 +366,7 @@ test-dashboard/
 - ✅ **Audit Trail Timeline View** with date-grouped change history
 - ✅ **Filtered Data Export (PDF/CSV)** for current visible results
 - ✅ **API File Lock + Retry Writes** for improved reliability under concurrent operations
+- ✅ **Deployable Environment Modes** (`demo` and `production`) with configurable index reset behavior
 
 ## Important Notes
 
@@ -365,8 +377,7 @@ test-dashboard/
 - ✅ Theme preference persists across pages
 - ✅ Data search works on title and description fields
 - ✅ Dark mode fully supported across all components
-- ✅ Visiting `index.php` resets the JSON data files before redirecting to the Home page
-- ✅ Reset confirmation and add/edit success messages use custom in-app toast notifications
+- ✅ `index.php` reset behavior is controlled by environment mode/settings (`APP_MODE` and `RESET_ON_INDEX_VISIT`)
 - ✅ Bulk actions are currently limited to bulk delete on the Data page only
 - ✅ Audit Trail supports both Table and Timeline views
 - ✅ Data-page filtered exports log export events and include only visible filtered rows

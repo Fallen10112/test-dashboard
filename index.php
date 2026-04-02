@@ -37,7 +37,9 @@ function resetDashboardFiles() {
 	file_put_contents($auditFile, encryptDataForReset($emptyAudit, ENCRYPTION_KEY, ENCRYPTION_CIPHER));
 }
 
-resetDashboardFiles();
+if (RESET_ON_INDEX_VISIT) {
+	resetDashboardFiles();
+}
 
 header('Location: pages/home.php');
 exit();
