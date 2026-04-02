@@ -150,7 +150,6 @@ test-dashboard/
 #### Main Pages
 - **index.php**: Entry point that resets `data.json`, `logs.json`, and `audit_trail.json`, then redirects to `home.php`
 - **pages/home.php**: Comprehensive welcome with feature overview
-- **pages/data.php**: Data management interface with CRUD operations
 - **pages/data.php**: Data management interface with CRUD operations and bulk delete selection
 - **pages/reports.php**: Report generation with multiple export options
 - **pages/audit.php**: Audit trail viewer with search functionality
