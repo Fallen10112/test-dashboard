@@ -69,12 +69,20 @@ test-dashboard/
 
 ### 🔍 Audit Trail Page
 - **Complete Change History**: View all data modifications
+- **Dual View Modes**: Switch between classic Table view and Timeline view
 - **Field-Level Tracking**: See exactly what changed in each field
 - **Before & After Values**: Compare old and new values
 - **Search Functionality**: Find specific changes quickly
 - **Timestamps**: Exact date and time of each modification
 - **Change Classification**: Clearly identifies ADD, EDIT, or DELETE operations
 - **Record Linking**: Associates changes with their respective record IDs
+
+### 📌 Header Analytics Widgets
+- **Total Entries**: Live count of records in `data.json`
+- **Total Edits**: Total number of EDIT events in audit history
+- **Adds Today**: Number of records added today
+- **Deletes Today**: Number of records deleted today
+- **Always Visible**: Displayed in the top-right of the fixed header for quick status checks
 
 ### 🎨 Dark Mode Theme
 - **Theme Toggle**: Toggle switch in the bottom-left area of navigation
@@ -152,7 +160,7 @@ test-dashboard/
 - **pages/home.php**: Comprehensive welcome with feature overview
 - **pages/data.php**: Data management interface with CRUD operations and bulk delete selection
 - **pages/reports.php**: Report generation with multiple export options
-- **pages/audit.php**: Audit trail viewer with search functionality
+- **pages/audit.php**: Audit trail viewer with search, plus table/timeline display toggle
 
 #### Include Files (Reusable Components)
 - **includes/header.php**: HTML head tags and fixed title bar
@@ -181,6 +189,8 @@ test-dashboard/
   - Modal form management
   - CRUD operations
   - Data-page bulk selection and bulk delete logic
+  - Header analytics metric calculations and refresh
+  - Audit Trail table/timeline view rendering and toggle logic
   - Report generation
   - PDF and CSV export
   - Dark mode theme switching and persistence
@@ -208,9 +218,15 @@ test-dashboard/
 
 ### View Changes
 1. Go to Audit Trail page
-2. Search for specific records or changes
-3. View exactly what changed with before/after values
-4. See timestamps for each modification
+2. Choose Table View or Timeline View
+3. Search for specific records or changes
+4. View exactly what changed with before/after values
+5. See timestamps for each modification
+
+### Header Analytics
+1. Look at the top-right of the header bar
+2. Review total entries and total edits
+3. Review adds today and deletes today for quick daily activity insight
 
 ### Generate and Export Reports
 1. Go to Reports page
@@ -318,6 +334,8 @@ test-dashboard/
 - ✅ **Reset Data Functionality** for fresh starts
 - ✅ **Bulk Delete Actions (Data Page)** with checkbox selection and confirmation prompt
 - ✅ **Bulk Delete Audit Summary Entry** added for each batch delete action
+- ✅ **Header Analytics Widgets** with total and daily activity counts
+- ✅ **Audit Trail Timeline View** with date-grouped change history
 
 ## Important Notes
 
@@ -331,6 +349,7 @@ test-dashboard/
 - ✅ Visiting `index.php` resets the JSON data files before redirecting to the Home page
 - ✅ Reset confirmation and add/edit success messages use custom in-app toast notifications
 - ✅ Bulk actions are currently limited to bulk delete on the Data page only
+- ✅ Audit Trail supports both Table and Timeline views
 
 ## Maintenance & Customization
 

@@ -23,6 +23,14 @@ $pageTitle = "Dashboard Showcase";
 				<span class="metric-label">Edits</span>
 				<span class="metric-value">--</span>
 			</div>
+			<div class="metric-pill" id="metric-adds-today">
+				<span class="metric-label">Adds Today</span>
+				<span class="metric-value">--</span>
+			</div>
+			<div class="metric-pill" id="metric-deletes-today">
+				<span class="metric-label">Deletes Today</span>
+				<span class="metric-value">--</span>
+			</div>
 		</div>
 	</header>
 

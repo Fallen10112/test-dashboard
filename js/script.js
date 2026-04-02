@@ -5,6 +5,7 @@ let allAuditTrail = null; // Store all audit trail entries globally
 let currentSortColumn = null; // Track current sort column
 let currentSortOrder = 'asc'; // Track sort order (asc/desc)
 let selectedRecordIds = new Set(); // Track selected records for bulk actions
+let currentAuditView = 'table'; // Track active audit display mode
 
 
 function ensureToastHost() {
@@ -135,20 +136,75 @@ function loadHeaderMetrics() {
 	).done(function(dataResponse, auditResponse) {
 		const dataPayload = dataResponse[0] || {};
 		const auditPayload = auditResponse[0] || {};
+		const auditEntries = Array.isArray(auditPayload.entries) ? auditPayload.entries : [];
 
 		const totalEntries = Array.isArray(dataPayload.items) ? dataPayload.items.length : 0;
-		const totalEdits = Array.isArray(auditPayload.entries)
-			? auditPayload.entries.filter(function(entry) {
+		const totalEdits = auditEntries.length > 0
+			? auditEntries.filter(function(entry) {
 				return String(entry.change_type || '').toUpperCase() === 'EDIT';
 			}).length
 			: 0;
+		const addsToday = countUniqueAuditRecordsForToday(auditEntries, 'ADD');
+		const deletesToday = countUniqueAuditRecordsForToday(auditEntries, 'DELETE');
 
 		$('#metric-total-entries .metric-value').text(totalEntries);
 		$('#metric-total-edits .metric-value').text(totalEdits);
+		$('#metric-adds-today .metric-value').text(addsToday);
+		$('#metric-deletes-today .metric-value').text(deletesToday);
 	}).fail(function() {
 		$('#metric-total-entries .metric-value').text('--');
 		$('#metric-total-edits .metric-value').text('--');
+		$('#metric-adds-today .metric-value').text('--');
+		$('#metric-deletes-today .metric-value').text('--');
 	});
+}
+
+
+function getTodayDateString() {
+	const now = new Date();
+	const year = now.getFullYear();
+	const month = String(now.getMonth() + 1).padStart(2, '0');
+	const day = String(now.getDate()).padStart(2, '0');
+	return year + '-' + month + '-' + day;
+}
+
+
+function countUniqueAuditRecordsForToday(entries, changeType) {
+	const today = getTodayDateString();
+	const normalizedType = String(changeType || '').toUpperCase();
+	const uniqueIds = new Set();
+
+	(entries || []).forEach(function(entry) {
+		if (String(entry.date || '') !== today) {
+			return;
+		}
+
+		if (String(entry.change_type || '').toUpperCase() !== normalizedType) {
+			return;
+		}
+
+		const fieldName = String(entry.field_name || '').toLowerCase();
+		const recordId = String(entry.record_id || '');
+
+		if (normalizedType === 'ADD' && fieldName !== 'title') {
+			return;
+		}
+
+		if (normalizedType === 'DELETE') {
+			if (fieldName !== 'title') {
+				return;
+			}
+			if (recordId.toUpperCase() === 'BULK') {
+				return;
+			}
+		}
+
+		if (recordId !== '') {
+			uniqueIds.add(recordId);
+		}
+	});
+
+	return uniqueIds.size;
 }
 
 
@@ -450,6 +506,26 @@ function setupAuditTrailPageHandlers() {
 	$('#search-input').on('keyup', function() {
 		filterAuditTrail();
 	});
+
+	$('#audit-view-table').on('click', function() {
+		setAuditView('table');
+	});
+
+	$('#audit-view-timeline').on('click', function() {
+		setAuditView('timeline');
+	});
+}
+
+
+function setAuditView(viewMode) {
+	currentAuditView = viewMode === 'timeline' ? 'timeline' : 'table';
+
+	$('#audit-view-table').toggleClass('active', currentAuditView === 'table');
+	$('#audit-view-timeline').toggleClass('active', currentAuditView === 'timeline');
+
+	if (allAuditTrail && Array.isArray(allAuditTrail.entries)) {
+		filterAuditTrail();
+	}
 }
 
 
@@ -1189,52 +1265,116 @@ function loadAuditTrail() {
 }
 
 
-function displayAuditTrail(data) {
+function renderAuditTrail(entries, emptyMessage) {
 	const container = $('#audit-container');
 	container.empty();
-	
-	if (data.entries && data.entries.length > 0) {
-		let tableHTML = `
-			<table class="data-table">
-				<thead>
-					<tr>
-						<th>ID</th>
-						<th>Date</th>
-						<th>Time</th>
-						<th>Record ID</th>
-						<th>Change Type</th>
-						<th>Field Name</th>
-						<th>Old Value</th>
-						<th>New Value</th>
-					</tr>
-				</thead>
-				<tbody>
-		`;
-		
-		data.entries.forEach(function(entry) {
-			tableHTML += `
-				<tr>
-					<td>${entry.id}</td>
-					<td>${entry.date}</td>
-					<td>${entry.time}</td>
-					<td>${entry.record_id}</td>
-					<td><span class="badge badge-${entry.change_type.toLowerCase()}">${entry.change_type}</span></td>
-					<td>${entry.field_name}</td>
-					<td><code>${entry.old_value || '(empty)'}</code></td>
-					<td><code>${entry.new_value || '(empty)'}</code></td>
-				</tr>
-			`;
-		});
-		
-		tableHTML += `
-				</tbody>
-			</table>
-		`;
-		
-		container.html(tableHTML);
-	} else {
-		container.html('<p>No audit trail entries yet.</p>');
+
+	if (!Array.isArray(entries) || entries.length === 0) {
+		container.html('<p>' + emptyMessage + '</p>');
+		return;
 	}
+
+	if (currentAuditView === 'timeline') {
+		renderAuditTimeline(entries);
+	} else {
+		renderAuditTable(entries);
+	}
+}
+
+
+function renderAuditTable(entries) {
+	const container = $('#audit-container');
+	let tableHTML = `
+		<table class="data-table">
+			<thead>
+				<tr>
+					<th>ID</th>
+					<th>Date</th>
+					<th>Time</th>
+					<th>Record ID</th>
+					<th>Change Type</th>
+					<th>Field Name</th>
+					<th>Old Value</th>
+					<th>New Value</th>
+				</tr>
+			</thead>
+			<tbody>
+	`;
+
+	entries.forEach(function(entry) {
+		tableHTML += `
+			<tr>
+				<td>${entry.id}</td>
+				<td>${entry.date}</td>
+				<td>${entry.time}</td>
+				<td>${entry.record_id}</td>
+				<td><span class="badge badge-${entry.change_type.toLowerCase()}">${entry.change_type}</span></td>
+				<td>${entry.field_name}</td>
+				<td><code>${entry.old_value || '(empty)'}</code></td>
+				<td><code>${entry.new_value || '(empty)'}</code></td>
+			</tr>
+		`;
+	});
+
+	tableHTML += `
+			</tbody>
+		</table>
+	`;
+
+	container.html(tableHTML);
+}
+
+
+function renderAuditTimeline(entries) {
+	const container = $('#audit-container');
+	const sortedEntries = entries.slice().sort(function(a, b) {
+		return Number(b.id || 0) - Number(a.id || 0);
+	});
+
+	let timelineHTML = '<div class="audit-timeline">';
+	let currentDate = '';
+
+	sortedEntries.forEach(function(entry) {
+		if (entry.date !== currentDate) {
+			if (currentDate !== '') {
+				timelineHTML += '</div>';
+			}
+			currentDate = entry.date;
+			timelineHTML += `
+				<div class="timeline-group">
+					<h3 class="timeline-date">${currentDate}</h3>
+			`;
+		}
+
+		const typeClass = String(entry.change_type || '').toLowerCase();
+		timelineHTML += `
+			<div class="timeline-item">
+				<div class="timeline-dot timeline-dot-${typeClass}"></div>
+				<div class="timeline-card">
+					<div class="timeline-card-header">
+						<span class="badge badge-${typeClass}">${entry.change_type}</span>
+						<span class="timeline-time">${entry.time}</span>
+						<span class="timeline-id">#${entry.id}</span>
+					</div>
+					<p class="timeline-line"><strong>Record:</strong> ${entry.record_id} | <strong>Field:</strong> ${entry.field_name}</p>
+					<p class="timeline-line"><strong>Old:</strong> <code>${entry.old_value || '(empty)'}</code></p>
+					<p class="timeline-line"><strong>New:</strong> <code>${entry.new_value || '(empty)'}</code></p>
+				</div>
+			</div>
+		`;
+	});
+
+	if (currentDate !== '') {
+		timelineHTML += '</div>';
+	}
+
+	timelineHTML += '</div>';
+	container.html(timelineHTML);
+}
+
+
+function displayAuditTrail(data) {
+	renderAuditTrail(data.entries || [], 'No audit trail entries yet.');
 }
 
 
@@ -1256,50 +1396,6 @@ function filterAuditTrail() {
 			   entry.time.includes(searchValue);
 	});
 	
-	const container = $('#audit-container');
-	container.empty();
-	
-	if (filteredEntries.length > 0) {
-		let tableHTML = `
-			<table class="data-table">
-				<thead>
-					<tr>
-						<th>ID</th>
-						<th>Date</th>
-						<th>Time</th>
-						<th>Record ID</th>
-						<th>Change Type</th>
-						<th>Field Name</th>
-						<th>Old Value</th>
-						<th>New Value</th>
-					</tr>
-				</thead>
-				<tbody>
-		`;
-		
-		filteredEntries.forEach(function(entry) {
-			tableHTML += `
-				<tr>
-					<td>${entry.id}</td>
-					<td>${entry.date}</td>
-					<td>${entry.time}</td>
-					<td>${entry.record_id}</td>
-					<td><span class="badge badge-${entry.change_type.toLowerCase()}">${entry.change_type}</span></td>
-					<td>${entry.field_name}</td>
-					<td><code>${entry.old_value || '(empty)'}</code></td>
-					<td><code>${entry.new_value || '(empty)'}</code></td>
-				</tr>
-			`;
-		});
-		
-		tableHTML += `
-				</tbody>
-			</table>
-		`;
-		
-		container.html(tableHTML);
-	} else {
-		container.html('<p>No audit trail entries match your search.</p>');
-	}
+	renderAuditTrail(filteredEntries, 'No audit trail entries match your search.');
 }
 

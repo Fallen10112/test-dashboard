@@ -390,6 +390,86 @@ body {
     box-shadow: 0 0 5px rgba(102, 126, 234, 0.3);
 }
 
+.audit-view-toggle {
+    display: flex;
+    gap: 8px;
+}
+
+.audit-view-toggle .btn.active {
+    background: #5568d3;
+}
+
+.audit-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.timeline-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.timeline-date {
+    margin: 0;
+    font-size: 1.1em;
+    color: #2c3e50;
+}
+
+.timeline-item {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+}
+
+.timeline-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-top: 12px;
+    flex: 0 0 12px;
+}
+
+.timeline-dot-add {
+    background: #27ae60;
+}
+
+.timeline-dot-edit {
+    background: #3498db;
+}
+
+.timeline-dot-delete {
+    background: #e74c3c;
+}
+
+.timeline-card {
+    background: #ffffff;
+    border: 1px solid #e4e8f0;
+    border-left: 4px solid #667eea;
+    border-radius: 8px;
+    padding: 10px 12px;
+    width: 100%;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.timeline-card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.timeline-time,
+.timeline-id {
+    font-size: 0.85em;
+    color: #6b7280;
+}
+
+.timeline-line {
+    margin: 4px 0;
+}
+
 .reports-controls .form-group {
     margin-bottom: 0;
     flex: 0 0 200px;
@@ -917,6 +997,25 @@ body.dark-mode .search-box:focus {
     box-shadow: 0 0 5px rgba(102, 126, 234, 0.5);
 }
 
+body.dark-mode .audit-view-toggle .btn.active {
+    background: #4659c7;
+}
+
+body.dark-mode .timeline-date {
+    color: #e0e0e0;
+}
+
+body.dark-mode .timeline-card {
+    background: #2a2a2a;
+    border-color: #3d3d3d;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+body.dark-mode .timeline-time,
+body.dark-mode .timeline-id {
+    color: #a0a0a0;
+}
+
 body.dark-mode .report {
     background: #2a2a2a;
     color: #e0e0e0;
@@ -1058,5 +1157,9 @@ body.dark-mode .custom-toast-message {
 
     .metric-label {
         display: none;
+    }
+
+    .timeline-card-header {
+        flex-wrap: wrap;
     }
 }
