@@ -1,12 +1,17 @@
 
-let allData = null; // Store all data globally for reports
-let allLogs = null; // Store all logs globally for reports
-let allAuditTrail = null; // Store all audit trail entries globally
-let currentSortColumn = null; // Track current sort column
-let currentSortOrder = 'asc'; // Track sort order (asc/desc)
-let selectedRecordIds = new Set(); // Track selected records for bulk actions
-let currentAuditView = 'table'; // Track active audit display mode
-let currentFilteredDataItems = []; // Track currently visible Data-page rows for export
+let allData = null;
+let allLogs = null;
+let allAuditTrail = null;
+let currentSortColumn = null;
+let currentSortOrder = 'asc';
+let selectedRecordIds = new Set();
+let currentAuditView = 'table';
+let currentFilteredDataItems = [];
+
+
+function setMetricValue(metricId, value) {
+	$(metricId + ' .metric-value').text(value);
+}
 
 
 function ensureToastHost() {
@@ -148,15 +153,15 @@ function loadHeaderMetrics() {
 		const addsToday = countUniqueAuditRecordsForToday(auditEntries, 'ADD');
 		const deletesToday = countUniqueAuditRecordsForToday(auditEntries, 'DELETE');
 
-		$('#metric-total-entries .metric-value').text(totalEntries);
-		$('#metric-total-edits .metric-value').text(totalEdits);
-		$('#metric-adds-today .metric-value').text(addsToday);
-		$('#metric-deletes-today .metric-value').text(deletesToday);
+		setMetricValue('#metric-total-entries', totalEntries);
+		setMetricValue('#metric-total-edits', totalEdits);
+		setMetricValue('#metric-adds-today', addsToday);
+		setMetricValue('#metric-deletes-today', deletesToday);
 	}).fail(function() {
-		$('#metric-total-entries .metric-value').text('--');
-		$('#metric-total-edits .metric-value').text('--');
-		$('#metric-adds-today .metric-value').text('--');
-		$('#metric-deletes-today .metric-value').text('--');
+		setMetricValue('#metric-total-entries', '--');
+		setMetricValue('#metric-total-edits', '--');
+		setMetricValue('#metric-adds-today', '--');
+		setMetricValue('#metric-deletes-today', '--');
 	});
 }
 

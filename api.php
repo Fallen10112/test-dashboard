@@ -185,7 +185,7 @@ $initFile = DATA_DIR . '/.encrypted_init';
 if (!file_exists($initFile) && (file_exists($dataFile) || file_exists($logsFile))) {
 	if (file_exists($dataFile)) {
 		$dataContent = file_get_contents($dataFile);
-		if (substr($dataContent, 0, 4) !== 'base') { // Check if not already encrypted
+		if (substr($dataContent, 0, 4) !== 'base') {
 			$encryptedData = encryptData($dataContent, $encryptionKey, $encryptionCipher);
 			writeFileWithLockRetry($dataFile, $encryptedData);
 		}
@@ -193,7 +193,7 @@ if (!file_exists($initFile) && (file_exists($dataFile) || file_exists($logsFile)
 	
 	if (file_exists($logsFile)) {
 		$logsContent = file_get_contents($logsFile);
-		if (substr($logsContent, 0, 4) !== 'base') { // Check if not already encrypted
+		if (substr($logsContent, 0, 4) !== 'base') {
 			$encryptedLogs = encryptData($logsContent, $encryptionKey, $encryptionCipher);
 			writeFileWithLockRetry($logsFile, $encryptedLogs);
 		}
