@@ -28,6 +28,42 @@ function decryptData($encryptedData, $key, $cipher) {
 	return openssl_decrypt($encrypted, $cipher, $key, 0, $iv);
 }
 
+function writeFileWithLockRetry($filePath, $content, $maxRetries = 3, $retryDelayMicros = 120000) {
+	$attempt = 0;
+
+	while ($attempt <= $maxRetries) {
+		$dir = dirname($filePath);
+		if (!is_dir($dir)) {
+			mkdir($dir, 0755, true);
+		}
+
+		$fp = fopen($filePath, 'c+');
+		if ($fp !== false) {
+			if (flock($fp, LOCK_EX)) {
+				ftruncate($fp, 0);
+				rewind($fp);
+				$bytesWritten = fwrite($fp, $content);
+				fflush($fp);
+				flock($fp, LOCK_UN);
+				fclose($fp);
+
+				if ($bytesWritten !== false) {
+					return true;
+				}
+			} else {
+				fclose($fp);
+			}
+		}
+
+		$attempt++;
+		if ($attempt <= $maxRetries) {
+			usleep($retryDelayMicros);
+		}
+	}
+
+	return false;
+}
+
 function addLog($event) {
 	global $encryptionKey, $encryptionCipher;
 	
@@ -71,7 +107,7 @@ function addLog($event) {
 	$logsData = ['logs' => $logs];
 	$jsonContent = json_encode($logsData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
 	$encryptedContent = encryptData($jsonContent, $encryptionKey, $encryptionCipher);
-	return file_put_contents($logsFile, $encryptedContent) !== false;
+	return writeFileWithLockRetry($logsFile, $encryptedContent);
 }
 
 function addAuditEntries($entries) {
@@ -128,7 +164,7 @@ function addAuditEntries($entries) {
 	$auditData = ['entries' => $auditEntries];
 	$jsonContent = json_encode($auditData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
 	$encryptedContent = encryptData($jsonContent, $encryptionKey, $encryptionCipher);
-	return file_put_contents($auditFile, $encryptedContent) !== false;
+	return writeFileWithLockRetry($auditFile, $encryptedContent);
 }
 
 function addAuditEntry($changeType, $recordId, $fieldName, $oldValue, $newValue) {
@@ -151,7 +187,7 @@ if (!file_exists($initFile) && (file_exists($dataFile) || file_exists($logsFile)
 		$dataContent = file_get_contents($dataFile);
 		if (substr($dataContent, 0, 4) !== 'base') { // Check if not already encrypted
 			$encryptedData = encryptData($dataContent, $encryptionKey, $encryptionCipher);
-			file_put_contents($dataFile, $encryptedData);
+			writeFileWithLockRetry($dataFile, $encryptedData);
 		}
 	}
 	
@@ -159,11 +195,11 @@ if (!file_exists($initFile) && (file_exists($dataFile) || file_exists($logsFile)
 		$logsContent = file_get_contents($logsFile);
 		if (substr($logsContent, 0, 4) !== 'base') { // Check if not already encrypted
 			$encryptedLogs = encryptData($logsContent, $encryptionKey, $encryptionCipher);
-			file_put_contents($logsFile, $encryptedLogs);
+			writeFileWithLockRetry($logsFile, $encryptedLogs);
 		}
 	}
 	
-	file_put_contents($initFile, 'initialized');
+	writeFileWithLockRetry($initFile, 'initialized');
 }
 
 if ($method === 'POST') {
@@ -198,19 +234,24 @@ if ($method === 'POST') {
 			]);
 			
 			$encryptedData = encryptData($testData, $encryptionKey, $encryptionCipher);
-			file_put_contents($dataFile, $encryptedData);
+			$dataWriteSuccess = writeFileWithLockRetry($dataFile, $encryptedData);
 			
 			$emptyLogs = json_encode(['logs' => []]);
 			$encryptedLogs = encryptData($emptyLogs, $encryptionKey, $encryptionCipher);
-			file_put_contents($logsFile, $encryptedLogs);
+			$logsWriteSuccess = writeFileWithLockRetry($logsFile, $encryptedLogs);
 			
 			$auditFile = DATA_DIR . '/audit_trail.json';
 			$emptyAudit = json_encode(['entries' => []]);
 			$encryptedAudit = encryptData($emptyAudit, $encryptionKey, $encryptionCipher);
-			file_put_contents($auditFile, $encryptedAudit);
+			$auditWriteSuccess = writeFileWithLockRetry($auditFile, $encryptedAudit);
 			
-			http_response_code(200);
-			echo json_encode(['success' => true, 'message' => 'Data reset successfully']);
+			if ($dataWriteSuccess && $logsWriteSuccess && $auditWriteSuccess) {
+				http_response_code(200);
+				echo json_encode(['success' => true, 'message' => 'Data reset successfully']);
+			} else {
+				http_response_code(500);
+				echo json_encode(['success' => false, 'message' => 'Failed to reset one or more data files']);
+			}
 			exit;
 		}
 		
@@ -256,7 +297,7 @@ if ($method === 'POST') {
 				$jsonContent = json_encode($data['data'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
 				$encryptedContent = encryptData($jsonContent, $encryptionKey, $encryptionCipher);
 				
-				if (file_put_contents($dataFile, $encryptedContent) && $logSuccess) {
+				if (writeFileWithLockRetry($dataFile, $encryptedContent) && $logSuccess) {
 					http_response_code(200);
 					echo json_encode(['success' => true, 'message' => 'Data saved successfully']);
 				} else {
@@ -286,7 +327,7 @@ if ($method === 'POST') {
 		if (!file_exists($file) || filesize($file) < 50) {
 			$initialData = json_encode(['entries' => []]);
 			$encryptedData = encryptData($initialData, $encryptionKey, $encryptionCipher);
-			file_put_contents($file, $encryptedData);
+			writeFileWithLockRetry($file, $encryptedData);
 			echo $initialData;
 		} else {
 			$fileContent = file_get_contents($file);
@@ -299,13 +340,13 @@ if ($method === 'POST') {
 				$parsed = json_decode($fileContent, true);
 				if ($parsed !== null) {
 					$encryptedData = encryptData($fileContent, $encryptionKey, $encryptionCipher);
-					file_put_contents($file, $encryptedData);
+					writeFileWithLockRetry($file, $encryptedData);
 					header('Content-Type: application/json');
 					echo $fileContent;
 				} else {
 					$initialData = json_encode(['entries' => []]);
 					$encryptedData = encryptData($initialData, $encryptionKey, $encryptionCipher);
-					file_put_contents($file, $encryptedData);
+					writeFileWithLockRetry($file, $encryptedData);
 					echo $initialData;
 				}
 			}
@@ -331,7 +372,7 @@ if ($method === 'POST') {
 				$initialData = json_encode(['items' => []]);
 			}
 			$encryptedData = encryptData($initialData, $encryptionKey, $encryptionCipher);
-			file_put_contents($file, $encryptedData);
+			writeFileWithLockRetry($file, $encryptedData);
 			header('Content-Type: application/json');
 			echo $initialData;
 		}

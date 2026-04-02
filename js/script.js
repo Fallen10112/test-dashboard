@@ -6,6 +6,7 @@ let currentSortColumn = null; // Track current sort column
 let currentSortOrder = 'asc'; // Track sort order (asc/desc)
 let selectedRecordIds = new Set(); // Track selected records for bulk actions
 let currentAuditView = 'table'; // Track active audit display mode
+let currentFilteredDataItems = []; // Track currently visible Data-page rows for export
 
 
 function ensureToastHost() {
@@ -296,6 +297,14 @@ function setupDataPageHandlers() {
 		openAddModal();
 	});
 
+	$('#export-filtered-pdf-btn').on('click', function() {
+		exportFilteredDataAsPDF();
+	});
+
+	$('#export-filtered-csv-btn').on('click', function() {
+		exportFilteredDataAsCSV();
+	});
+
 	$('#bulk-delete-btn').on('click', function() {
 		bulkDeleteSelectedRecords();
 	});
@@ -322,6 +331,15 @@ function setupDataPageHandlers() {
 			closeModal();
 		}
 	});
+
+	updateFilteredExportButtonsState();
+}
+
+
+function updateFilteredExportButtonsState() {
+	const hasRows = Array.isArray(currentFilteredDataItems) && currentFilteredDataItems.length > 0;
+	$('#export-filtered-pdf-btn').prop('disabled', !hasRows);
+	$('#export-filtered-csv-btn').prop('disabled', !hasRows);
 }
 
 
@@ -626,6 +644,7 @@ function displayDataTable(data) {
 	container.empty();
 	
 	if (data.items && data.items.length > 0) {
+		currentFilteredDataItems = data.items.slice();
 		let tableHTML = `
 			<table class="data-table data-records-table">
 				<thead>
@@ -687,10 +706,13 @@ function displayDataTable(data) {
 		bindSelectionHandlers();
 		updateBulkDeleteButtonState();
 		updateSelectAllCheckboxState();
+		updateFilteredExportButtonsState();
 	} else {
 		container.html('<p>No data available.</p>');
 		selectedRecordIds.clear();
 		updateBulkDeleteButtonState();
+		currentFilteredDataItems = [];
+		updateFilteredExportButtonsState();
 	}
 }
 
@@ -727,6 +749,7 @@ function filterAndSortTable() {
 	
 	const container = $('#data-container');
 	container.empty();
+	currentFilteredDataItems = filteredItems.slice();
 	
 	if (filteredItems.length > 0) {
 		let tableHTML = `
@@ -799,10 +822,120 @@ function filterAndSortTable() {
 		bindSelectionHandlers();
 		updateBulkDeleteButtonState();
 		updateSelectAllCheckboxState();
+		updateFilteredExportButtonsState();
 	} else {
 		container.html('<p>No records match your search.</p>');
 		updateBulkDeleteButtonState();
+		updateFilteredExportButtonsState();
 	}
+}
+
+
+function exportFilteredDataAsCSV() {
+	if (!Array.isArray(currentFilteredDataItems) || currentFilteredDataItems.length === 0) {
+		showToast({
+			type: 'warning',
+			title: 'No Filtered Rows',
+			message: 'There are no visible rows to export.',
+			showOkayButton: true,
+			autoCloseMs: 3000
+		});
+		return;
+	}
+
+	let csv = 'ID,Title,Description\n';
+	currentFilteredDataItems.forEach(function(item) {
+		const title = '"' + String(item.title || '').replace(/"/g, '""') + '"';
+		const description = '"' + String(item.description || '').replace(/"/g, '""') + '"';
+		csv += item.id + ',' + title + ',' + description + '\n';
+	});
+
+	const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+	const link = document.createElement('a');
+	const url = URL.createObjectURL(blob);
+	link.setAttribute('href', url);
+	link.setAttribute('download', 'filtered-data-' + new Date().toISOString().split('T')[0] + '.csv');
+	link.style.visibility = 'hidden';
+	document.body.appendChild(link);
+	link.click();
+	document.body.removeChild(link);
+
+	logEvent('A filtered CSV export has been downloaded for: Data (' + currentFilteredDataItems.length + ' rows)');
+	showToast({
+		type: 'success',
+		title: 'CSV Export Complete',
+		message: 'Filtered Data CSV downloaded successfully.',
+		showOkayButton: true,
+		autoCloseMs: 3000
+	});
+}
+
+
+function exportFilteredDataAsPDF() {
+	if (!Array.isArray(currentFilteredDataItems) || currentFilteredDataItems.length === 0) {
+		showToast({
+			type: 'warning',
+			title: 'No Filtered Rows',
+			message: 'There are no visible rows to export.',
+			showOkayButton: true,
+			autoCloseMs: 3000
+		});
+		return;
+	}
+
+	if (typeof html2pdf === 'undefined') {
+		showToast({
+			type: 'error',
+			title: 'PDF Export Unavailable',
+			message: 'PDF export library is not loaded on this page.',
+			showOkayButton: true,
+			autoCloseMs: 3000
+		});
+		return;
+	}
+
+	const exportDate = new Date().toLocaleDateString();
+	let tableRows = '';
+	currentFilteredDataItems.forEach(function(item) {
+		tableRows += '<tr><td>' + item.id + '</td><td>' + item.title + '</td><td>' + item.description + '</td></tr>';
+	});
+
+	const exportContainer = document.createElement('div');
+	exportContainer.innerHTML = `
+		<div style="font-family: Arial, sans-serif; color: #2c3e50;">
+			<h2 style="margin-bottom: 8px;">Filtered Data Export</h2>
+			<p style="margin: 0 0 12px;"><strong>Generated:</strong> ${exportDate}</p>
+			<p style="margin: 0 0 16px;"><strong>Total Rows:</strong> ${currentFilteredDataItems.length}</p>
+			<table style="width:100%; border-collapse: collapse;">
+				<thead>
+					<tr style="background:#667eea; color:#ffffff;">
+						<th style="padding:8px; border:1px solid #d4dae6; text-align:left;">ID</th>
+						<th style="padding:8px; border:1px solid #d4dae6; text-align:left;">Title</th>
+						<th style="padding:8px; border:1px solid #d4dae6; text-align:left;">Description</th>
+					</tr>
+				</thead>
+				<tbody>${tableRows}</tbody>
+			</table>
+		</div>
+	`;
+
+	const opt = {
+		margin: 10,
+		filename: 'filtered-data-' + new Date().toISOString().split('T')[0] + '.pdf',
+		image: { type: 'jpeg', quality: 0.98 },
+		html2canvas: { scale: 2 },
+		jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
+	};
+
+	html2pdf().set(opt).from(exportContainer).save();
+	logEvent('A filtered PDF export has been downloaded for: Data (' + currentFilteredDataItems.length + ' rows)');
+	showToast({
+		type: 'success',
+		title: 'PDF Export Complete',
+		message: 'Filtered Data PDF downloaded successfully.',
+		showOkayButton: true,
+		autoCloseMs: 3000
+	});
 }
 
 

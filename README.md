@@ -53,6 +53,8 @@ test-dashboard/
 - **Edit Records**: Full editing capability for existing records
 - **Delete Records**: Remove records with confirmation dialogs
 - **Bulk Delete Records**: Select multiple records and delete them in one action (Data page only)
+- **Filtered Export (PDF/CSV)**: Export only the currently visible filtered/sorted rows from the Data page
+- **Action Order**: Data controls are arranged as Add, Delete, Export PDF, Export CSV
 - **Search & Filter**: Real-time search by title and description
 - **Column Sorting**: Click column headers to sort (ascending/descending)
 - **Auto-Save**: All changes immediately saved to encrypted storage
@@ -127,11 +129,17 @@ test-dashboard/
   - New entry added
   - Entry edited (with field-level changes)
   - Entry deleted
+  - Filtered Data export downloaded (PDF/CSV)
   - Report generated
   - Report downloaded (PDF or CSV)
 - **Encryption**: All logs encrypted at rest for security
 - **Timezone Handling**: Uses a fixed one-hour offset when generating log timestamps
 - **Searchable**: Logs are available through the Reports page dataset selector
+
+### 🔒 API Reliability (Lock + Retry)
+- **Write Locking**: API file writes use exclusive file locks to reduce concurrent write collisions
+- **Retry Logic**: Failed lock/write attempts are retried automatically with short delay
+- **Coverage**: Data, logs, audit trail, reset operations, and initialization writes use lock+retry path
 
 ### 🎯 Layout & Design
 - **Fixed Title Bar**: 5% viewport height with a gradient background
@@ -166,6 +174,7 @@ test-dashboard/
 - **includes/header.php**: HTML head tags and fixed title bar
 - **includes/navigation.php**: Fixed left sidebar with dark mode toggle
 - **includes/footer.php**: Closing HTML tags, shared script includes, and reports-only PDF library include
+- **includes/footer.php**: Closing HTML tags and shared script includes, including PDF library loading for Reports and Data pages
 
 #### Backend
 - **api.php**: Handles all backend operations:
@@ -173,6 +182,7 @@ test-dashboard/
   - Manage logs and audit trails
   - Track all data changes with field-level detail
   - Encrypt/decrypt using AES-256-CBC
+  - Apply file locking and retry logic to write operations
   - Generate timestamps using a fixed one-hour offset
 
 #### Frontend Assets
@@ -215,6 +225,13 @@ test-dashboard/
 3. Click "Delete Selected"
 4. Confirm in the custom toast prompt
 5. Selected records are removed, saved to data JSON, and logged in audit trail (including a bulk-action summary line)
+
+### Export Filtered Data
+1. Navigate to Data page and apply search/sort filters
+2. Use action buttons in order: Add, Delete, Export PDF, Export CSV
+3. Click "Export Filtered PDF" or "Export Filtered CSV"
+4. Only the currently visible filtered rows are exported
+5. Export action is logged in the system logs
 
 ### View Changes
 1. Go to Audit Trail page
@@ -336,6 +353,8 @@ test-dashboard/
 - ✅ **Bulk Delete Audit Summary Entry** added for each batch delete action
 - ✅ **Header Analytics Widgets** with total and daily activity counts
 - ✅ **Audit Trail Timeline View** with date-grouped change history
+- ✅ **Filtered Data Export (PDF/CSV)** for current visible results
+- ✅ **API File Lock + Retry Writes** for improved reliability under concurrent operations
 
 ## Important Notes
 
@@ -350,6 +369,7 @@ test-dashboard/
 - ✅ Reset confirmation and add/edit success messages use custom in-app toast notifications
 - ✅ Bulk actions are currently limited to bulk delete on the Data page only
 - ✅ Audit Trail supports both Table and Timeline views
+- ✅ Data-page filtered exports log export events and include only visible filtered rows
 
 ## Maintenance & Customization
 
