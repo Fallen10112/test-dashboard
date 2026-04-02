@@ -197,7 +197,7 @@ function countUniqueAuditRecordsForToday(entries, changeType) {
 		}
 
 		if (normalizedType === 'DELETE') {
-			if (fieldName !== 'title') {
+			if (fieldName !== 'title' && fieldName !== 'record') {
 				return;
 			}
 			if (recordId.toUpperCase() === 'BULK') {
@@ -478,15 +478,8 @@ function bulkDeleteSelectedRecords() {
 						auditEntries.push({
 							changeType: 'DELETE',
 							recordId: item.id,
-							fieldName: 'title',
-							oldValue: item.title,
-							newValue: ''
-						});
-						auditEntries.push({
-							changeType: 'DELETE',
-							recordId: item.id,
-							fieldName: 'description',
-							oldValue: item.description,
+							fieldName: 'record',
+							oldValue: 'Title: "' + item.title + '", Description: "' + item.description + '"',
 							newValue: ''
 						});
 					});
@@ -1019,6 +1012,46 @@ function addAuditTrailEntries(entries) {
 }
 
 
+function getHighestNumericRecordId(entries) {
+	let maxId = 0;
+
+	(entries || []).forEach(function(entry) {
+		const parsed = parseInt(entry.record_id, 10);
+		if (!Number.isNaN(parsed) && parsed > maxId) {
+			maxId = parsed;
+		}
+	});
+
+	return maxId;
+}
+
+
+function determineNextRecordId(callback) {
+	const currentItems = Array.isArray(allData && allData.items) ? allData.items : [];
+	const localMax = currentItems.reduce(function(maxId, item) {
+		const parsed = parseInt(item.id, 10);
+		if (!Number.isNaN(parsed) && parsed > maxId) {
+			return parsed;
+		}
+		return maxId;
+	}, 0);
+
+	$.ajax({
+		url: '../api.php?action=audit_trail',
+		type: 'GET',
+		dataType: 'json',
+		success: function(auditData) {
+			const auditEntries = Array.isArray(auditData && auditData.entries) ? auditData.entries : [];
+			const auditMax = getHighestNumericRecordId(auditEntries);
+			callback(Math.max(localMax, auditMax) + 1);
+		},
+		error: function() {
+			callback(localMax + 1);
+		}
+	});
+}
+
+
 function saveRecord() {
 	const id = $('#record-form').attr('data-record-id');
 	const title = $('#record-title').val().trim();
@@ -1035,62 +1068,90 @@ function saveRecord() {
 		return;
 	}
 	
-	let eventMessage = '';
-	
+	function finalizeSave(eventMessage, actionType) {
+		saveDataToFileWithLog(eventMessage, actionType);
+		closeModal();
+		displayDataTable(allData);
+	}
+
 	if (editMode) {
 		const index = allData.items.findIndex(i => i.id == id);
 		if (index !== -1) {
 			const oldTitle = allData.items[index].title;
 			const oldDescription = allData.items[index].description;
-			
+
 			if (oldTitle !== title) {
 				addAuditTrailEntry('EDIT', id, 'title', oldTitle, title);
 			}
 			if (oldDescription !== description) {
 				addAuditTrailEntry('EDIT', id, 'description', oldDescription, description);
 			}
-			
+
 			allData.items[index].title = title;
 			allData.items[index].description = description;
-			eventMessage = `An entry has been edited; ID ${id} with title: "${title}", and description: "${description}"`;
+
+			const eventMessage = `An entry has been edited; ID ${id} with title: "${title}", and description: "${description}"`;
+			finalizeSave(eventMessage, 'edit');
 		}
-	} else {
-		const newId = allData.items.length > 0 
-			? Math.max(...allData.items.map(i => i.id)) + 1 
-			: 1;
+		return;
+	}
+
+	determineNextRecordId(function(newId) {
 		allData.items.push({
 			id: newId,
 			title: title,
 			description: description
 		});
-		
+
 		addAuditTrailEntry('ADD', newId, 'title', '', title);
 		addAuditTrailEntry('ADD', newId, 'description', '', description);
-		
-		eventMessage = `A new entry has been added; ID ${newId} with title: "${title}", and description: "${description}"`;
-	}
-	
-	saveDataToFileWithLog(eventMessage, editMode ? 'edit' : 'add');
-	
-	closeModal();
-	displayDataTable(allData);
+
+		const eventMessage = `A new entry has been added; ID ${newId} with title: "${title}", and description: "${description}"`;
+		finalizeSave(eventMessage, 'add');
+	});
 }
 
 
 function deleteRecord(id) {
-	if (confirm('Are you sure you want to delete this record?')) {
-		const item = allData.items.find(i => i.id == id);
-		
-		addAuditTrailEntry('DELETE', id, 'title', item.title, '');
-		addAuditTrailEntry('DELETE', id, 'description', item.description, '');
-		
-		const eventMessage = `An entry has been deleted; ID ${item.id} with title: "${item.title}", and description: "${item.description}"`;
-		
-		allData.items = allData.items.filter(item => item.id != id);
-		selectedRecordIds.delete(String(id));
-		saveDataToFileWithLog(eventMessage, 'delete');
-		displayDataTable(allData);
+	const item = allData.items.find(i => i.id == id);
+	if (!item) {
+		return;
 	}
+
+	showToast({
+		type: 'warning',
+		title: 'Delete Record?',
+		message: 'This will permanently delete record ID ' + item.id + '.',
+		autoCloseMs: 0,
+		buttons: [
+			{
+				label: 'Cancel',
+				className: 'btn-secondary'
+			},
+			{
+				label: 'Delete',
+				className: 'btn-danger',
+				onClick: function() {
+					addAuditTrailEntry('DELETE', id, 'record', 'Title: "' + item.title + '", Description: "' + item.description + '"', '');
+
+					const eventMessage = `An entry has been deleted; ID ${item.id} with title: "${item.title}", and description: "${item.description}"`;
+
+					allData.items = allData.items.filter(item => item.id != id);
+					selectedRecordIds.delete(String(id));
+					saveDataToFileWithLog(eventMessage, 'delete', {
+						successToast: {
+							type: 'success',
+							title: 'Record Deleted',
+							message: 'The record has been deleted successfully.',
+							showOkayButton: true,
+							autoCloseMs: 3000
+						}
+					});
+					displayDataTable(allData);
+				}
+			}
+		]
+	});
 }
 
 
