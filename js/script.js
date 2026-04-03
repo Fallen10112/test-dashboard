@@ -7,6 +7,20 @@ let currentSortOrder = 'asc';
 let selectedRecordIds = new Set();
 let currentAuditView = 'table';
 let currentFilteredDataItems = [];
+let nextRecordId = 1;
+
+
+function debounce(fn, delayMs) {
+	let timeoutId = null;
+	return function() {
+		const context = this;
+		const args = arguments;
+		clearTimeout(timeoutId);
+		timeoutId = setTimeout(function() {
+			fn.apply(context, args);
+		}, delayMs);
+	};
+}
 
 
 function setMetricValue(metricId, value) {
@@ -299,6 +313,8 @@ function setupResetButtonHandler() {
 
 
 function setupDataPageHandlers() {
+	const debouncedFilter = debounce(filterAndSortTable, 180);
+
 	$('#add-record-btn').on('click', function() {
 		openAddModal();
 	});
@@ -316,7 +332,57 @@ function setupDataPageHandlers() {
 	});
 	
 	$('#search-input').on('keyup', function() {
+		debouncedFilter();
+	});
+
+	$('#data-container').on('click', '.sortable', function() {
+		const column = $(this).data('column');
+		if (currentSortColumn === column) {
+			currentSortOrder = currentSortOrder === 'asc' ? 'desc' : 'asc';
+		} else {
+			currentSortColumn = column;
+			currentSortOrder = 'asc';
+		}
 		filterAndSortTable();
+	});
+
+	$('#data-container').on('click', '.edit-btn', function() {
+		const id = $(this).data('id');
+		openEditModal(id);
+	});
+
+	$('#data-container').on('click', '.delete-btn', function() {
+		const id = $(this).data('id');
+		deleteRecord(id);
+	});
+
+	$('#data-container').on('change', '#select-all-records', function() {
+		const isChecked = $(this).is(':checked');
+
+		$('.record-select-checkbox').each(function() {
+			const id = String($(this).data('id'));
+			$(this).prop('checked', isChecked);
+			if (isChecked) {
+				selectedRecordIds.add(id);
+			} else {
+				selectedRecordIds.delete(id);
+			}
+		});
+
+		updateBulkDeleteButtonState();
+		updateSelectAllCheckboxState();
+	});
+
+	$('#data-container').on('change', '.record-select-checkbox', function() {
+		const id = String($(this).data('id'));
+		if ($(this).is(':checked')) {
+			selectedRecordIds.add(id);
+		} else {
+			selectedRecordIds.delete(id);
+		}
+
+		updateBulkDeleteButtonState();
+		updateSelectAllCheckboxState();
 	});
 	
 	$('.modal-close').on('click', function() {
@@ -406,38 +472,6 @@ function updateSelectAllCheckboxState() {
 }
 
 
-function bindSelectionHandlers() {
-	$('#select-all-records').off('change').on('change', function() {
-		const isChecked = $(this).is(':checked');
-
-		$('.record-select-checkbox').each(function() {
-			const id = String($(this).data('id'));
-			$(this).prop('checked', isChecked);
-			if (isChecked) {
-				selectedRecordIds.add(id);
-			} else {
-				selectedRecordIds.delete(id);
-			}
-		});
-
-		updateBulkDeleteButtonState();
-		updateSelectAllCheckboxState();
-	});
-
-	$('.record-select-checkbox').off('change').on('change', function() {
-		const id = String($(this).data('id'));
-		if ($(this).is(':checked')) {
-			selectedRecordIds.add(id);
-		} else {
-			selectedRecordIds.delete(id);
-		}
-
-		updateBulkDeleteButtonState();
-		updateSelectAllCheckboxState();
-	});
-}
-
-
 function bulkDeleteSelectedRecords() {
 	const selectedIds = Array.from(selectedRecordIds);
 
@@ -520,8 +554,10 @@ function bulkDeleteSelectedRecords() {
 
 
 function setupAuditTrailPageHandlers() {
+	const debouncedAuditFilter = debounce(filterAuditTrail, 180);
+
 	$('#search-input').on('keyup', function() {
-		filterAuditTrail();
+		debouncedAuditFilter();
 	});
 
 	$('#audit-view-table').on('click', function() {
@@ -578,6 +614,7 @@ function loadData(callback) {
 		success: function(data) {
 			console.log("Data loaded successfully:", data);
 			allData = data;
+			refreshNextRecordId();
 			if ($('#data-container').length > 0) {
 				displayDataTable(data);
 			}
@@ -637,72 +674,95 @@ function convertToLocalTime(timeString, dateString) {
 }
 
 
+function refreshNextRecordId() {
+	const currentItems = Array.isArray(allData && allData.items) ? allData.items : [];
+	nextRecordId = currentItems.reduce(function(maxId, item) {
+		const parsed = parseInt(item.id, 10);
+		if (!Number.isNaN(parsed) && parsed > maxId) {
+			return parsed;
+		}
+		return maxId;
+	}, 0) + 1;
+}
+
+
+function buildDataTableHtml(items) {
+	let tableHTML = `
+		<table class="data-table data-records-table">
+			<thead>
+				<tr>
+					<th class="select-column"><input type="checkbox" id="select-all-records" aria-label="Select all records"></th>
+					<th class="sortable ${currentSortColumn === 'id' ? 'sorted' : ''}" data-column="id">
+						ID
+						<span class="sort-indicator">${currentSortColumn === 'id' ? (currentSortOrder === 'asc' ? '▲' : '▼') : ''}</span>
+					</th>
+					<th class="sortable ${currentSortColumn === 'title' ? 'sorted' : ''}" data-column="title">
+						Title
+						<span class="sort-indicator">${currentSortColumn === 'title' ? (currentSortOrder === 'asc' ? '▲' : '▼') : ''}</span>
+					</th>
+					<th class="sortable ${currentSortColumn === 'description' ? 'sorted' : ''}" data-column="description">
+						Description
+						<span class="sort-indicator">${currentSortColumn === 'description' ? (currentSortOrder === 'asc' ? '▲' : '▼') : ''}</span>
+					</th>
+					<th>Actions</th>
+				</tr>
+			</thead>
+			<tbody>
+	`;
+
+	items.forEach(function(item) {
+		const isSelected = selectedRecordIds.has(String(item.id));
+		tableHTML += `
+			<tr>
+				<td class="select-column"><input type="checkbox" class="record-select-checkbox" data-id="${item.id}" ${isSelected ? 'checked' : ''} aria-label="Select record ${item.id}"></td>
+				<td>${item.id}</td>
+				<td>${item.title}</td>
+				<td>${item.description}</td>
+				<td>
+					<button class="btn btn-sm btn-secondary edit-btn" data-id="${item.id}">Edit</button>
+					<button class="btn btn-sm btn-danger delete-btn" data-id="${item.id}">Delete</button>
+				</td>
+			</tr>
+		`;
+	});
+
+	tableHTML += `
+			</tbody>
+		</table>
+	`;
+
+	return tableHTML;
+}
+
+
+function ensureSearchIndex(items) {
+	(items || []).forEach(function(item) {
+		const title = String(item.title || '');
+		const description = String(item.description || '');
+
+		if (item.__searchTitleSource !== title) {
+			item.__searchTitle = title.toLowerCase();
+			item.__searchTitleSource = title;
+		}
+
+		if (item.__searchDescriptionSource !== description) {
+			item.__searchDescription = description.toLowerCase();
+			item.__searchDescriptionSource = description;
+		}
+	});
+}
+
+
 function displayDataTable(data) {
 	syncSelectedRecordIdsWithData();
 	const container = $('#data-container');
 	container.empty();
 	
 	if (data.items && data.items.length > 0) {
+		ensureSearchIndex(data.items);
 		currentFilteredDataItems = data.items.slice();
-		let tableHTML = `
-			<table class="data-table data-records-table">
-				<thead>
-					<tr>
-						<th class="select-column"><input type="checkbox" id="select-all-records" aria-label="Select all records"></th>
-						<th class="sortable" data-column="id">ID <span class="sort-indicator"></span></th>
-						<th class="sortable" data-column="title">Title <span class="sort-indicator"></span></th>
-						<th class="sortable" data-column="description">Description <span class="sort-indicator"></span></th>
-						<th>Actions</th>
-					</tr>
-				</thead>
-				<tbody>
-		`;
-		
-		data.items.forEach(function(item) {
-			const isSelected = selectedRecordIds.has(String(item.id));
-			tableHTML += `
-				<tr>
-					<td class="select-column"><input type="checkbox" class="record-select-checkbox" data-id="${item.id}" ${isSelected ? 'checked' : ''} aria-label="Select record ${item.id}"></td>
-					<td>${item.id}</td>
-					<td>${item.title}</td>
-					<td>${item.description}</td>
-					<td>
-						<button class="btn btn-sm btn-secondary edit-btn" data-id="${item.id}">Edit</button>
-						<button class="btn btn-sm btn-danger delete-btn" data-id="${item.id}">Delete</button>
-					</td>
-				</tr>
-			`;
-		});
-		
-		tableHTML += `
-				</tbody>
-			</table>
-		`;
-		
-		container.html(tableHTML);
-		
-		$('.sortable').on('click', function() {
-			const column = $(this).data('column');
-			if (currentSortColumn === column) {
-				currentSortOrder = currentSortOrder === 'asc' ? 'desc' : 'asc';
-			} else {
-				currentSortColumn = column;
-				currentSortOrder = 'asc';
-			}
-			filterAndSortTable();
-		});
-		
-		$('.edit-btn').on('click', function() {
-			const id = $(this).data('id');
-			openEditModal(id);
-		});
-		
-		$('.delete-btn').on('click', function() {
-			const id = $(this).data('id');
-			deleteRecord(id);
-		});
+		container.html(buildDataTableHtml(data.items));
 
-		bindSelectionHandlers();
 		updateBulkDeleteButtonState();
 		updateSelectAllCheckboxState();
 		updateFilteredExportButtonsState();
@@ -720,12 +780,13 @@ function filterAndSortTable() {
 	if (!allData || !allData.items) return;
 
 	syncSelectedRecordIdsWithData();
+	ensureSearchIndex(allData.items);
 	
 	const searchValue = $('#search-input').val().toLowerCase();
 	
 	let filteredItems = allData.items.filter(function(item) {
-		return item.title.toLowerCase().includes(searchValue) || 
-			   item.description.toLowerCase().includes(searchValue);
+		return String(item.__searchTitle || '').includes(searchValue) || 
+			   String(item.__searchDescription || '').includes(searchValue);
 	});
 	
 	if (currentSortColumn) {
@@ -751,74 +812,7 @@ function filterAndSortTable() {
 	currentFilteredDataItems = filteredItems.slice();
 	
 	if (filteredItems.length > 0) {
-		let tableHTML = `
-			<table class="data-table data-records-table">
-				<thead>
-					<tr>
-						<th class="select-column"><input type="checkbox" id="select-all-records" aria-label="Select all records"></th>
-						<th class="sortable ${currentSortColumn === 'id' ? 'sorted' : ''}" data-column="id">
-							ID 
-							<span class="sort-indicator">${currentSortColumn === 'id' ? (currentSortOrder === 'asc' ? '▲' : '▼') : ''}</span>
-						</th>
-						<th class="sortable ${currentSortColumn === 'title' ? 'sorted' : ''}" data-column="title">
-							Title 
-							<span class="sort-indicator">${currentSortColumn === 'title' ? (currentSortOrder === 'asc' ? '▲' : '▼') : ''}</span>
-						</th>
-						<th class="sortable ${currentSortColumn === 'description' ? 'sorted' : ''}" data-column="description">
-							Description 
-							<span class="sort-indicator">${currentSortColumn === 'description' ? (currentSortOrder === 'asc' ? '▲' : '▼') : ''}</span>
-						</th>
-						<th>Actions</th>
-					</tr>
-				</thead>
-				<tbody>
-		`;
-		
-		filteredItems.forEach(function(item) {
-			const isSelected = selectedRecordIds.has(String(item.id));
-			tableHTML += `
-				<tr>
-					<td class="select-column"><input type="checkbox" class="record-select-checkbox" data-id="${item.id}" ${isSelected ? 'checked' : ''} aria-label="Select record ${item.id}"></td>
-					<td>${item.id}</td>
-					<td>${item.title}</td>
-					<td>${item.description}</td>
-					<td>
-						<button class="btn btn-sm btn-secondary edit-btn" data-id="${item.id}">Edit</button>
-						<button class="btn btn-sm btn-danger delete-btn" data-id="${item.id}">Delete</button>
-					</td>
-				</tr>
-			`;
-		});
-		
-		tableHTML += `
-				</tbody>
-			</table>
-		`;
-		
-		container.html(tableHTML);
-		
-		$('.sortable').on('click', function() {
-			const column = $(this).data('column');
-			if (currentSortColumn === column) {
-				currentSortOrder = currentSortOrder === 'asc' ? 'desc' : 'asc';
-			} else {
-				currentSortColumn = column;
-				currentSortOrder = 'asc';
-			}
-			filterAndSortTable();
-		});
-		
-		$('.edit-btn').on('click', function() {
-			const id = $(this).data('id');
-			openEditModal(id);
-		});
-		
-		$('.delete-btn').on('click', function() {
-			const id = $(this).data('id');
-			deleteRecord(id);
-		});
-
-		bindSelectionHandlers();
+		container.html(buildDataTableHtml(filteredItems));
 		updateBulkDeleteButtonState();
 		updateSelectAllCheckboxState();
 		updateFilteredExportButtonsState();
@@ -1013,43 +1007,14 @@ function addAuditTrailEntries(entries) {
 }
 
 
-function getHighestNumericRecordId(entries) {
-	let maxId = 0;
+function determineNextRecordId() {
+	if (!Number.isInteger(nextRecordId) || nextRecordId < 1) {
+		refreshNextRecordId();
+	}
 
-	(entries || []).forEach(function(entry) {
-		const parsed = parseInt(entry.record_id, 10);
-		if (!Number.isNaN(parsed) && parsed > maxId) {
-			maxId = parsed;
-		}
-	});
-
-	return maxId;
-}
-
-
-function determineNextRecordId(callback) {
-	const currentItems = Array.isArray(allData && allData.items) ? allData.items : [];
-	const localMax = currentItems.reduce(function(maxId, item) {
-		const parsed = parseInt(item.id, 10);
-		if (!Number.isNaN(parsed) && parsed > maxId) {
-			return parsed;
-		}
-		return maxId;
-	}, 0);
-
-	$.ajax({
-		url: '../api.php?action=audit_trail',
-		type: 'GET',
-		dataType: 'json',
-		success: function(auditData) {
-			const auditEntries = Array.isArray(auditData && auditData.entries) ? auditData.entries : [];
-			const auditMax = getHighestNumericRecordId(auditEntries);
-			callback(Math.max(localMax, auditMax) + 1);
-		},
-		error: function() {
-			callback(localMax + 1);
-		}
-	});
+	const newId = nextRecordId;
+	nextRecordId += 1;
+	return newId;
 }
 
 
@@ -1080,13 +1045,25 @@ function saveRecord() {
 		if (index !== -1) {
 			const oldTitle = allData.items[index].title;
 			const oldDescription = allData.items[index].description;
-			const auditRequests = [];
+			const auditEntries = [];
 
 			if (oldTitle !== title) {
-				auditRequests.push(addAuditTrailEntry('EDIT', id, 'title', oldTitle, title));
+				auditEntries.push({
+					changeType: 'EDIT',
+					recordId: id,
+					fieldName: 'title',
+					oldValue: oldTitle,
+					newValue: title
+				});
 			}
 			if (oldDescription !== description) {
-				auditRequests.push(addAuditTrailEntry('EDIT', id, 'description', oldDescription, description));
+				auditEntries.push({
+					changeType: 'EDIT',
+					recordId: id,
+					fieldName: 'description',
+					oldValue: oldDescription,
+					newValue: description
+				});
 			}
 
 			allData.items[index].title = title;
@@ -1094,8 +1071,8 @@ function saveRecord() {
 
 			const eventMessage = `An entry has been edited; ID ${id} with title: "${title}", and description: "${description}"`;
 
-			if (auditRequests.length > 0) {
-				$.when.apply($, auditRequests).always(function() {
+			if (auditEntries.length > 0) {
+				addAuditTrailEntries(auditEntries).always(function() {
 					finalizeSave(eventMessage, 'edit');
 				});
 			} else {
@@ -1105,21 +1082,35 @@ function saveRecord() {
 		return;
 	}
 
-	determineNextRecordId(function(newId) {
-		allData.items.push({
-			id: newId,
-			title: title,
-			description: description
-		});
+	const newId = determineNextRecordId();
 
-		const addTitleAuditRequest = addAuditTrailEntry('ADD', newId, 'title', '', title);
-		const addDescriptionAuditRequest = addAuditTrailEntry('ADD', newId, 'description', '', description);
+	allData.items.push({
+		id: newId,
+		title: title,
+		description: description
+	});
 
-		const eventMessage = `A new entry has been added; ID ${newId} with title: "${title}", and description: "${description}"`;
+	const addEntries = [
+		{
+			changeType: 'ADD',
+			recordId: newId,
+			fieldName: 'title',
+			oldValue: '',
+			newValue: title
+		},
+		{
+			changeType: 'ADD',
+			recordId: newId,
+			fieldName: 'description',
+			oldValue: '',
+			newValue: description
+		}
+	];
 
-		$.when(addTitleAuditRequest, addDescriptionAuditRequest).always(function() {
-			finalizeSave(eventMessage, 'add');
-		});
+	const eventMessage = `A new entry has been added; ID ${newId} with title: "${title}", and description: "${description}"`;
+
+	addAuditTrailEntries(addEntries).always(function() {
+		finalizeSave(eventMessage, 'add');
 	});
 }
 
@@ -1213,7 +1204,9 @@ function saveDataToFileWithLog(eventMessage, action, options) {
 					showToast(settings.successToast);
 			}
 
-			loadLogs();
+			if ($('#report-container').length > 0) {
+				loadLogs();
+			}
 			loadHeaderMetrics();
 		},
 		error: function(xhr, status, error) {

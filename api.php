@@ -107,7 +107,7 @@ function addLog($event) {
 	$logs[] = $logEntry;
 	
 	$logsData = ['logs' => $logs];
-	$jsonContent = json_encode($logsData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+	$jsonContent = json_encode($logsData, JSON_UNESCAPED_SLASHES);
 	$encryptedContent = encryptData($jsonContent, $encryptionKey, $encryptionCipher);
 	return writeFileWithLockRetry($logsFile, $encryptedContent);
 }
@@ -164,7 +164,7 @@ function addAuditEntries($entries) {
 	}
 	
 	$auditData = ['entries' => $auditEntries];
-	$jsonContent = json_encode($auditData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+	$jsonContent = json_encode($auditData, JSON_UNESCAPED_SLASHES);
 	$encryptedContent = encryptData($jsonContent, $encryptionKey, $encryptionCipher);
 	return writeFileWithLockRetry($auditFile, $encryptedContent);
 }
@@ -298,7 +298,7 @@ if ($method === 'POST') {
 			}
 			
 			if ($action !== 'report_generated' && $action !== 'report_downloaded') {
-				$jsonContent = json_encode($data['data'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+				$jsonContent = json_encode($data['data'], JSON_UNESCAPED_SLASHES);
 				$encryptedContent = encryptData($jsonContent, $encryptionKey, $encryptionCipher);
 				
 				if (writeFileWithLockRetry($dataFile, $encryptedContent) && $logSuccess) {
