@@ -8,6 +8,12 @@ let selectedRecordIds = new Set();
 let currentAuditView = 'table';
 let currentFilteredDataItems = [];
 let nextRecordId = 1;
+let currentPage = 1;
+let pageSize = 25;
+let currentPagedItems = [];
+const virtualRowHeightPx = 52;
+const virtualOverscanRows = 6;
+const dataPageSizeStorageKey = 'data-page-size';
 
 
 function debounce(fn, delayMs) {
@@ -126,6 +132,7 @@ $(document).ready(function() {
 	loadHeaderMetrics();
 
 	if ($('#data-container').length > 0) {
+		initializeDataPagePreferences();
 		loadData();
 		setupDataPageHandlers();
 	}
@@ -314,6 +321,7 @@ function setupResetButtonHandler() {
 
 function setupDataPageHandlers() {
 	const debouncedFilter = debounce(filterAndSortTable, 180);
+	const debouncedVirtualRender = debounce(renderVirtualizedRows, 16);
 
 	$('#add-record-btn').on('click', function() {
 		openAddModal();
@@ -332,7 +340,16 @@ function setupDataPageHandlers() {
 	});
 	
 	$('#search-input').on('keyup', function() {
+		currentPage = 1;
 		debouncedFilter();
+	});
+
+	$('#data-container').on('change', '#data-page-size', function() {
+		const requested = parseInt($(this).val(), 10);
+		pageSize = Number.isNaN(requested) ? 25 : Math.max(1, requested);
+		localStorage.setItem(dataPageSizeStorageKey, String(pageSize));
+		currentPage = 1;
+		renderDataTableView();
 	});
 
 	$('#data-container').on('click', '.sortable', function() {
@@ -343,7 +360,28 @@ function setupDataPageHandlers() {
 			currentSortColumn = column;
 			currentSortOrder = 'asc';
 		}
+		currentPage = 1;
 		filterAndSortTable();
+	});
+
+	$('#data-container').on('click', '#data-page-prev', function() {
+		if (currentPage > 1) {
+			currentPage -= 1;
+			renderDataTableView();
+		}
+	});
+
+	$('#data-container').on('click', '#data-page-next', function() {
+		const totalRows = currentFilteredDataItems.length;
+		const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+		if (currentPage < totalPages) {
+			currentPage += 1;
+			renderDataTableView();
+		}
+	});
+
+	$('#data-container').on('scroll', '#data-table-viewport', function() {
+		debouncedVirtualRender();
 	});
 
 	$('#data-container').on('click', '.edit-btn', function() {
@@ -359,9 +397,8 @@ function setupDataPageHandlers() {
 	$('#data-container').on('change', '#select-all-records', function() {
 		const isChecked = $(this).is(':checked');
 
-		$('.record-select-checkbox').each(function() {
-			const id = String($(this).data('id'));
-			$(this).prop('checked', isChecked);
+		currentPagedItems.forEach(function(item) {
+			const id = String(item.id);
 			if (isChecked) {
 				selectedRecordIds.add(id);
 			} else {
@@ -369,6 +406,7 @@ function setupDataPageHandlers() {
 			}
 		});
 
+		renderVirtualizedRows();
 		updateBulkDeleteButtonState();
 		updateSelectAllCheckboxState();
 	});
@@ -405,6 +443,17 @@ function setupDataPageHandlers() {
 	});
 
 	updateFilteredExportButtonsState();
+}
+
+
+function initializeDataPagePreferences() {
+	const storedValue = localStorage.getItem(dataPageSizeStorageKey);
+	const parsed = parseInt(storedValue, 10);
+	const allowedPageSizes = [25, 50, 100];
+
+	if (!Number.isNaN(parsed) && allowedPageSizes.indexOf(parsed) !== -1) {
+		pageSize = parsed;
+	}
 }
 
 
@@ -447,28 +496,28 @@ function updateBulkDeleteButtonState() {
 
 
 function updateSelectAllCheckboxState() {
-	const $visibleCheckboxes = $('.record-select-checkbox');
 	const $selectAll = $('#select-all-records');
 
 	if ($selectAll.length === 0) {
 		return;
 	}
 
-	if ($visibleCheckboxes.length === 0) {
+	if (!Array.isArray(currentPagedItems) || currentPagedItems.length === 0) {
 		$selectAll.prop('checked', false);
 		$selectAll.prop('indeterminate', false);
 		return;
 	}
 
-	let checkedCount = 0;
-	$visibleCheckboxes.each(function() {
-		if ($(this).is(':checked')) {
-			checkedCount += 1;
-		}
-	});
+	const checkedCount = currentPagedItems.reduce(function(total, item) {
+		return total + (selectedRecordIds.has(String(item.id)) ? 1 : 0);
+	}, 0);
 
-	$selectAll.prop('checked', checkedCount === $visibleCheckboxes.length);
-	$selectAll.prop('indeterminate', checkedCount > 0 && checkedCount < $visibleCheckboxes.length);
+	$selectAll.prop('checked', checkedCount === currentPagedItems.length);
+	$selectAll.prop('indeterminate', checkedCount > 0 && checkedCount < currentPagedItems.length);
+	$('.record-select-checkbox').each(function() {
+		const id = String($(this).data('id'));
+		$(this).prop('checked', selectedRecordIds.has(id));
+	});
 }
 
 
@@ -686,55 +735,6 @@ function refreshNextRecordId() {
 }
 
 
-function buildDataTableHtml(items) {
-	let tableHTML = `
-		<table class="data-table data-records-table">
-			<thead>
-				<tr>
-					<th class="select-column"><input type="checkbox" id="select-all-records" aria-label="Select all records"></th>
-					<th class="sortable ${currentSortColumn === 'id' ? 'sorted' : ''}" data-column="id">
-						ID
-						<span class="sort-indicator">${currentSortColumn === 'id' ? (currentSortOrder === 'asc' ? '▲' : '▼') : ''}</span>
-					</th>
-					<th class="sortable ${currentSortColumn === 'title' ? 'sorted' : ''}" data-column="title">
-						Title
-						<span class="sort-indicator">${currentSortColumn === 'title' ? (currentSortOrder === 'asc' ? '▲' : '▼') : ''}</span>
-					</th>
-					<th class="sortable ${currentSortColumn === 'description' ? 'sorted' : ''}" data-column="description">
-						Description
-						<span class="sort-indicator">${currentSortColumn === 'description' ? (currentSortOrder === 'asc' ? '▲' : '▼') : ''}</span>
-					</th>
-					<th>Actions</th>
-				</tr>
-			</thead>
-			<tbody>
-	`;
-
-	items.forEach(function(item) {
-		const isSelected = selectedRecordIds.has(String(item.id));
-		tableHTML += `
-			<tr>
-				<td class="select-column"><input type="checkbox" class="record-select-checkbox" data-id="${item.id}" ${isSelected ? 'checked' : ''} aria-label="Select record ${item.id}"></td>
-				<td>${item.id}</td>
-				<td>${item.title}</td>
-				<td>${item.description}</td>
-				<td>
-					<button class="btn btn-sm btn-secondary edit-btn" data-id="${item.id}">Edit</button>
-					<button class="btn btn-sm btn-danger delete-btn" data-id="${item.id}">Delete</button>
-				</td>
-			</tr>
-		`;
-	});
-
-	tableHTML += `
-			</tbody>
-		</table>
-	`;
-
-	return tableHTML;
-}
-
-
 function ensureSearchIndex(items) {
 	(items || []).forEach(function(item) {
 		const title = String(item.title || '');
@@ -753,74 +753,301 @@ function ensureSearchIndex(items) {
 }
 
 
-function displayDataTable(data) {
-	syncSelectedRecordIdsWithData();
-	const container = $('#data-container');
-	container.empty();
-	
-	if (data.items && data.items.length > 0) {
-		ensureSearchIndex(data.items);
-		currentFilteredDataItems = data.items.slice();
-		container.html(buildDataTableHtml(data.items));
-
-		updateBulkDeleteButtonState();
-		updateSelectAllCheckboxState();
-		updateFilteredExportButtonsState();
-	} else {
-		container.html('<p>No data available.</p>');
-		selectedRecordIds.clear();
-		updateBulkDeleteButtonState();
-		currentFilteredDataItems = [];
-		updateFilteredExportButtonsState();
+function getFilteredSortedItems() {
+	if (!allData || !Array.isArray(allData.items)) {
+		return [];
 	}
+
+	ensureSearchIndex(allData.items);
+	const searchValue = String($('#search-input').val() || '').toLowerCase();
+
+	let filteredItems = allData.items.filter(function(item) {
+		return String(item.__searchTitle || '').includes(searchValue) ||
+			String(item.__searchDescription || '').includes(searchValue);
+	});
+
+	if (currentSortColumn) {
+		filteredItems = filteredItems.slice().sort(function(a, b) {
+			let aVal = a[currentSortColumn];
+			let bVal = b[currentSortColumn];
+
+			if (currentSortColumn === 'id') {
+				aVal = parseInt(aVal, 10);
+				bVal = parseInt(bVal, 10);
+			}
+
+			if (currentSortOrder === 'asc') {
+				return aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+			}
+			return aVal > bVal ? -1 : aVal < bVal ? 1 : 0;
+		});
+	}
+
+	return filteredItems;
+}
+
+
+function createDataTableElement() {
+	const table = document.createElement('table');
+	table.className = 'data-table data-records-table virtualized-table';
+
+	const thead = document.createElement('thead');
+	const headRow = document.createElement('tr');
+
+	const selectTh = document.createElement('th');
+	selectTh.className = 'select-column';
+	const selectAll = document.createElement('input');
+	selectAll.type = 'checkbox';
+	selectAll.id = 'select-all-records';
+	selectAll.setAttribute('aria-label', 'Select all records');
+	selectTh.appendChild(selectAll);
+	headRow.appendChild(selectTh);
+
+	function createSortableHeader(column, label) {
+		const th = document.createElement('th');
+		th.className = 'sortable' + (currentSortColumn === column ? ' sorted' : '');
+		th.setAttribute('data-column', column);
+		th.appendChild(document.createTextNode(label + ' '));
+
+		const indicator = document.createElement('span');
+		indicator.className = 'sort-indicator';
+		if (currentSortColumn === column) {
+			indicator.textContent = currentSortOrder === 'asc' ? '▲' : '▼';
+		}
+		th.appendChild(indicator);
+		return th;
+	}
+
+	headRow.appendChild(createSortableHeader('id', 'ID'));
+	headRow.appendChild(createSortableHeader('title', 'Title'));
+	headRow.appendChild(createSortableHeader('description', 'Description'));
+
+	const actionsTh = document.createElement('th');
+	actionsTh.textContent = 'Actions';
+	headRow.appendChild(actionsTh);
+
+	thead.appendChild(headRow);
+	table.appendChild(thead);
+
+	const tbody = document.createElement('tbody');
+	tbody.id = 'data-table-body';
+	table.appendChild(tbody);
+
+	return table;
+}
+
+
+function createDataRowElement(item) {
+	const row = document.createElement('tr');
+
+	const selectTd = document.createElement('td');
+	selectTd.className = 'select-column';
+	const checkbox = document.createElement('input');
+	checkbox.type = 'checkbox';
+	checkbox.className = 'record-select-checkbox';
+	checkbox.setAttribute('data-id', String(item.id));
+	checkbox.setAttribute('aria-label', 'Select record ' + item.id);
+	checkbox.checked = selectedRecordIds.has(String(item.id));
+	selectTd.appendChild(checkbox);
+	row.appendChild(selectTd);
+
+	const idTd = document.createElement('td');
+	idTd.textContent = item.id;
+	row.appendChild(idTd);
+
+	const titleTd = document.createElement('td');
+	titleTd.textContent = item.title;
+	row.appendChild(titleTd);
+
+	const descriptionTd = document.createElement('td');
+	descriptionTd.textContent = item.description;
+	row.appendChild(descriptionTd);
+
+	const actionsTd = document.createElement('td');
+	const editBtn = document.createElement('button');
+	editBtn.type = 'button';
+	editBtn.className = 'btn btn-sm btn-secondary edit-btn';
+	editBtn.setAttribute('data-id', String(item.id));
+	editBtn.textContent = 'Edit';
+	actionsTd.appendChild(editBtn);
+
+	const deleteBtn = document.createElement('button');
+	deleteBtn.type = 'button';
+	deleteBtn.className = 'btn btn-sm btn-danger delete-btn';
+	deleteBtn.setAttribute('data-id', String(item.id));
+	deleteBtn.textContent = 'Delete';
+	actionsTd.appendChild(deleteBtn);
+
+	row.appendChild(actionsTd);
+	return row;
+}
+
+
+function renderVirtualizedRows() {
+	const viewport = document.getElementById('data-table-viewport');
+	const tbody = document.getElementById('data-table-body');
+
+	if (!viewport || !tbody) {
+		return;
+	}
+
+	tbody.textContent = '';
+
+	if (!Array.isArray(currentPagedItems) || currentPagedItems.length === 0) {
+		return;
+	}
+
+	const viewportHeight = viewport.clientHeight || 520;
+	const scrollTop = viewport.scrollTop;
+	const totalRows = currentPagedItems.length;
+	const startIndex = Math.max(0, Math.floor(scrollTop / virtualRowHeightPx) - virtualOverscanRows);
+	const visibleCount = Math.ceil(viewportHeight / virtualRowHeightPx) + (virtualOverscanRows * 2);
+	const endIndex = Math.min(totalRows, startIndex + visibleCount);
+
+	const fragment = document.createDocumentFragment();
+
+	if (startIndex > 0) {
+		const topSpacer = document.createElement('tr');
+		topSpacer.className = 'virtual-spacer-row';
+		const topSpacerCell = document.createElement('td');
+		topSpacerCell.colSpan = 5;
+		topSpacerCell.style.height = String(startIndex * virtualRowHeightPx) + 'px';
+		topSpacer.appendChild(topSpacerCell);
+		fragment.appendChild(topSpacer);
+	}
+
+	for (let i = startIndex; i < endIndex; i += 1) {
+		fragment.appendChild(createDataRowElement(currentPagedItems[i]));
+	}
+
+	if (endIndex < totalRows) {
+		const bottomSpacer = document.createElement('tr');
+		bottomSpacer.className = 'virtual-spacer-row';
+		const bottomSpacerCell = document.createElement('td');
+		bottomSpacerCell.colSpan = 5;
+		bottomSpacerCell.style.height = String((totalRows - endIndex) * virtualRowHeightPx) + 'px';
+		bottomSpacer.appendChild(bottomSpacerCell);
+		fragment.appendChild(bottomSpacer);
+	}
+
+	tbody.appendChild(fragment);
+}
+
+
+function renderDataTableView() {
+	syncSelectedRecordIdsWithData();
+	const container = document.getElementById('data-container');
+	if (!container) {
+		return;
+	}
+
+	container.textContent = '';
+	const filteredItems = getFilteredSortedItems();
+	currentFilteredDataItems = filteredItems.slice();
+
+	if (filteredItems.length === 0) {
+		currentPagedItems = [];
+		selectedRecordIds.clear();
+		container.textContent = allData && Array.isArray(allData.items) && allData.items.length > 0
+			? 'No records match your search.'
+			: 'No data available.';
+		updateBulkDeleteButtonState();
+		updateFilteredExportButtonsState();
+		return;
+	}
+
+	const totalRows = filteredItems.length;
+	const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+	if (currentPage > totalPages) {
+		currentPage = totalPages;
+	}
+
+	const pageStart = (currentPage - 1) * pageSize;
+	const pageEnd = pageStart + pageSize;
+	currentPagedItems = filteredItems.slice(pageStart, pageEnd);
+
+	const viewport = document.createElement('div');
+	viewport.id = 'data-table-viewport';
+	viewport.className = 'data-table-viewport';
+	viewport.appendChild(createDataTableElement());
+	container.appendChild(viewport);
+
+	const pagination = document.createElement('div');
+	pagination.className = 'data-pagination';
+	const summary = document.createElement('span');
+	summary.className = 'data-pagination-summary';
+	summary.textContent = 'Showing ' + (pageStart + 1) + '-' + (pageStart + currentPagedItems.length) + ' of ' + totalRows;
+
+	const controls = document.createElement('div');
+	controls.className = 'data-pagination-controls';
+
+	const pageSizeGroup = document.createElement('div');
+	pageSizeGroup.className = 'data-page-size-group';
+
+	const pageSizeLabel = document.createElement('label');
+	pageSizeLabel.className = 'data-page-size-label';
+	pageSizeLabel.htmlFor = 'data-page-size';
+	pageSizeLabel.textContent = 'Rows per page';
+
+	const pageSizeSelect = document.createElement('select');
+	pageSizeSelect.id = 'data-page-size';
+	pageSizeSelect.className = 'data-page-size-select';
+	['25', '50', '100'].forEach(function(sizeValue) {
+		const option = document.createElement('option');
+		option.value = sizeValue;
+		option.textContent = sizeValue;
+		if (parseInt(sizeValue, 10) === pageSize) {
+			option.selected = true;
+		}
+		pageSizeSelect.appendChild(option);
+	});
+
+	pageSizeGroup.appendChild(pageSizeLabel);
+	pageSizeGroup.appendChild(pageSizeSelect);
+
+	const prevBtn = document.createElement('button');
+	prevBtn.type = 'button';
+	prevBtn.id = 'data-page-prev';
+	prevBtn.className = 'btn btn-sm btn-secondary';
+	prevBtn.disabled = currentPage <= 1;
+	prevBtn.textContent = 'Previous';
+
+	const pageLabel = document.createElement('span');
+	pageLabel.className = 'data-page-label';
+	pageLabel.textContent = 'Page ' + currentPage + ' of ' + totalPages;
+
+	const nextBtn = document.createElement('button');
+	nextBtn.type = 'button';
+	nextBtn.id = 'data-page-next';
+	nextBtn.className = 'btn btn-sm btn-secondary';
+	nextBtn.disabled = currentPage >= totalPages;
+	nextBtn.textContent = 'Next';
+
+	controls.appendChild(pageSizeGroup);
+	controls.appendChild(prevBtn);
+	controls.appendChild(pageLabel);
+	controls.appendChild(nextBtn);
+	pagination.appendChild(summary);
+	pagination.appendChild(controls);
+	container.appendChild(pagination);
+
+	renderVirtualizedRows();
+	updateBulkDeleteButtonState();
+	updateSelectAllCheckboxState();
+	updateFilteredExportButtonsState();
+}
+
+
+function displayDataTable(data) {
+	if (data && typeof data === 'object') {
+		allData = data;
+	}
+	renderDataTableView();
 }
 
 
 function filterAndSortTable() {
-	if (!allData || !allData.items) return;
-
-	syncSelectedRecordIdsWithData();
-	ensureSearchIndex(allData.items);
-	
-	const searchValue = $('#search-input').val().toLowerCase();
-	
-	let filteredItems = allData.items.filter(function(item) {
-		return String(item.__searchTitle || '').includes(searchValue) || 
-			   String(item.__searchDescription || '').includes(searchValue);
-	});
-	
-	if (currentSortColumn) {
-		filteredItems.sort(function(a, b) {
-			let aVal = a[currentSortColumn];
-			let bVal = b[currentSortColumn];
-			
-			if (currentSortColumn === 'id') {
-				aVal = parseInt(aVal);
-				bVal = parseInt(bVal);
-			}
-			
-			if (currentSortOrder === 'asc') {
-				return aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
-			} else {
-				return aVal > bVal ? -1 : aVal < bVal ? 1 : 0;
-			}
-		});
-	}
-	
-	const container = $('#data-container');
-	container.empty();
-	currentFilteredDataItems = filteredItems.slice();
-	
-	if (filteredItems.length > 0) {
-		container.html(buildDataTableHtml(filteredItems));
-		updateBulkDeleteButtonState();
-		updateSelectAllCheckboxState();
-		updateFilteredExportButtonsState();
-	} else {
-		container.html('<p>No records match your search.</p>');
-		updateBulkDeleteButtonState();
-		updateFilteredExportButtonsState();
-	}
+	renderDataTableView();
 }
 
 
@@ -888,29 +1115,70 @@ function exportFilteredDataAsPDF() {
 	}
 
 	const exportDate = new Date().toLocaleDateString();
-	let tableRows = '';
-	currentFilteredDataItems.forEach(function(item) {
-		tableRows += '<tr><td>' + item.id + '</td><td>' + item.title + '</td><td>' + item.description + '</td></tr>';
-	});
-
 	const exportContainer = document.createElement('div');
-	exportContainer.innerHTML = `
-		<div style="font-family: Arial, sans-serif; color: #2c3e50;">
-			<h2 style="margin-bottom: 8px;">Filtered Data Export</h2>
-			<p style="margin: 0 0 12px;"><strong>Generated:</strong> ${exportDate}</p>
-			<p style="margin: 0 0 16px;"><strong>Total Rows:</strong> ${currentFilteredDataItems.length}</p>
-			<table style="width:100%; border-collapse: collapse;">
-				<thead>
-					<tr style="background:#667eea; color:#ffffff;">
-						<th style="padding:8px; border:1px solid #d4dae6; text-align:left;">ID</th>
-						<th style="padding:8px; border:1px solid #d4dae6; text-align:left;">Title</th>
-						<th style="padding:8px; border:1px solid #d4dae6; text-align:left;">Description</th>
-					</tr>
-				</thead>
-				<tbody>${tableRows}</tbody>
-			</table>
-		</div>
-	`;
+	const wrapper = document.createElement('div');
+	wrapper.style.fontFamily = 'Arial, sans-serif';
+	wrapper.style.color = '#2c3e50';
+
+	const title = document.createElement('h2');
+	title.style.marginBottom = '8px';
+	title.textContent = 'Filtered Data Export';
+
+	const generated = document.createElement('p');
+	generated.style.margin = '0 0 12px';
+	const generatedStrong = document.createElement('strong');
+	generatedStrong.textContent = 'Generated:';
+	generated.appendChild(generatedStrong);
+	generated.appendChild(document.createTextNode(' ' + exportDate));
+
+	const totalRows = document.createElement('p');
+	totalRows.style.margin = '0 0 16px';
+	const totalStrong = document.createElement('strong');
+	totalStrong.textContent = 'Total Rows:';
+	totalRows.appendChild(totalStrong);
+	totalRows.appendChild(document.createTextNode(' ' + currentFilteredDataItems.length));
+
+	const table = document.createElement('table');
+	table.style.width = '100%';
+	table.style.borderCollapse = 'collapse';
+
+	const thead = document.createElement('thead');
+	const headRow = document.createElement('tr');
+	headRow.style.background = '#667eea';
+	headRow.style.color = '#ffffff';
+	['ID', 'Title', 'Description'].forEach(function(label) {
+		const th = document.createElement('th');
+		th.style.padding = '8px';
+		th.style.border = '1px solid #d4dae6';
+		th.style.textAlign = 'left';
+		th.textContent = label;
+		headRow.appendChild(th);
+	});
+	thead.appendChild(headRow);
+	table.appendChild(thead);
+
+	const tbody = document.createElement('tbody');
+	const rowFragment = document.createDocumentFragment();
+	currentFilteredDataItems.forEach(function(item) {
+		const row = document.createElement('tr');
+		[item.id, item.title, item.description].forEach(function(value) {
+			const td = document.createElement('td');
+			td.style.padding = '8px';
+			td.style.border = '1px solid #d4dae6';
+			td.style.textAlign = 'left';
+			td.textContent = String(value);
+			row.appendChild(td);
+		});
+		rowFragment.appendChild(row);
+	});
+	tbody.appendChild(rowFragment);
+	table.appendChild(tbody);
+
+	wrapper.appendChild(title);
+	wrapper.appendChild(generated);
+	wrapper.appendChild(totalRows);
+	wrapper.appendChild(table);
+	exportContainer.appendChild(wrapper);
 
 	const opt = {
 		margin: 10,
@@ -1247,52 +1515,79 @@ function generateDataReport() {
 		return;
 	}
 	
-	const container = $('#report-container');
-	container.empty();
-	
+	const container = document.getElementById('report-container');
+	container.textContent = '';
+
 	const totalRecords = allData.items.length;
 	const reportDate = new Date().toLocaleDateString();
-	
-	let reportHTML = `
-		<div id="report-content" class="report">
-			<div class="report-header">
-				<h3>Data Report</h3>
-				<p><strong>Generated:</strong> ${reportDate}</p>
-				<p><strong>Total Records:</strong> ${totalRecords}</p>
-			</div>
-			
-			<table class="report-table">
-				<thead>
-					<tr>
-						<th>ID</th>
-						<th>Title</th>
-						<th>Description</th>
-					</tr>
-				</thead>
-				<tbody>
-	`;
-	
-	allData.items.forEach(function(item) {
-		reportHTML += `
-			<tr>
-				<td>${item.id}</td>
-				<td>${item.title}</td>
-				<td>${item.description}</td>
-			</tr>
-		`;
+
+	const report = document.createElement('div');
+	report.id = 'report-content';
+	report.className = 'report';
+
+	const header = document.createElement('div');
+	header.className = 'report-header';
+
+	const title = document.createElement('h3');
+	title.textContent = 'Data Report';
+
+	const generated = document.createElement('p');
+	const generatedLabel = document.createElement('strong');
+	generatedLabel.textContent = 'Generated:';
+	generated.appendChild(generatedLabel);
+	generated.appendChild(document.createTextNode(' ' + reportDate));
+
+	const total = document.createElement('p');
+	const totalLabel = document.createElement('strong');
+	totalLabel.textContent = 'Total Records:';
+	total.appendChild(totalLabel);
+	total.appendChild(document.createTextNode(' ' + totalRecords));
+
+	header.appendChild(title);
+	header.appendChild(generated);
+	header.appendChild(total);
+	report.appendChild(header);
+
+	const table = document.createElement('table');
+	table.className = 'report-table';
+
+	const thead = document.createElement('thead');
+	const headRow = document.createElement('tr');
+	['ID', 'Title', 'Description'].forEach(function(label) {
+		const th = document.createElement('th');
+		th.textContent = label;
+		headRow.appendChild(th);
 	});
-	
-	reportHTML += `
-				</tbody>
-			</table>
-			
-			<div class="report-footer">
-				<p>End of Report</p>
-			</div>
-		</div>
-	`;
-	
-	container.html(reportHTML);
+	thead.appendChild(headRow);
+	table.appendChild(thead);
+
+	const tbody = document.createElement('tbody');
+	const rowsFragment = document.createDocumentFragment();
+	allData.items.forEach(function(item) {
+		const row = document.createElement('tr');
+		const idTd = document.createElement('td');
+		idTd.textContent = item.id;
+		const titleTd = document.createElement('td');
+		titleTd.textContent = item.title;
+		const descTd = document.createElement('td');
+		descTd.textContent = item.description;
+		row.appendChild(idTd);
+		row.appendChild(titleTd);
+		row.appendChild(descTd);
+		rowsFragment.appendChild(row);
+	});
+	tbody.appendChild(rowsFragment);
+	table.appendChild(tbody);
+	report.appendChild(table);
+
+	const footer = document.createElement('div');
+	footer.className = 'report-footer';
+	const footerText = document.createElement('p');
+	footerText.textContent = 'End of Report';
+	footer.appendChild(footerText);
+	report.appendChild(footer);
+
+	container.appendChild(report);
 	$('#download-pdf-btn').removeClass('hidden');
 	$('#download-csv-btn').removeClass('hidden');
 }
@@ -1304,55 +1599,83 @@ function generateLogsReport() {
 		return;
 	}
 	
-	const container = $('#report-container');
-	container.empty();
-	
+	const container = document.getElementById('report-container');
+	container.textContent = '';
+
 	const totalLogs = allLogs.logs.length;
 	const reportDate = new Date().toLocaleDateString();
-	
-	let reportHTML = `
-		<div id="report-content" class="report">
-			<div class="report-header">
-				<h3>Logs Report</h3>
-				<p><strong>Generated:</strong> ${reportDate}</p>
-				<p><strong>Total Log Entries:</strong> ${totalLogs}</p>
-			</div>
-			
-			<table class="report-table">
-				<thead>
-					<tr>
-						<th>ID</th>
-						<th>Date</th>
-						<th>Time</th>
-						<th>Event</th>
-					</tr>
-				</thead>
-				<tbody>
-	`;
-	
+
+	const report = document.createElement('div');
+	report.id = 'report-content';
+	report.className = 'report';
+
+	const header = document.createElement('div');
+	header.className = 'report-header';
+
+	const title = document.createElement('h3');
+	title.textContent = 'Logs Report';
+
+	const generated = document.createElement('p');
+	const generatedLabel = document.createElement('strong');
+	generatedLabel.textContent = 'Generated:';
+	generated.appendChild(generatedLabel);
+	generated.appendChild(document.createTextNode(' ' + reportDate));
+
+	const total = document.createElement('p');
+	const totalLabel = document.createElement('strong');
+	totalLabel.textContent = 'Total Log Entries:';
+	total.appendChild(totalLabel);
+	total.appendChild(document.createTextNode(' ' + totalLogs));
+
+	header.appendChild(title);
+	header.appendChild(generated);
+	header.appendChild(total);
+	report.appendChild(header);
+
+	const table = document.createElement('table');
+	table.className = 'report-table';
+
+	const thead = document.createElement('thead');
+	const headRow = document.createElement('tr');
+	['ID', 'Date', 'Time', 'Event'].forEach(function(label) {
+		const th = document.createElement('th');
+		th.textContent = label;
+		headRow.appendChild(th);
+	});
+	thead.appendChild(headRow);
+	table.appendChild(thead);
+
+	const tbody = document.createElement('tbody');
+	const rowsFragment = document.createDocumentFragment();
 	allLogs.logs.forEach(function(log) {
 		const localTime = convertToLocalTime(log.time, log.date);
-		reportHTML += `
-			<tr>
-				<td>${log.id}</td>
-				<td>${log.date}</td>
-				<td>${localTime}</td>
-				<td>${log.event}</td>
-			</tr>
-		`;
+		const row = document.createElement('tr');
+		const idTd = document.createElement('td');
+		idTd.textContent = log.id;
+		const dateTd = document.createElement('td');
+		dateTd.textContent = log.date;
+		const timeTd = document.createElement('td');
+		timeTd.textContent = localTime;
+		const eventTd = document.createElement('td');
+		eventTd.textContent = log.event;
+		row.appendChild(idTd);
+		row.appendChild(dateTd);
+		row.appendChild(timeTd);
+		row.appendChild(eventTd);
+		rowsFragment.appendChild(row);
 	});
-	
-	reportHTML += `
-				</tbody>
-			</table>
-			
-			<div class="report-footer">
-				<p>End of Report</p>
-			</div>
-		</div>
-	`;
-	
-	container.html(reportHTML);
+	tbody.appendChild(rowsFragment);
+	table.appendChild(tbody);
+	report.appendChild(table);
+
+	const footer = document.createElement('div');
+	footer.className = 'report-footer';
+	const footerText = document.createElement('p');
+	footerText.textContent = 'End of Report';
+	footer.appendChild(footerText);
+	report.appendChild(footer);
+
+	container.appendChild(report);
 	$('#download-pdf-btn').removeClass('hidden');
 	$('#download-csv-btn').removeClass('hidden');
 }

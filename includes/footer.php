@@ -4,8 +4,19 @@
 	
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 	<?php endif; ?>
-	
-	<script src="../js/script.js"></script>
+
+	<script src="../js/core/shared.js"></script>
+	<?php $currentPage = basename($_SERVER['PHP_SELF']); ?>
+	<?php if ($currentPage === 'data.php'): ?>
+	<script src="../js/features/data-page.js"></script>
+	<?php endif; ?>
+	<?php if ($currentPage === 'reports.php'): ?>
+	<script src="../js/features/reports-page.js"></script>
+	<?php endif; ?>
+	<?php if ($currentPage === 'audit.php'): ?>
+	<script src="../js/features/audit-page.js"></script>
+	<?php endif; ?>
+	<script src="../js/pages/app-init.js"></script>
 </body>
 </html>
 
