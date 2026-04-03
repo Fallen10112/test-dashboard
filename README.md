@@ -172,6 +172,8 @@ test-dashboard/
 - **Fixed Left Navigation**: 250px sidebar with active page highlighting
 - **Scroll-Safe Sidebar**: Menu area scrolls while bottom utility controls remain visible and non-overlapping
 - **Responsive Main Content**: Scrollable content area that adapts to the active theme
+- **Mobile-Optimized Layout**: At smaller breakpoints, the fixed desktop shell converts to a stacked flow with sticky header, full-width navigation, and touch-friendly spacing
+- **Mobile-Friendly Tables**: Data and report tables use horizontal overflow on small screens to preserve readability
 - **Professional Styling**: Modern UI with smooth transitions and hover effects
 - **Consistent Design**: Unified look across all pages
 
@@ -395,6 +397,8 @@ test-dashboard/
 - ✅ **API File Lock + Retry Writes** for improved reliability under concurrent operations
 - ✅ **Deployable Environment Modes** (`demo` and `production`) with configurable index reset behavior
 - ✅ **Modular JavaScript Loading** with shared core + page-specific feature modules
+- ✅ **Mobile Responsive Shell** with phone-first layout overrides for header, navigation, controls, and content flow
+- ✅ **Small-Screen Table Handling** with touch scrolling support and safer table sizing
 
 ## Important Notes
 
@@ -411,6 +415,7 @@ test-dashboard/
 - ✅ Data-page filtered exports log export events and include only visible filtered rows
 - ✅ Data page rows-per-page preference persists across reloads
 - ✅ Legacy monolithic `js/script.js` has been retired in favor of modular files
+- ✅ For real phone testing on a local server, open the app using your computer's LAN IP (not `localhost`)
 
 ## Maintenance & Customization
 
