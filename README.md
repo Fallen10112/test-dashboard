@@ -25,7 +25,7 @@ test-dashboard/
 │   ├── core/
 │   │   └── shared.js      # Shared state/utilities, theme, reset flow, common data/log loaders
 │   ├── features/
-│   │   ├── data-page.js   # Data page CRUD, pagination/virtualization, filtered export
+│   │   ├── data-page.js   # Data page server-backed CRUD, pagination, sorting, and filtered export
 │   │   ├── reports-page.js# Reports generation and PDF/CSV downloads
 │   │   └── audit-page.js  # Audit trail filters, table/timeline rendering, diff markup
 │   └── pages/
@@ -55,20 +55,18 @@ test-dashboard/
 - Technical stack information
 
 ### 📊 Data Management Page
-- **View Data**: Displays all records in a responsive, sortable table
-- **Pagination Controls**: Navigate data with Previous/Next controls and page summary
+- **View Data**: Displays records in a responsive, sortable table powered by server-side queries
+- **Server-Side Pagination**: Previous/Next navigation and page summaries are driven by the backend instead of paging the full dataset in the browser
 - **Rows-Per-Page Selector**: Change visible page size from bottom-right pagination controls (25/50/100)
-- **Virtualized Rendering**: Only visible rows are rendered for smoother performance with larger datasets
+- **Server-Side Filtering & Sorting**: Search and column sorting are sent to the API so the browser only renders the active page results
+- **Virtualized Rendering**: Only visible rows on the current page are rendered for smoother performance
 - **Preference Persistence**: Selected rows-per-page value is saved in localStorage and restored automatically
-- **Add Records**: Modal form to add new entries with auto-incrementing IDs
-- **Edit Records**: Full editing capability for existing records
-- **Delete Records**: Remove records with confirmation dialogs
-- **Bulk Delete Records**: Select multiple records and delete them in one action (Data page only)
-- **Filtered Export (PDF/CSV)**: Export only the currently visible filtered/sorted rows from the Data page
+- **API-Backed CRUD**: Add, edit, delete, and bulk delete actions are executed through dedicated API operations
+- **Filtered Export (PDF/CSV)**: Export uses a backend-filtered dataset so downloaded files match the active search/sort state
 - **Action Order**: Data controls are arranged as Add, Delete, Export PDF, Export CSV
-- **Search & Filter**: Real-time search by title and description
-- **Column Sorting**: Click column headers to sort (ascending/descending)
-- **Auto-Save**: All changes immediately saved to encrypted storage
+- **Search & Filter**: Real-time search by title and description via API request
+- **Column Sorting**: Click column headers to sort (ascending/descending) via API request
+- **Auto-Save**: All changes are saved immediately through backend mutation endpoints
 - **Activity Logging**: Every operation automatically logged with timestamps
 - **Audit Integration**: All changes tracked in the audit trail with field-level detail
 
@@ -213,11 +211,20 @@ test-dashboard/
 #### Backend
 - **api.php**: Handles all backend operations:
   - Get/save data from/to encrypted JSON files
+  - Serve paginated, filtered, and sorted Data page responses
+  - Process dedicated Data page create, update, delete, and bulk delete requests
   - Manage logs and audit trails
   - Track all data changes with field-level detail
   - Encrypt/decrypt using AES-256-CBC
   - Apply file locking and retry logic to write operations
   - Generate timestamps using a fixed one-hour offset
+
+#### Server-Side Data API
+- **Paged Data Endpoint**: `GET api.php?action=data_page` returns the current page of Data records plus metadata such as `page`, `pageSize`, `totalPages`, `totalCount`, and `filteredCount`
+- **Query Parameters**: Supports `search`, `sortColumn`, `sortOrder`, `page`, and `pageSize` for the Data page
+- **Filtered Export Endpoint**: `GET api.php?action=data_filtered_export` returns the full filtered/sorted result set for PDF/CSV export generation
+- **Mutation Actions**: `POST` requests with `action` values `data_create`, `data_update`, `data_delete`, and `data_bulk_delete` handle Data page changes on the server
+- **Compatibility**: Existing full-data and logs/audit endpoints remain available for reports, metrics, and shared loaders
 
 #### Frontend Assets
 - **css/style.css**:
@@ -233,10 +240,10 @@ test-dashboard/
   - Theme initialization/persistence and reset workflow
   - Shared data and logs loading helpers
 - **js/features/data-page.js**:
-  - Data table rendering with search and sorting
-  - Modal form management and CRUD operations
+  - Server-backed Data table rendering with search, sorting, and pagination queries
+  - Modal form management with API-driven create/update/delete actions
   - Data-page bulk selection and bulk delete logic
-  - Pagination, row virtualization, filtered PDF/CSV export
+  - Row virtualization for the active page and filtered PDF/CSV export
 - **js/features/reports-page.js**:
   - Report generation and report PDF/CSV download handlers
 - **js/features/audit-page.js**:
@@ -268,7 +275,7 @@ test-dashboard/
 1. Navigate to Data page and apply search/sort filters
 2. Use action buttons in order: Add, Delete, Export PDF, Export CSV
 3. Click "Export Filtered PDF" or "Export Filtered CSV"
-4. Only the currently visible filtered rows are exported
+4. The export endpoint returns the full filtered/sorted dataset that matches the active Data page query
 5. Export action is logged in the system logs
 
 ### View Changes
@@ -394,6 +401,8 @@ test-dashboard/
 - ✅ **Filtered Data Export (PDF/CSV)** for current visible results
 - ✅ **Paginated Data Grid** with bottom-right rows-per-page selector and persistent preference
 - ✅ **Virtualized Row Rendering** for improved Data page performance on larger lists
+- ✅ **Server-Side Data Queries** for Data page pagination, filtering, and sorting
+- ✅ **API-Driven Data CRUD** for Data page add, edit, delete, and bulk delete actions
 - ✅ **API File Lock + Retry Writes** for improved reliability under concurrent operations
 - ✅ **Deployable Environment Modes** (`demo` and `production`) with configurable index reset behavior
 - ✅ **Modular JavaScript Loading** with shared core + page-specific feature modules
@@ -412,7 +421,7 @@ test-dashboard/
 - ✅ `index.php` reset behavior is controlled by environment mode/settings (`APP_MODE` and `RESET_ON_INDEX_VISIT`)
 - ✅ Bulk actions are currently limited to bulk delete on the Data page only
 - ✅ Audit Trail supports both Table and Timeline views
-- ✅ Data-page filtered exports log export events and include only visible filtered rows
+- ✅ Data-page filtered exports log export events and include the full filtered/sorted dataset returned by the backend export endpoint
 - ✅ Data page rows-per-page preference persists across reloads
 - ✅ Legacy monolithic `js/script.js` has been retired in favor of modular files
 - ✅ For real phone testing on a local server, open the app using your computer's LAN IP (not `localhost`)
