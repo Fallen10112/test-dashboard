@@ -1,5 +1,9 @@
+let currentFilteredItemCount = 0;
+let currentTotalDataCount = 0;
+
+
 function setupDataPageHandlers() {
-	const debouncedFilter = debounce(filterAndSortTable, 180);
+	const debouncedFilter = debounce(loadDataPage, 180);
 	const debouncedVirtualRender = debounce(renderVirtualizedRows, 16);
 
 	$('#add-record-btn').on('click', function() {
@@ -18,17 +22,18 @@ function setupDataPageHandlers() {
 		bulkDeleteSelectedRecords();
 	});
 
-	$('#search-input').on('keyup', function() {
+	$('#search-input').on('input', function() {
 		currentPage = 1;
 		debouncedFilter();
 	});
 
 	$('#data-container').on('change', '#data-page-size', function() {
 		const requested = parseInt($(this).val(), 10);
-		pageSize = Number.isNaN(requested) ? 25 : Math.max(1, requested);
+		const allowedPageSizes = [25, 50, 100];
+		pageSize = !Number.isNaN(requested) && allowedPageSizes.indexOf(requested) !== -1 ? requested : 25;
 		localStorage.setItem(dataPageSizeStorageKey, String(pageSize));
 		currentPage = 1;
-		renderDataTableView();
+		loadDataPage();
 	});
 
 	$('#data-container').on('click', '.sortable', function() {
@@ -40,22 +45,21 @@ function setupDataPageHandlers() {
 			currentSortOrder = 'asc';
 		}
 		currentPage = 1;
-		filterAndSortTable();
+		loadDataPage();
 	});
 
 	$('#data-container').on('click', '#data-page-prev', function() {
 		if (currentPage > 1) {
 			currentPage -= 1;
-			renderDataTableView();
+			loadDataPage();
 		}
 	});
 
 	$('#data-container').on('click', '#data-page-next', function() {
-		const totalRows = currentFilteredDataItems.length;
-		const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+		const totalPages = Math.max(1, Math.ceil(currentFilteredItemCount / pageSize));
 		if (currentPage < totalPages) {
 			currentPage += 1;
-			renderDataTableView();
+			loadDataPage();
 		}
 	});
 
@@ -109,6 +113,7 @@ function setupDataPageHandlers() {
 		}
 	});
 
+	updateBulkDeleteButtonState();
 	updateFilteredExportButtonsState();
 }
 
@@ -120,31 +125,56 @@ function initializeDataPagePreferences() {
 	if (!Number.isNaN(parsed) && allowedPageSizes.indexOf(parsed) !== -1) {
 		pageSize = parsed;
 	}
+	if (!currentSortColumn) {
+		currentSortColumn = 'id';
+	}
+	if (!currentSortOrder) {
+		currentSortOrder = 'asc';
+	}
+}
+
+
+function buildDataPageRequestParams() {
+	return {
+		action: 'data_page',
+		search: String($('#search-input').val() || '').trim(),
+		sortColumn: currentSortColumn || 'id',
+		sortOrder: currentSortOrder || 'asc',
+		page: currentPage,
+		pageSize: pageSize
+	};
+}
+
+
+function loadDataPage(callback) {
+	$.ajax({
+		url: '../api.php',
+		type: 'GET',
+		dataType: 'json',
+		data: buildDataPageRequestParams(),
+		success: function(response) {
+			renderDataTableView(response || {});
+			if (typeof callback === 'function') {
+				callback(response || {});
+			}
+		},
+		error: function() {
+			$('#data-container').html('<p class="error">Error loading data. Please refresh the page.</p>');
+			currentPagedItems = [];
+			currentFilteredDataItems = [];
+			currentFilteredItemCount = 0;
+			currentTotalDataCount = 0;
+			updateBulkDeleteButtonState();
+			updateFilteredExportButtonsState();
+		}
+	});
 }
 
 
 function updateFilteredExportButtonsState() {
-	const hasRows = Array.isArray(currentFilteredDataItems) && currentFilteredDataItems.length > 0;
+	const hasRows = currentFilteredItemCount > 0;
 	$('#export-filtered-pdf-btn').prop('disabled', !hasRows);
 	$('#export-filtered-csv-btn').prop('disabled', !hasRows);
-}
-
-
-function syncSelectedRecordIdsWithData() {
-	if (!allData || !Array.isArray(allData.items)) {
-		selectedRecordIds.clear();
-		return;
-	}
-
-	const existingIds = new Set(allData.items.map(function(item) {
-		return String(item.id);
-	}));
-
-	selectedRecordIds.forEach(function(id) {
-		if (!existingIds.has(String(id))) {
-			selectedRecordIds.delete(id);
-		}
-	});
 }
 
 
@@ -181,6 +211,30 @@ function updateSelectAllCheckboxState() {
 }
 
 
+function performDataMutation(payload, onSuccess, errorMessage) {
+	$.ajax({
+		url: '../api.php',
+		type: 'POST',
+		contentType: 'application/json',
+		dataType: 'json',
+		data: JSON.stringify(payload),
+		success: function(response) {
+			if (response && response.success === false) {
+				showToast({ type: 'error', title: 'Action Failed', message: response.message || errorMessage || 'The request could not be completed.', showOkayButton: true, autoCloseMs: 3000 });
+				return;
+			}
+			if (typeof onSuccess === 'function') {
+				onSuccess(response || {});
+			}
+		},
+		error: function(xhr) {
+			const response = xhr && xhr.responseJSON ? xhr.responseJSON : null;
+			showToast({ type: 'error', title: 'Action Failed', message: (response && response.message) || errorMessage || 'The request could not be completed.', showOkayButton: true, autoCloseMs: 3000 });
+		}
+	});
+}
+
+
 function bulkDeleteSelectedRecords() {
 	const selectedIds = Array.from(selectedRecordIds);
 	if (selectedIds.length === 0) {
@@ -199,96 +253,26 @@ function bulkDeleteSelectedRecords() {
 				label: 'Delete Selected',
 				className: 'btn-danger',
 				onClick: function() {
-					const idSet = new Set(selectedIds.map(String));
-					const deletedItems = allData.items.filter(function(item) {
-						return idSet.has(String(item.id));
-					});
-					const deletedIdsSummary = deletedItems.map(function(item) {
-						return item.id;
-					}).join(', ');
-					const auditEntries = [];
-
-					deletedItems.forEach(function(item) {
-						auditEntries.push({
-							changeType: 'DELETE',
-							recordId: item.id,
-							fieldName: 'record',
-							oldValue: 'Title: "' + item.title + '", Description: "' + item.description + '"',
-							newValue: ''
-						});
-					});
-
-					auditEntries.push({
-						changeType: 'DELETE',
-						recordId: 'BULK',
-						fieldName: 'bulk_action',
-						oldValue: 'Selected IDs: ' + deletedIdsSummary,
-						newValue: 'Deleted ' + deletedItems.length + ' records'
-					});
-
-					addAuditTrailEntries(auditEntries);
-					allData.items = allData.items.filter(function(item) {
-						return !idSet.has(String(item.id));
-					});
-					selectedRecordIds.clear();
-					displayDataTable(allData);
-					const eventMessage = 'Bulk delete completed for ' + deletedItems.length + ' records (IDs: ' + deletedIdsSummary + ')';
-					saveDataToFileWithLog(eventMessage, 'delete', {
-						successToast: {
-							type: 'success',
-							title: 'Bulk Delete Complete',
-							message: deletedItems.length + ' record(s) deleted successfully.',
-							showOkayButton: true,
-							autoCloseMs: 3000
-						}
-					});
+					performDataMutation(
+						{ action: 'data_bulk_delete', ids: selectedIds },
+						function(response) {
+							selectedRecordIds.clear();
+							loadDataPage();
+							loadHeaderMetrics();
+							showToast({
+								type: 'success',
+								title: 'Bulk Delete Complete',
+								message: String(response.deletedCount || selectedIds.length) + ' record(s) deleted successfully.',
+								showOkayButton: true,
+								autoCloseMs: 3000
+							});
+						},
+						'Error deleting selected records.'
+					);
 				}
 			}
 		]
 	});
-}
-
-
-function ensureSearchIndex(items) {
-	(items || []).forEach(function(item) {
-		const title = String(item.title || '');
-		const description = String(item.description || '');
-		if (item.__searchTitleSource !== title) {
-			item.__searchTitle = title.toLowerCase();
-			item.__searchTitleSource = title;
-		}
-		if (item.__searchDescriptionSource !== description) {
-			item.__searchDescription = description.toLowerCase();
-			item.__searchDescriptionSource = description;
-		}
-	});
-}
-
-
-function getFilteredSortedItems() {
-	if (!allData || !Array.isArray(allData.items)) {
-		return [];
-	}
-	ensureSearchIndex(allData.items);
-	const searchValue = String($('#search-input').val() || '').toLowerCase();
-	let filteredItems = allData.items.filter(function(item) {
-		return String(item.__searchTitle || '').includes(searchValue) || String(item.__searchDescription || '').includes(searchValue);
-	});
-	if (currentSortColumn) {
-		filteredItems = filteredItems.slice().sort(function(a, b) {
-			let aVal = a[currentSortColumn];
-			let bVal = b[currentSortColumn];
-			if (currentSortColumn === 'id') {
-				aVal = parseInt(aVal, 10);
-				bVal = parseInt(bVal, 10);
-			}
-			if (currentSortOrder === 'asc') {
-				return aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
-			}
-			return aVal > bVal ? -1 : aVal < bVal ? 1 : 0;
-		});
-	}
-	return filteredItems;
 }
 
 
@@ -423,35 +407,38 @@ function renderVirtualizedRows() {
 }
 
 
-function renderDataTableView() {
-	syncSelectedRecordIdsWithData();
+function renderDataTableView(response) {
 	const container = document.getElementById('data-container');
 	if (!container) {
 		return;
 	}
 
-	container.textContent = '';
-	const filteredItems = getFilteredSortedItems();
-	currentFilteredDataItems = filteredItems.slice();
+	const payload = response && typeof response === 'object' ? response : {};
+	currentPage = parseInt(payload.page, 10) || 1;
+	pageSize = parseInt(payload.pageSize, 10) || pageSize;
+	currentFilteredItemCount = parseInt(payload.filteredCount, 10) || 0;
+	currentTotalDataCount = parseInt(payload.totalCount, 10) || 0;
+	currentSortColumn = payload.sortColumn || currentSortColumn || 'id';
+	currentSortOrder = payload.sortOrder || currentSortOrder || 'asc';
+	currentPagedItems = Array.isArray(payload.items) ? payload.items.slice() : [];
+	currentFilteredDataItems = currentPagedItems.slice();
 
-	if (filteredItems.length === 0) {
+	container.textContent = '';
+
+	if (currentFilteredItemCount === 0) {
 		currentPagedItems = [];
-		selectedRecordIds.clear();
-		container.textContent = allData && Array.isArray(allData.items) && allData.items.length > 0 ? 'No records match your search.' : 'No data available.';
+		currentFilteredDataItems = [];
+		if (currentTotalDataCount === 0) {
+			selectedRecordIds.clear();
+		}
+		container.textContent = currentTotalDataCount > 0 ? 'No records match your search.' : 'No data available.';
 		updateBulkDeleteButtonState();
 		updateFilteredExportButtonsState();
 		return;
 	}
 
-	const totalRows = filteredItems.length;
-	const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
-	if (currentPage > totalPages) {
-		currentPage = totalPages;
-	}
-
 	const pageStart = (currentPage - 1) * pageSize;
-	const pageEnd = pageStart + pageSize;
-	currentPagedItems = filteredItems.slice(pageStart, pageEnd);
+	const totalPages = Math.max(1, parseInt(payload.totalPages, 10) || Math.ceil(currentFilteredItemCount / pageSize));
 
 	const viewport = document.createElement('div');
 	viewport.id = 'data-table-viewport';
@@ -463,7 +450,7 @@ function renderDataTableView() {
 	pagination.className = 'data-pagination';
 	const summary = document.createElement('span');
 	summary.className = 'data-pagination-summary';
-	summary.textContent = 'Showing ' + (pageStart + 1) + '-' + (pageStart + currentPagedItems.length) + ' of ' + totalRows;
+	summary.textContent = 'Showing ' + (pageStart + 1) + '-' + (pageStart + currentPagedItems.length) + ' of ' + currentFilteredItemCount;
 
 	const controls = document.createElement('div');
 	controls.className = 'data-pagination-controls';
@@ -523,48 +510,57 @@ function renderDataTableView() {
 
 
 function displayDataTable(data) {
-	if (data && typeof data === 'object') {
-		allData = data;
-	}
-	renderDataTableView();
+	const items = data && Array.isArray(data.items) ? data.items : [];
+	renderDataTableView({
+		items: items,
+		page: 1,
+		pageSize: pageSize,
+		totalPages: 1,
+		totalCount: items.length,
+		filteredCount: items.length,
+		sortColumn: currentSortColumn || 'id',
+		sortOrder: currentSortOrder || 'asc'
+	});
 }
 
 
 function filterAndSortTable() {
-	renderDataTableView();
+	loadDataPage();
 }
 
 
 function exportFilteredDataAsCSV() {
-	if (!Array.isArray(currentFilteredDataItems) || currentFilteredDataItems.length === 0) {
+	if (currentFilteredItemCount === 0) {
 		showToast({ type: 'warning', title: 'No Filtered Rows', message: 'There are no visible rows to export.', showOkayButton: true, autoCloseMs: 3000 });
 		return;
 	}
 
-	let csv = 'ID,Title,Description\n';
-	currentFilteredDataItems.forEach(function(item) {
-		const title = '"' + String(item.title || '').replace(/"/g, '""') + '"';
-		const description = '"' + String(item.description || '').replace(/"/g, '""') + '"';
-		csv += item.id + ',' + title + ',' + description + '\n';
+	fetchFilteredItemsForExport(function(filteredItems) {
+		let csv = 'ID,Title,Description\n';
+		filteredItems.forEach(function(item) {
+			const title = '"' + String(item.title || '').replace(/"/g, '""') + '"';
+			const description = '"' + String(item.description || '').replace(/"/g, '""') + '"';
+			csv += item.id + ',' + title + ',' + description + '\n';
+		});
+
+		const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+		const link = document.createElement('a');
+		const url = URL.createObjectURL(blob);
+		link.setAttribute('href', url);
+		link.setAttribute('download', 'filtered-data-' + new Date().toISOString().split('T')[0] + '.csv');
+		link.style.visibility = 'hidden';
+		document.body.appendChild(link);
+		link.click();
+		document.body.removeChild(link);
+
+		logEvent('A filtered CSV export has been downloaded for: Data (' + filteredItems.length + ' rows)');
+		showToast({ type: 'success', title: 'CSV Export Complete', message: 'Filtered Data CSV downloaded successfully.', showOkayButton: true, autoCloseMs: 3000 });
 	});
-
-	const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-	const link = document.createElement('a');
-	const url = URL.createObjectURL(blob);
-	link.setAttribute('href', url);
-	link.setAttribute('download', 'filtered-data-' + new Date().toISOString().split('T')[0] + '.csv');
-	link.style.visibility = 'hidden';
-	document.body.appendChild(link);
-	link.click();
-	document.body.removeChild(link);
-
-	logEvent('A filtered CSV export has been downloaded for: Data (' + currentFilteredDataItems.length + ' rows)');
-	showToast({ type: 'success', title: 'CSV Export Complete', message: 'Filtered Data CSV downloaded successfully.', showOkayButton: true, autoCloseMs: 3000 });
 }
 
 
 function exportFilteredDataAsPDF() {
-	if (!Array.isArray(currentFilteredDataItems) || currentFilteredDataItems.length === 0) {
+	if (currentFilteredItemCount === 0) {
 		showToast({ type: 'warning', title: 'No Filtered Rows', message: 'There are no visible rows to export.', showOkayButton: true, autoCloseMs: 3000 });
 		return;
 	}
@@ -574,79 +570,109 @@ function exportFilteredDataAsPDF() {
 		return;
 	}
 
-	const exportDate = new Date().toLocaleDateString();
-	const exportContainer = document.createElement('div');
-	const wrapper = document.createElement('div');
-	wrapper.style.fontFamily = 'Arial, sans-serif';
-	wrapper.style.color = '#2c3e50';
+	fetchFilteredItemsForExport(function(filteredItems) {
+		const exportDate = new Date().toLocaleDateString();
+		const exportContainer = document.createElement('div');
+		const wrapper = document.createElement('div');
+		wrapper.style.fontFamily = 'Arial, sans-serif';
+		wrapper.style.color = '#2c3e50';
 
-	const title = document.createElement('h2');
-	title.style.marginBottom = '8px';
-	title.textContent = 'Filtered Data Export';
-	const generated = document.createElement('p');
-	generated.style.margin = '0 0 12px';
-	const generatedStrong = document.createElement('strong');
-	generatedStrong.textContent = 'Generated:';
-	generated.appendChild(generatedStrong);
-	generated.appendChild(document.createTextNode(' ' + exportDate));
-	const totalRows = document.createElement('p');
-	totalRows.style.margin = '0 0 16px';
-	const totalStrong = document.createElement('strong');
-	totalStrong.textContent = 'Total Rows:';
-	totalRows.appendChild(totalStrong);
-	totalRows.appendChild(document.createTextNode(' ' + currentFilteredDataItems.length));
+		const title = document.createElement('h2');
+		title.style.marginBottom = '8px';
+		title.textContent = 'Filtered Data Export';
+		const generated = document.createElement('p');
+		generated.style.margin = '0 0 12px';
+		const generatedStrong = document.createElement('strong');
+		generatedStrong.textContent = 'Generated:';
+		generated.appendChild(generatedStrong);
+		generated.appendChild(document.createTextNode(' ' + exportDate));
+		const totalRows = document.createElement('p');
+		totalRows.style.margin = '0 0 16px';
+		const totalStrong = document.createElement('strong');
+		totalStrong.textContent = 'Total Rows:';
+		totalRows.appendChild(totalStrong);
+		totalRows.appendChild(document.createTextNode(' ' + filteredItems.length));
 
-	const table = document.createElement('table');
-	table.style.width = '100%';
-	table.style.borderCollapse = 'collapse';
-	const thead = document.createElement('thead');
-	const headRow = document.createElement('tr');
-	headRow.style.background = '#667eea';
-	headRow.style.color = '#ffffff';
-	['ID', 'Title', 'Description'].forEach(function(label) {
-		const th = document.createElement('th');
-		th.style.padding = '8px';
-		th.style.border = '1px solid #d4dae6';
-		th.style.textAlign = 'left';
-		th.textContent = label;
-		headRow.appendChild(th);
-	});
-	thead.appendChild(headRow);
-	table.appendChild(thead);
-
-	const tbody = document.createElement('tbody');
-	const rowFragment = document.createDocumentFragment();
-	currentFilteredDataItems.forEach(function(item) {
-		const row = document.createElement('tr');
-		[item.id, item.title, item.description].forEach(function(value) {
-			const td = document.createElement('td');
-			td.style.padding = '8px';
-			td.style.border = '1px solid #d4dae6';
-			td.style.textAlign = 'left';
-			td.textContent = String(value);
-			row.appendChild(td);
+		const table = document.createElement('table');
+		table.style.width = '100%';
+		table.style.borderCollapse = 'collapse';
+		const thead = document.createElement('thead');
+		const headRow = document.createElement('tr');
+		headRow.style.background = '#667eea';
+		headRow.style.color = '#ffffff';
+		['ID', 'Title', 'Description'].forEach(function(label) {
+			const th = document.createElement('th');
+			th.style.padding = '8px';
+			th.style.border = '1px solid #d4dae6';
+			th.style.textAlign = 'left';
+			th.textContent = label;
+			headRow.appendChild(th);
 		});
-		rowFragment.appendChild(row);
+		thead.appendChild(headRow);
+		table.appendChild(thead);
+
+		const tbody = document.createElement('tbody');
+		const rowFragment = document.createDocumentFragment();
+		filteredItems.forEach(function(item) {
+			const row = document.createElement('tr');
+			[item.id, item.title, item.description].forEach(function(value) {
+				const td = document.createElement('td');
+				td.style.padding = '8px';
+				td.style.border = '1px solid #d4dae6';
+				td.style.textAlign = 'left';
+				td.textContent = String(value);
+				row.appendChild(td);
+			});
+			rowFragment.appendChild(row);
+		});
+		tbody.appendChild(rowFragment);
+		table.appendChild(tbody);
+		wrapper.appendChild(title);
+		wrapper.appendChild(generated);
+		wrapper.appendChild(totalRows);
+		wrapper.appendChild(table);
+		exportContainer.appendChild(wrapper);
+
+		const opt = {
+			margin: 10,
+			filename: 'filtered-data-' + new Date().toISOString().split('T')[0] + '.pdf',
+			image: { type: 'jpeg', quality: 0.98 },
+			html2canvas: { scale: 2 },
+			jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
+		};
+
+		html2pdf().set(opt).from(exportContainer).save();
+		logEvent('A filtered PDF export has been downloaded for: Data (' + filteredItems.length + ' rows)');
+		showToast({ type: 'success', title: 'PDF Export Complete', message: 'Filtered Data PDF downloaded successfully.', showOkayButton: true, autoCloseMs: 3000 });
 	});
-	tbody.appendChild(rowFragment);
-	table.appendChild(tbody);
-	wrapper.appendChild(title);
-	wrapper.appendChild(generated);
-	wrapper.appendChild(totalRows);
-	wrapper.appendChild(table);
-	exportContainer.appendChild(wrapper);
+}
 
-	const opt = {
-		margin: 10,
-		filename: 'filtered-data-' + new Date().toISOString().split('T')[0] + '.pdf',
-		image: { type: 'jpeg', quality: 0.98 },
-		html2canvas: { scale: 2 },
-		jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
-	};
 
-	html2pdf().set(opt).from(exportContainer).save();
-	logEvent('A filtered PDF export has been downloaded for: Data (' + currentFilteredDataItems.length + ' rows)');
-	showToast({ type: 'success', title: 'PDF Export Complete', message: 'Filtered Data PDF downloaded successfully.', showOkayButton: true, autoCloseMs: 3000 });
+function fetchFilteredItemsForExport(callback) {
+	$.ajax({
+		url: '../api.php',
+		type: 'GET',
+		dataType: 'json',
+		data: {
+			action: 'data_filtered_export',
+			search: String($('#search-input').val() || '').trim(),
+			sortColumn: currentSortColumn || 'id',
+			sortOrder: currentSortOrder || 'asc',
+			page: currentPage,
+			pageSize: pageSize
+		},
+		success: function(response) {
+			const filteredItems = response && Array.isArray(response.filteredItems) ? response.filteredItems : [];
+			if (filteredItems.length === 0) {
+				showToast({ type: 'warning', title: 'No Filtered Rows', message: 'There are no visible rows to export.', showOkayButton: true, autoCloseMs: 3000 });
+				return;
+			}
+			callback(filteredItems);
+		},
+		error: function() {
+			showToast({ type: 'error', title: 'Export Failed', message: 'Unable to load filtered rows for export.', showOkayButton: true, autoCloseMs: 3000 });
+		}
+	});
 }
 
 
@@ -661,7 +687,9 @@ function openAddModal() {
 
 
 function openEditModal(id) {
-	const item = allData.items.find(i => i.id == id);
+	const item = currentPagedItems.find(function(entry) {
+		return String(entry.id) === String(id);
+	});
 	if (item) {
 		$('#modal-title').text('Edit Record');
 		$('#record-form').attr('data-record-id', item.id);
@@ -678,39 +706,6 @@ function closeModal() {
 }
 
 
-function addAuditTrailEntry(changeType, recordId, fieldName, oldValue, newValue) {
-	return $.ajax({
-		url: '../api.php?action=audit_trail',
-		type: 'POST',
-		contentType: 'application/json',
-		data: JSON.stringify({ action: 'add_audit_entry', changeType: changeType, recordId: recordId, fieldName: fieldName, oldValue: oldValue, newValue: newValue })
-	});
-}
-
-
-function addAuditTrailEntries(entries) {
-	if (!Array.isArray(entries) || entries.length === 0) {
-		return $.Deferred().resolve().promise();
-	}
-	return $.ajax({
-		url: '../api.php?action=audit_trail',
-		type: 'POST',
-		contentType: 'application/json',
-		data: JSON.stringify({ action: 'add_audit_entries', entries: entries })
-	});
-}
-
-
-function determineNextRecordId() {
-	if (!Number.isInteger(nextRecordId) || nextRecordId < 1) {
-		refreshNextRecordId();
-	}
-	const newId = nextRecordId;
-	nextRecordId += 1;
-	return newId;
-}
-
-
 function saveRecord() {
 	const id = $('#record-form').attr('data-record-id');
 	const title = $('#record-title').val().trim();
@@ -721,53 +716,37 @@ function saveRecord() {
 		return;
 	}
 
-	function finalizeSave(eventMessage, actionType) {
-		saveDataToFileWithLog(eventMessage, actionType);
-		closeModal();
-		displayDataTable(allData);
-	}
-
 	if (editMode) {
-		const index = allData.items.findIndex(i => i.id == id);
-		if (index !== -1) {
-			const oldTitle = allData.items[index].title;
-			const oldDescription = allData.items[index].description;
-			const auditEntries = [];
-			if (oldTitle !== title) {
-				auditEntries.push({ changeType: 'EDIT', recordId: id, fieldName: 'title', oldValue: oldTitle, newValue: title });
-			}
-			if (oldDescription !== description) {
-				auditEntries.push({ changeType: 'EDIT', recordId: id, fieldName: 'description', oldValue: oldDescription, newValue: description });
-			}
-			allData.items[index].title = title;
-			allData.items[index].description = description;
-			const eventMessage = `An entry has been edited; ID ${id} with title: "${title}", and description: "${description}"`;
-			if (auditEntries.length > 0) {
-				addAuditTrailEntries(auditEntries).always(function() {
-					finalizeSave(eventMessage, 'edit');
-				});
-			} else {
-				finalizeSave(eventMessage, 'edit');
-			}
-		}
+		performDataMutation(
+			{ action: 'data_update', id: id, title: title, description: description },
+			function() {
+				closeModal();
+				loadDataPage();
+				loadHeaderMetrics();
+				showToast({ type: 'success', title: 'Record Updated', message: 'The record has been edited successfully.', showOkayButton: true, autoCloseMs: 3000 });
+			},
+			'Error updating record.'
+		);
 		return;
 	}
 
-	const newId = determineNextRecordId();
-	allData.items.push({ id: newId, title: title, description: description });
-	const addEntries = [
-		{ changeType: 'ADD', recordId: newId, fieldName: 'title', oldValue: '', newValue: title },
-		{ changeType: 'ADD', recordId: newId, fieldName: 'description', oldValue: '', newValue: description }
-	];
-	const eventMessage = `A new entry has been added; ID ${newId} with title: "${title}", and description: "${description}"`;
-	addAuditTrailEntries(addEntries).always(function() {
-		finalizeSave(eventMessage, 'add');
-	});
+	performDataMutation(
+		{ action: 'data_create', title: title, description: description },
+		function() {
+			closeModal();
+			loadDataPage();
+			loadHeaderMetrics();
+			showToast({ type: 'success', title: 'Record Added', message: 'The new record has been added successfully.', showOkayButton: true, autoCloseMs: 3000 });
+		},
+		'Error creating record.'
+	);
 }
 
 
 function deleteRecord(id) {
-	const item = allData.items.find(i => i.id == id);
+	const item = currentPagedItems.find(function(entry) {
+		return String(entry.id) === String(id);
+	});
 	if (!item) {
 		return;
 	}
@@ -782,55 +761,18 @@ function deleteRecord(id) {
 				label: 'Delete',
 				className: 'btn-danger',
 				onClick: function() {
-					const eventMessage = `An entry has been deleted; ID ${item.id} with title: "${item.title}", and description: "${item.description}"`;
-					addAuditTrailEntry('DELETE', id, 'record', 'Title: "' + item.title + '", Description: "' + item.description + '"', '').always(function() {
-						allData.items = allData.items.filter(item => item.id != id);
-						selectedRecordIds.delete(String(id));
-						saveDataToFileWithLog(eventMessage, 'delete', {
-							successToast: {
-								type: 'success',
-								title: 'Record Deleted',
-								message: 'The record has been deleted successfully.',
-								showOkayButton: true,
-								autoCloseMs: 3000
-							}
-						});
-						displayDataTable(allData);
-					});
+					performDataMutation(
+						{ action: 'data_delete', id: id },
+						function() {
+							selectedRecordIds.delete(String(id));
+							loadDataPage();
+							loadHeaderMetrics();
+							showToast({ type: 'success', title: 'Record Deleted', message: 'The record has been deleted successfully.', showOkayButton: true, autoCloseMs: 3000 });
+						},
+						'Error deleting record.'
+					);
 				}
 			}
 		]
-	});
-}
-
-
-function saveDataToFileWithLog(eventMessage, action, options) {
-	const settings = options || {};
-	$.ajax({
-		url: '../api.php?action=' + action,
-		type: 'POST',
-		contentType: 'application/json',
-		data: JSON.stringify({ data: allData, event: eventMessage }),
-		dataType: 'json',
-		success: function(response) {
-			if (response && response.success === false) {
-				showToast({ type: 'error', title: 'Save Failed', message: 'Error saving data: ' + (response.message || 'Unknown error'), showOkayButton: true, autoCloseMs: 3000 });
-				return;
-			}
-			if (action === 'add') {
-				showToast({ type: 'success', title: 'Record Added', message: 'The new record has been added successfully.', showOkayButton: true, autoCloseMs: 3000 });
-			} else if (action === 'edit') {
-				showToast({ type: 'success', title: 'Record Updated', message: 'The record has been edited successfully.', showOkayButton: true, autoCloseMs: 3000 });
-			} else if (settings.successToast) {
-				showToast(settings.successToast);
-			}
-			if ($('#report-container').length > 0) {
-				loadLogs();
-			}
-			loadHeaderMetrics();
-		},
-		error: function() {
-			showToast({ type: 'error', title: 'Save Failed', message: 'Error saving data. Please try again.', showOkayButton: true, autoCloseMs: 3000 });
-		}
 	});
 }

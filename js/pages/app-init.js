@@ -7,9 +7,13 @@ $(document).ready(function() {
 		if (typeof initializeDataPagePreferences === 'function') {
 			initializeDataPagePreferences();
 		}
-		loadData();
 		if (typeof setupDataPageHandlers === 'function') {
 			setupDataPageHandlers();
+		}
+		if (typeof loadDataPage === 'function') {
+			loadDataPage();
+		} else {
+			loadData();
 		}
 	}
 
