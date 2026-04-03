@@ -22,7 +22,14 @@ test-dashboard/
 ├── css/
 │   └── style.css          # Main stylesheet with light & dark mode support
 ├── js/
-│   └── script.js          # jQuery functionality, AJAX calls, theme management
+│   ├── core/
+│   │   └── shared.js      # Shared state/utilities, theme, reset flow, common data/log loaders
+│   ├── features/
+│   │   ├── data-page.js   # Data page CRUD, pagination/virtualization, filtered export
+│   │   ├── reports-page.js# Reports generation and PDF/CSV downloads
+│   │   └── audit-page.js  # Audit trail filters, table/timeline rendering, diff markup
+│   └── pages/
+│       └── app-init.js    # Page-aware bootstrap and shared UI initialization
 ├── data/
 │   ├── data.json          # Main data storage (encrypted)
 │   ├── logs.json          # Administrative activity logs (encrypted)
@@ -49,6 +56,10 @@ test-dashboard/
 
 ### 📊 Data Management Page
 - **View Data**: Displays all records in a responsive, sortable table
+- **Pagination Controls**: Navigate data with Previous/Next controls and page summary
+- **Rows-Per-Page Selector**: Change visible page size from bottom-right pagination controls (25/50/100)
+- **Virtualized Rendering**: Only visible rows are rendered for smoother performance with larger datasets
+- **Preference Persistence**: Selected rows-per-page value is saved in localStorage and restored automatically
 - **Add Records**: Modal form to add new entries with auto-incrementing IDs
 - **Edit Records**: Full editing capability for existing records
 - **Delete Records**: Remove records with confirmation dialogs
@@ -164,6 +175,12 @@ test-dashboard/
 - **Professional Styling**: Modern UI with smooth transitions and hover effects
 - **Consistent Design**: Unified look across all pages
 
+### 🧩 Modular Frontend Architecture
+- **Shared Core Module**: Common state, utilities, theme, reset flow, and shared loaders in `js/core/shared.js`
+- **Feature Modules**: Page-focused logic split into `js/features/data-page.js`, `js/features/reports-page.js`, and `js/features/audit-page.js`
+- **Page-Aware Bootstrap**: `js/pages/app-init.js` initializes only the handlers needed for the current page
+- **Conditional Script Loading**: `includes/footer.php` loads only relevant feature scripts for each page
+
 ## Getting Started
 
 ### 1. Installation
@@ -189,7 +206,7 @@ test-dashboard/
 #### Include Files (Reusable Components)
 - **includes/header.php**: HTML head tags and fixed-height title bar
 - **includes/navigation.php**: Fixed left sidebar with independent menu scrolling and bottom utility controls
-- **includes/footer.php**: Closing HTML tags and shared script includes, including PDF library loading for Reports and Data pages
+- **includes/footer.php**: Closing HTML tags and page-aware script includes, including PDF library loading for Reports and Data pages
 
 #### Backend
 - **api.php**: Handles all backend operations:
@@ -208,18 +225,22 @@ test-dashboard/
   - Modal dialogs
   - Button variations
   - Light and dark mode styles
-- **js/script.js**:
-  - AJAX operations with error handling
-  - Table rendering with search and sorting
-  - Modal form management
-  - CRUD operations
-  - Data-page bulk selection and bulk delete logic
+- **js/core/shared.js**:
+  - Shared app state and utility helpers
   - Header analytics metric calculations and refresh
-  - Audit Trail table/timeline view rendering and toggle logic
-  - Report generation
-  - PDF and CSV export
-  - Dark mode theme switching and persistence
-  - Custom toast prompts and timed notifications
+  - Theme initialization/persistence and reset workflow
+  - Shared data and logs loading helpers
+- **js/features/data-page.js**:
+  - Data table rendering with search and sorting
+  - Modal form management and CRUD operations
+  - Data-page bulk selection and bulk delete logic
+  - Pagination, row virtualization, filtered PDF/CSV export
+- **js/features/reports-page.js**:
+  - Report generation and report PDF/CSV download handlers
+- **js/features/audit-page.js**:
+  - Audit Trail table/timeline rendering, filtering, and diff markup
+- **js/pages/app-init.js**:
+  - Page-aware bootstrap that initializes only relevant feature modules
 
 #### Data Storage
 - **data/data.json**: Main data storage (encrypted)
@@ -369,8 +390,11 @@ test-dashboard/
 - ✅ **Header Analytics Widgets** with total and daily activity counts
 - ✅ **Audit Trail Timeline View** with date-grouped change history
 - ✅ **Filtered Data Export (PDF/CSV)** for current visible results
+- ✅ **Paginated Data Grid** with bottom-right rows-per-page selector and persistent preference
+- ✅ **Virtualized Row Rendering** for improved Data page performance on larger lists
 - ✅ **API File Lock + Retry Writes** for improved reliability under concurrent operations
 - ✅ **Deployable Environment Modes** (`demo` and `production`) with configurable index reset behavior
+- ✅ **Modular JavaScript Loading** with shared core + page-specific feature modules
 
 ## Important Notes
 
@@ -385,6 +409,8 @@ test-dashboard/
 - ✅ Bulk actions are currently limited to bulk delete on the Data page only
 - ✅ Audit Trail supports both Table and Timeline views
 - ✅ Data-page filtered exports log export events and include only visible filtered rows
+- ✅ Data page rows-per-page preference persists across reloads
+- ✅ Legacy monolithic `js/script.js` has been retired in favor of modular files
 
 ## Maintenance & Customization
 
@@ -399,7 +425,7 @@ test-dashboard/
 
 ### Adding New Fields
 1. Update the form in `pages/data.php`
-2. Update JavaScript handlers in `js/script.js`
+2. Update the relevant feature module in `js/features/` (for example `data-page.js`)
 3. Update audit trail tracking
 4. Data automatically encrypted
 
