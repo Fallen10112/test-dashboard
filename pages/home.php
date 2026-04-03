@@ -5,46 +5,32 @@
 	<main class="main-content">
 		<section class="content-section active">
 			<h2>Welcome to Dashboard Showcase</h2>
-			<h3 style="margin-top: 30px; color: #2c3e50; font-size: 1.3em;">About This Project</h3>
-			<p>This dashboard application demonstrates a full-featured data management system with encryption, audit trails, and reporting capabilities. Built using PHP, jQuery, HTML, CSS, and secure encryption protocols, it provides an interface for managing structured data with complete change tracking. Future iterations may include additional features and enhancements, such as SQL database integration instead of JSON files.</p>
+			<h3 style="margin-top: 30px; margin-bottom: 10px; color: #2c3e50; font-size: 1.3em;">About This Project</h3>
+			<p>This dashboard is a focused data operations app: manage records, track every change, and export what you need. It is built for quick day-to-day use with strong auditability and simple workflows.</p>
 			
-			<h3 style="margin-top: 30px; color: #2c3e50; font-size: 1.3em; ">Key Features</h3>
+			<h3 style="margin-top: 30px; margin-bottom: 10px; color: #2c3e50; font-size: 1.3em; ">Top Highlights</h3>
 			<ul style="margin-bottom: 20px;">
-				<li><strong>Data Management</strong> - Create, edit, and delete records with a clean, intuitive interface</li>
-				<li><strong>Fast Data Grid</strong> - Data page uses pagination with Previous/Next controls, bottom-right rows-per-page selection, and virtualized row rendering for smoother performance on larger datasets</li>
-				<li><strong>Saved Grid Preferences</strong> - Rows-per-page preference is remembered in local storage and restored automatically</li>
-				<li><strong>Bulk Delete (Data Page)</strong> - Select multiple records and remove them in a single action from the Data page, with a dedicated bulk-action audit entry</li>
-				<li><strong>Filtered View Export</strong> - Export only the currently visible Data page results as PDF or CSV, with export logging</li>
-				<li><strong>Header Analytics Widgets</strong> - Quick KPI pills in the header for total entries, total edits, adds today, and deletes today</li>
-				<li><strong>Fixed Header Height</strong> - The top title bar uses a consistent fixed height for stable layout across resolutions and window sizes</li>
-				<li><strong>Encryption</strong> - All data and logs are encrypted using AES-256-CBC for security</li>
-				<li><strong>Audit Trail</strong> - Complete tracking of every data change with timestamps, record IDs, and field-level modifications, available in both table and timeline views</li>
-				<li><strong>Write Safety</strong> - API write operations use file locking with retry logic for improved reliability during concurrent actions</li>
-				<li><strong>Event Logging</strong> - Automatic event logging for all operations performed on the system</li>
-				<li><strong>Reports</strong> - Generate comprehensive reports and export data as PDF or CSV</li>
-				<li><strong>Search & Sort</strong> - Quickly find data with powerful search and sorting capabilities</li>
-				<li><strong>Dark Mode</strong> - Toggle between light and dark themes with persistent settings from the dedicated bottom utility area in the sidebar</li>
-				<li><strong>Scroll-Safe Sidebar Utilities</strong> - Navigation links scroll independently, while the theme toggle and Reset Data controls remain separated by a divider and never overlap links</li>
-				<li><strong>Custom Toast Notifications</strong> - Top-center prompts for confirmations and success messages with action buttons or timed fade-out</li>
-				<li><strong>Modular Frontend Architecture</strong> - JavaScript is split into shared core utilities, page-specific feature modules, and a lightweight page-aware bootstrap loader</li>
+				<li><strong>Fast Data Workflow</strong> - Search, sort, paginate, edit, and bulk delete records from one place</li>
+				<li><strong>Reliable Change History</strong> - Every add/edit/delete is captured with field-level audit detail</li>
+				<li><strong>Exports That Match Your View</strong> - Download filtered results as PDF or CSV</li>
+				<li><strong>Operational Visibility</strong> - Header KPIs show totals and daily activity at a glance</li>
+				<li><strong>Secure by Default</strong> - Encrypted storage (AES-256-CBC) plus write lock/retry protection</li>
+				<li><strong>Mobile-Ready UI</strong> - Responsive layout for desktop and phone screens</li>
 			</ul>
 			
-			<h3 style="margin-top: 30px; color: #2c3e50; font-size: 1.3em;">Getting Started</h3>
+			<h3 style="margin-top: 30px; margin-bottom: 10px; color: #2c3e50; font-size: 1.3em;">Start Here</h3>
 			<ul>
-				<li><strong>Data Page</strong> - Manage your records. Add new entries, edit existing ones, delete single records, or bulk delete selected records. You can also export the current filtered view as PDF or CSV, adjust rows per page from the bottom-right controls, and move through pages with Previous/Next. All changes are automatically logged in the audit trail, including a bulk-action summary entry for batch deletes.</li>
-				<li><strong>Reports Page</strong> - Generate reports from your data or system logs. Export reports as PDF or CSV files for sharing and analysis.</li>
-				<li><strong>Audit Trail Page</strong> - View the complete history of all data modifications in table or timeline view. Search for specific changes or record IDs to see exactly what changed and when.</li>
-				<li><strong>Header Widgets</strong> - Use the top-right analytics pills for quick daily and total activity counts.</li>
-				<li><strong>Theme Toggle</strong> - Use the toggle in the bottom utility area of the navigation to switch between light and dark mode.</li>
-				<li><strong>Toast Prompts</strong> - Reset Data now uses a custom confirmation toast, and successful add/edit actions show auto-fading confirmation toasts.</li>
+				<li><strong>1. Manage Data</strong> - Use the Data page to add, edit, search, and bulk delete records</li>
+				<li><strong>2. Review Changes</strong> - Open Audit Trail to see who changed what and when</li>
+				<li><strong>3. Export Results</strong> - Create PDF/CSV outputs from Data or Reports pages</li>
+				<li><strong>4. Customize View</strong> - Switch theme and use top header metrics for quick status checks</li>
 			</ul>
 			
-			<h3 style="margin-top: 30px; color: #2c3e50; font-size: 1.3em;">Technical Stack</h3>
+			<h3 style="margin-top: 30px; margin-bottom: 10px; color: #2c3e50; font-size: 1.3em;">Built With</h3>
 			<ul>
-				<li><strong>Backend</strong> - PHP with OpenSSL encryption (AES-256-CBC)</li>
-				<li><strong>Frontend</strong> - jQuery for interactive features, HTML5, modern CSS, and page-based JavaScript modules</li>
-				<li><strong>Data Storage</strong> - Encrypted JSON files for persistent data storage</li>
-				<li><strong>Security</strong> - Encrypted audit trails and event logs</li>
+				<li><strong>Backend</strong> - PHP + OpenSSL (AES-256-CBC)</li>
+				<li><strong>Frontend</strong> - HTML, CSS, jQuery, modular JavaScript</li>
+				<li><strong>Storage</strong> - Encrypted JSON data, logs, and audit trail files</li>
 			</ul>
 		</section>
 	</main>
