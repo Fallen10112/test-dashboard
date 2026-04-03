@@ -1342,6 +1342,18 @@ body.dark-mode .custom-toast-message {
 }
 
 @media (max-width: 900px) {
+    body {
+        overflow-y: auto;
+    }
+
+    .title-bar {
+        padding: 10px 14px;
+        min-height: var(--header-height);
+        height: auto;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
     .title-bar h1 {
         font-size: 1.3em;
     }
@@ -1376,5 +1388,147 @@ body.dark-mode .custom-toast-message {
     .data-page-size-group {
         width: 100%;
         justify-content: flex-start;
+    }
+}
+
+@media (max-width: 768px) {
+    body {
+        height: auto;
+        min-height: 100vh;
+        overflow: auto;
+    }
+
+    .title-bar {
+        position: sticky;
+        top: 0;
+        left: auto;
+        right: auto;
+        z-index: 1000;
+        padding: 10px 12px;
+        min-height: 64px;
+        height: auto;
+    }
+
+    .title-bar h1 {
+        width: 100%;
+        font-size: 1.1em;
+        line-height: 1.3;
+    }
+
+    .header-metrics {
+        width: 100%;
+        overflow-x: auto;
+        padding-bottom: 2px;
+    }
+
+    .metric-pill {
+        flex: 0 0 auto;
+        min-width: 72px;
+        padding: 5px 8px;
+    }
+
+    .sidebar {
+        position: static;
+        width: 100%;
+        height: auto;
+        top: auto;
+        box-shadow: none;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    }
+
+    .nav-menu {
+        display: flex;
+        gap: 6px;
+        overflow-x: auto;
+        padding: 10px;
+        white-space: nowrap;
+    }
+
+    .nav-link {
+        border-left: none;
+        border-radius: 6px;
+        padding: 10px 12px;
+        font-size: 0.95em;
+    }
+
+    .nav-link:hover,
+    .nav-link.active {
+        border-left-color: transparent;
+    }
+
+    .theme-toggle-container {
+        margin-top: 0;
+        padding: 10px;
+        border-top: 1px solid rgba(236, 240, 241, 0.15);
+    }
+
+    .reset-button-container {
+        padding: 0 10px 12px;
+    }
+
+    .main-content {
+        position: static;
+        top: auto;
+        left: auto;
+        right: auto;
+        height: auto;
+        overflow: visible;
+        padding: 18px 12px 22px;
+    }
+
+    .content-section h2 {
+        font-size: 1.45em;
+    }
+
+    .data-controls,
+    .reports-controls {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+
+    .search-container,
+    .reports-controls .form-group {
+        max-width: none;
+        width: 100%;
+        flex: 1 1 auto;
+    }
+
+    .form-actions {
+        justify-content: stretch;
+        flex-wrap: wrap;
+    }
+
+    .form-actions .btn,
+    .data-controls .btn,
+    .reports-controls .btn {
+        width: 100%;
+    }
+
+    .report,
+    .modal-content {
+        padding: 16px;
+    }
+
+    .data-table-viewport {
+        max-height: none;
+        overflow: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .data-table,
+    .report-table {
+        min-width: 640px;
+    }
+
+    .toast-host {
+        top: 8px;
+        width: calc(100vw - 16px);
+    }
+
+    .scroll-to-top {
+        right: 14px;
+        bottom: 14px;
+        padding: 10px 12px;
     }
 }
