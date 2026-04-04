@@ -21,6 +21,60 @@ function respondJson($statusCode, $payload) {
 }
 
 
+function getHeaderValue($headerName) {
+	$serverKey = 'HTTP_' . strtoupper(str_replace('-', '_', $headerName));
+	if (isset($_SERVER[$serverKey])) {
+		return trim((string)$_SERVER[$serverKey]);
+	}
+
+	if (function_exists('getallheaders')) {
+		$headers = getallheaders();
+		if (is_array($headers)) {
+			foreach ($headers as $name => $value) {
+				if (strcasecmp($name, $headerName) === 0) {
+					return trim((string)$value);
+				}
+			}
+		}
+	}
+
+	return '';
+}
+
+
+function getProvidedApiKey() {
+	$headerApiKey = getHeaderValue(API_KEY_HEADER);
+	if ($headerApiKey !== '') {
+		return $headerApiKey;
+	}
+
+	$authorization = getHeaderValue('Authorization');
+	if (stripos($authorization, 'Bearer ') === 0) {
+		return trim(substr($authorization, 7));
+	}
+
+	$queryApiKey = isset($_GET['api_key']) ? trim((string)$_GET['api_key']) : '';
+	if ($queryApiKey !== '') {
+		return $queryApiKey;
+	}
+
+	return '';
+}
+
+
+function requireApiKeyAuthentication() {
+	$expectedApiKey = trim((string)API_KEY);
+	if ($expectedApiKey === '') {
+		respondJson(500, ['success' => false, 'message' => 'Server API key is not configured']);
+	}
+
+	$providedApiKey = getProvidedApiKey();
+	if ($providedApiKey === '' || !hash_equals($expectedApiKey, $providedApiKey)) {
+		respondJson(401, ['success' => false, 'message' => 'Unauthorized: valid API key required']);
+	}
+}
+
+
 function encryptData($data, $key, $cipher) {
 	$iv = openssl_random_pseudo_bytes(openssl_cipher_iv_length($cipher));
 	$encrypted = openssl_encrypt($data, $cipher, $key, 0, $iv);
@@ -358,6 +412,13 @@ function normalizeRecordText($value) {
 
 
 $method = $_SERVER['REQUEST_METHOD'];
+
+if ($method === 'OPTIONS') {
+	http_response_code(204);
+	exit;
+}
+
+requireApiKeyAuthentication();
 
 $initFile = DATA_DIR . '/.encrypted_init';
 if (!file_exists($initFile) && (file_exists($dataFile) || file_exists($logsFile))) {

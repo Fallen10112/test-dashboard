@@ -105,6 +105,9 @@ test-dashboard/
 - **Full Coverage**: Dark mode applies to all pages and components
 
 ### ⚙️ Environment Configuration
+- **API_KEY**: Shared secret required by `api.php` for GET and POST requests
+  - Send using `X-API-Key` header (preferred) or `Authorization: Bearer <key>`
+  - Default local value is for development only; change it before deployment
 - **APP_MODE**: Set to `demo` (default) or `production`
   - Demo mode: Auto-resets all data when `index.php` is loaded (fresh start for testing)
   - Production mode: Preserves all data across application restarts
@@ -221,177 +224,50 @@ test-dashboard/
 
 #### API Endpoints
 
-All responses are returned as JSON. All API endpoints include built-in encryption/decryption, data validation, file locking, and retry logic.
+All responses are JSON.
 
-##### GET Endpoints (Read-Only)
+Authentication (required):
+- Header (recommended): `X-API-Key: <your_api_key>`
+- Bearer alternative: `Authorization: Bearer <your_api_key>`
+- Query fallback/testing: `?api_key=<your_api_key>`
 
-###### Retrieve Paged Data (Server-Filtered & Sorted)
-```
-GET api.php?action=data_page&search=TEXT&sortColumn=COLUMN&sortOrder=ORDER&page=PAGE&pageSize=SIZE
-```
-- **Returns**: Current page of Data records with pagination metadata
-- **Parameters**:
-  - `search` (optional): Search text for title/description filtering
-  - `sortColumn` (optional): Column to sort by (`id`, `title`, or `description`; default: `id`)
-  - `sortOrder` (optional): Sort direction (`asc` or `desc`; default: `asc`)
-  - `page` (optional): Page number (default: 1)
-  - `pageSize` (optional): Records per page (`25`, `50`, or `100`; default: 25)
-- **Response**: JSON object with `items` array, `page`, `pageSize`, `totalPages`, `totalCount`, `filteredCount`, and search/sort parameters
-- **Use Case**: Render Data page with pagination, searching, and column sorting
+##### GET Endpoints
 
-###### Retrieve Filtered Data for Export
-```
-GET api.php?action=data_filtered_export&search=TEXT&sortColumn=COLUMN&sortOrder=ORDER
-```
-- **Returns**: Full filtered and sorted dataset (not paginated)
-- **Parameters**: Same as `data_page` (except `page` and `pageSize` are ignored)
-- **Response**: JSON object with complete `items` array matching the active search/sort filters
-- **Use Case**: Export all filtered records to PDF or CSV without pagination limits
+| Endpoint | Purpose | Key Params |
+| --- | --- | --- |
+| `GET api.php?action=data_page` | Paged, filtered, sorted data for Data page | `search`, `sortColumn(id/title/description)`, `sortOrder(asc/desc)`, `page`, `pageSize(25/50/100)` |
+| `GET api.php?action=data_filtered_export` | Full filtered/sorted data (no pagination) | `search`, `sortColumn`, `sortOrder` |
+| `GET api.php?action=audit_trail` | Full audit history | none |
+| `GET api.php?action=logs` | Full activity logs | none |
+| `GET api.php` | Full raw data payload | none |
 
-###### Retrieve Audit Trail
-```
-GET api.php?action=audit_trail
-```
-- **Returns**: Complete audit trail of all record changes
-- **Parameters**: None
-- **Response**: JSON object with `entries` array containing all audit trail records
-- **Fields per Entry**: `id`, `date`, `time`, `change_type` (ADD/EDIT/DELETE), `record_id`, `field_name`, `old_value`, `new_value`
-- **Use Case**: Display change history, generate compliance reports, or review system activity
+Auth usage pattern for every GET endpoint:
+- Header auth: append required endpoint params and send `X-API-Key` header
+- Query auth: append `&api_key=YOUR_API_KEY` (or `?api_key=` if no query exists)
 
-###### Retrieve Activity Logs
-```
-GET api.php?action=logs
-```
-- **Returns**: All administrative activity logs
-- **Parameters**: None
-- **Response**: JSON object with `logs` array containing timestamped event records
-- **Fields per Log**: `id`, `date`, `time`, `event` (description of activity)
-- **Use Case**: Review system event history, generate activity reports, understand user actions
+##### POST Endpoints
 
-###### Retrieve All Data (Default)
-```
-GET api.php
-```
-- **Returns**: Complete unfiltered dataset
-- **Parameters**: None
-- **Response**: JSON object with `items` array containing all records
-- **Use Case**: Load all data for initial page load or full dataset export
+All POST endpoints require `Content-Type: application/json` and JSON body containing `action`.
 
-##### POST Endpoints (Write Operations)
+| Action (`POST api.php`) | Purpose | Required Body Fields |
+| --- | --- | --- |
+| `data_create` | Create one record | `title`, `description` |
+| `data_update` | Update one record | `id`, `title`, `description` |
+| `data_delete` | Delete one record | `id` |
+| `data_bulk_delete` | Delete many records | `ids` (array) |
+| `add_audit_entry` | Write one audit entry | `changeType`, `recordId`, `fieldName`, `oldValue`, `newValue` |
+| `add_audit_entries` | Write multiple audit entries | `entries` (array of audit entry objects) |
+| `reset_data` | Reset data/logs/audit to sample state | `action` |
 
-**Note**: All POST requests require JSON body with `Content-Type: application/json` header.
-
-###### Create New Record
-```
-POST api.php
-Content-Type: application/json
-{
-  "action": "data_create",
-  "title": "Record Title",
-  "description": "Record Description"
-}
-```
-- **Returns**: Newly created record with ID, plus confirmation message
-- **Required Fields**: `title`, `description` (both non-empty strings)
-- **Response**: JSON with `success: true`, `message`, and `item` object
-- **Side Effects**: Creates audit trail entries for new record, logs the action
-- **Use Case**: Add new data record from Data page form or external system
-
-###### Update Existing Record
-```
-POST api.php
-Content-Type: application/json
-{
-  "action": "data_update",
-  "id": RECORD_ID,
-  "title": "Updated Title",
-  "description": "Updated Description"
-}
-```
-- **Returns**: Updated record, change audit entries, and confirmation message
-- **Required Fields**: `id` (valid record ID), `title`, `description` (both non-empty strings)
-- **Response**: JSON with `success: true`, `message`, and updated `item` object
-- **Side Effects**: Creates audit trail entries only for changed fields, logs the action
-- **Use Case**: Modify existing record from Data page form
-
-###### Delete Single Record
-```
-POST api.php
-Content-Type: application/json
-{
-  "action": "data_delete",
-  "id": RECORD_ID
-}
-```
-- **Returns**: Deleted record details and confirmation message
-- **Required Fields**: `id` (valid record ID)
-- **Response**: JSON with `success: true`, `message`, and `item` object (deleted record)
-- **Side Effects**: Creates DELETE audit trail entry with full record contents, logs the action
-- **Use Case**: Remove individual record from Data page
-
-###### Delete Multiple Records (Bulk Delete)
-```
-POST api.php
-Content-Type: application/json
-{
-  "action": "data_bulk_delete",
-  "ids": [ID1, ID2, ID3, ...]
-}
-```
-- **Returns**: Count of deleted records and list of deleted IDs
-- **Required Fields**: `ids` (array of valid record IDs)
-- **Response**: JSON with `success: true`, `message`, `deletedCount`, and `deletedIds` array
-- **Side Effects**: Creates DELETE audit entry for each record, plus one bulk-action summary entry; logs the action
-- **Use Case**: Remove multiple selected records from Data page in single operation
-
-###### Add Single Audit Entry (Manual)
-```
-POST api.php
-Content-Type: application/json
-{
-  "action": "add_audit_entry",
-  "changeType": "EDIT",
-  "recordId": RECORD_ID,
-  "fieldName": "field_name",
-  "oldValue": "previous value",
-  "newValue": "new value"
-}
-```
-- **Returns**: Confirmation message
-- **Required Fields**: `changeType`, `recordId`, `fieldName`, `oldValue`, `newValue`
-- **Response**: JSON with `success: true` and `message`
-- **Use Case**: Manually log system or external changes to audit trail
-
-###### Add Multiple Audit Entries
-```
-POST api.php
-Content-Type: application/json
-{
-  "action": "add_audit_entries",
-  "entries": [
-    {"changeType": "ADD", "recordId": 1, "fieldName": "title", "oldValue": "", "newValue": "New Record"},
-    {"changeType": "EDIT", "recordId": 2, "fieldName": "description", "oldValue": "old", "newValue": "updated"}
-  ]
-}
-```
-- **Returns**: Confirmation message
-- **Required Fields**: `entries` (array of entry objects with `changeType`, `recordId`, `fieldName`, `oldValue`, `newValue`)
-- **Response**: JSON with `success: true` and `message`
-- **Use Case**: Batch log multiple system or external changes as single atomic operation
-
-###### Reset All Data
-```
-POST api.php
-Content-Type: application/json
-{
-  "action": "reset_data"
-}
-```
-- **Returns**: Confirmation message
-- **Required Fields**: `action` only
-- **Response**: JSON with `success: true` and `message`
-- **Side Effects**: Clears all data records, logs, and audit trail; restores 3 sample test entries
-- **Use Case**: Factory reset application to clean state (typically called from Reset button in navigation)
+Auth usage pattern for every POST endpoint:
+- Header auth (recommended):
+  - URL: `POST /api.php`
+  - Headers: `X-API-Key: YOUR_API_KEY`, `Content-Type: application/json`
+  - Body: JSON with selected `action` + required fields
+- Query auth fallback:
+  - URL: `POST /api.php?api_key=YOUR_API_KEY`
+  - Header: `Content-Type: application/json`
+  - Body: JSON with selected `action` + required fields
 
 #### Frontend Assets
 - **css/style.css**:

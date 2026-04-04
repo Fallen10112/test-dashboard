@@ -4,6 +4,10 @@
 	
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 	<?php endif; ?>
+	<?php require_once __DIR__ . '/../config/config.php'; ?>
+	<script>
+		window.DASHBOARD_API_KEY = <?php echo json_encode((string)API_KEY, JSON_UNESCAPED_SLASHES); ?>;
+	</script>
 
 	<script src="../js/core/shared.js"></script>
 	<?php $currentPage = basename($_SERVER['PHP_SELF']); ?>

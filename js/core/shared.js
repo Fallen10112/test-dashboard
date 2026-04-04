@@ -15,6 +15,25 @@ const virtualOverscanRows = 6;
 const dataPageSizeStorageKey = 'data-page-size';
 
 
+function configureApiAuthentication() {
+	const apiKey = String(window.DASHBOARD_API_KEY || '').trim();
+	if (apiKey === '') {
+		return;
+	}
+
+	$.ajaxSetup({
+		beforeSend: function(xhr, settings) {
+			if (settings && typeof settings.url === 'string' && settings.url.indexOf('api.php') !== -1) {
+				xhr.setRequestHeader('X-API-Key', apiKey);
+			}
+		}
+	});
+}
+
+
+configureApiAuthentication();
+
+
 function debounce(fn, delayMs) {
 	let timeoutId = null;
 	return function() {

@@ -18,6 +18,8 @@ if (file_exists($envFile)) {
 
 define('ENCRYPTION_KEY', getenv('ENCRYPTION_KEY') ?: 'showcase-dashboard-encryption-key-2026');
 define('ENCRYPTION_CIPHER', 'AES-256-CBC');
+define('API_KEY', getenv('API_KEY') ?: 'local-dev-api-key-change-me');
+define('API_KEY_HEADER', 'X-API-Key');
 
 function envToBool($value, $default = false) {
 	if ($value === false || $value === null || $value === '') {
