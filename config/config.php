@@ -20,6 +20,14 @@ define('ENCRYPTION_KEY', getenv('ENCRYPTION_KEY') ?: 'showcase-dashboard-encrypt
 define('ENCRYPTION_CIPHER', 'AES-256-CBC');
 define('API_KEY', getenv('API_KEY') ?: 'local-dev-api-key-change-me');
 define('API_KEY_HEADER', 'X-API-Key');
+define('STORAGE_DRIVER', strtolower(getenv('STORAGE_DRIVER') ?: 'json'));
+define('DB_CONNECTION', strtolower(getenv('DB_CONNECTION') ?: 'mysql'));
+define('DB_HOST', getenv('DB_HOST') ?: '127.0.0.1');
+define('DB_PORT', getenv('DB_PORT') ?: '3306');
+define('DB_DATABASE', getenv('DB_DATABASE') ?: 'test_dashboard');
+define('DB_USERNAME', getenv('DB_USERNAME') ?: 'root');
+define('DB_PASSWORD', getenv('DB_PASSWORD') ?: '');
+define('DB_CHARSET', getenv('DB_CHARSET') ?: 'utf8mb4');
 
 function envToBool($value, $default = false) {
 	if ($value === false || $value === null || $value === '') {

@@ -114,6 +114,9 @@ test-dashboard/
 - **RESET_ON_INDEX_VISIT**: Override auto-reset behavior (true/false)
   - Can be set to `true` in production mode if manual resets are needed
   - Can be set to `false` in demo mode if data persistence is desired for testing
+- **STORAGE_DRIVER**: Set to `json` (current default) or reserve `sql` for the upcoming database-backed implementation
+- **DB_CONNECTION**: Planned SQL driver, currently defaults to `mysql`
+- **DB_HOST / DB_PORT / DB_DATABASE / DB_USERNAME / DB_PASSWORD / DB_CHARSET**: SQL connection settings staged for future database support
 - **Configuration Location**: Edit `.env` file in the `config/` directory or use system environment variables
 - **Default Behavior**: Demo mode resets on index visit; production mode does not
 
