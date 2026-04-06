@@ -87,13 +87,20 @@ test-dashboard/
 - **Record Linking**: Associates changes with their respective record IDs
 
 ### 🛠️ Dev Tools Page
-- **Category Selector**: Choose between `System` and `Notifications` to load only relevant tools
+- **Category Selector**: Choose between `System`, `Users`, and `Notifications` to load only relevant tools
 - **Default Category**: `System` is selected by default
 - **System Tools**:
   - `Reset Activity Log` maintenance action
   - `Reset Audit Log` maintenance action
   - `Reset Records` maintenance action (restores 3 sample entries)
+  - `Reset Widget Prefs` maintenance action (reseeds default widget visibility for all active users)
   - `Reset Notifications Table` maintenance action
+  - `Reset all` maintenance action
+- **Users Tools**:
+  - Create user (auto-generates password and seeds default widget preferences)
+  - Update user details/status and optional password reset
+  - Force delete user with self-delete protection
+  - Reset widget preferences for a single detected user
 - **Notifications Tools**: Includes the `Create Notification` test form for QA flows
 
 ### 📌 Header Analytics Widgets
@@ -140,9 +147,12 @@ test-dashboard/
   - `Reset Activity Log`
   - `Reset Audit Log`
   - `Reset Records`
+  - `Reset Widget Prefs`
   - `Reset Notifications Table`
+  - `Reset all`
 - **Toast Confirmation Prompt**: Each action uses a custom top-center confirmation prompt before execution
 - **Safe Operation**: Page reloads after successful maintenance action
+- **Widget Prefs Reset Behavior**: Rebuilds one default preference row per active user
 
 ### 🔔 Custom Toast Notification System
 - **Top-Center Toasts**: Small notifications shown at the top-center of the page
@@ -223,8 +233,8 @@ test-dashboard/
 - **pages/data.php**: Data management interface with CRUD operations and bulk delete selection
 - **pages/reports.php**: Report generation with multiple export options
 - **pages/audit.php**: Audit trail viewer with search, plus table/timeline display toggle
-- **pages/ui-customization.php**: Per-user header widget visibility controls (4 current widget options)
-- **pages/dev-tools.php**: Category-driven maintenance and QA utilities (`System` default, `Notifications` optional)
+- **pages/ui-customization.php**: Per-user header widget visibility controls (5 current widget options)
+- **pages/dev-tools.php**: Category-driven maintenance and QA utilities (`System` default, plus `Users` and `Notifications`)
 
 #### Include Files (Reusable Components)
 - **includes/header.php**: HTML head tags and fixed-height title bar
@@ -282,6 +292,17 @@ All POST endpoints require `Content-Type: application/json` and JSON body contai
 | `notification_mark_read` | Mark one notification as read | `id` |
 | `notifications_mark_all_read` | Mark all notifications as read for current user | `action` |
 | `widget_preferences_update` | Save current user's header widget visibility settings | `widgets` (object with `total_entries`, `total_edits`, `adds_today`, `deletes_today`, `local_time`) |
+| `admin_user_lookup` | Lookup user by id or username | `lookup` |
+| `admin_user_create` | Create user from Dev Tools | `email`, `username`, optional `display_name`, optional `status` |
+| `admin_user_update` | Update user details and optional password | `user_id`, `email`, `username`, `display_name`, `status`, optional `reset_password` |
+| `admin_user_force_delete` | Hard delete one user | `user_id` |
+| `admin_user_reset_widget_prefs` | Reset widget prefs for one user to defaults | `user_id` |
+| `reset_activity_log` | Reset activity_log table | `action` |
+| `reset_audit_log` | Reset audit_log table | `action` |
+| `reset_records` | Reset records table to sample rows | `action` |
+| `reset_widget_prefs` | Reset and reseed widget prefs for all active users | `action` |
+| `reset_notifications_table` | Reset notifications table | `action` |
+| `reset_all` | Reset activity, audit, records, and notifications | `action` |
 | `reset_data` | Reset data/logs/audit to sample state | `action` |
 
 Auth usage pattern for every POST endpoint:
@@ -374,10 +395,17 @@ Auth usage pattern for every POST endpoint:
 ### Run Maintenance Reset Action
 1. Go to Dev Tools page
 2. Select `System` in the category dropdown (default)
-3. Click one target action (`Reset Activity Log`, `Reset Audit Log`, `Reset Records`, or `Reset Notifications Table`)
+3. Click one target action (`Reset Activity Log`, `Reset Audit Log`, `Reset Records`, `Reset Widget Prefs`, `Reset Notifications Table`, or `Reset all`)
 4. Confirm the action in the custom top-center toast prompt
 5. The selected table reset runs
 6. Page automatically reloads after completion
+
+### Reset Widget Preferences For One User
+1. Go to Dev Tools page
+2. Select `Users`
+3. In `Reset Widget Preferences`, detect a user by id or username
+4. Click `Reset Widget Preferences` and confirm
+5. That user is reset to default widget visibility
 
 ### Toast Notifications
 1. Add or edit a record on the Data page
@@ -441,7 +469,7 @@ Auth usage pattern for every POST endpoint:
 ### API and Storage Security
 - **Authentication**: API key required for all API calls
 - **Prepared Statements**: Parameterized SQL queries for CRUD endpoints
-- **Controlled Resets**: Reset operations are restricted to demo mode
+- **Controlled Resets**: `reset_data` is demo-mode only, while Dev Tools maintenance resets are available through system actions
 - **Storage**: Data persisted in MySQL tables (`records`, `activity_log`, `audit_log`)
 
 ### Error Handling
@@ -480,6 +508,8 @@ Auth usage pattern for every POST endpoint:
 - ✅ **Deployable Environment Modes** (`demo` and `production`) with configurable index reset behavior
 - ✅ **Modular JavaScript Loading** with shared core + page-specific feature modules
 - ✅ **Modular Dev Tools Page** with category-based utility rendering and `System` as default selection
+- ✅ **Dev Tools User Management** with create, update, force delete, and per-user widget reset
+- ✅ **Widget Preference Seeding** during user creation and widget reset operations
 - ✅ **Mobile Responsive Shell** with phone-first layout overrides for header, navigation, controls, and content flow
 - ✅ **Small-Screen Table Handling** with touch scrolling support and safer table sizing
 - ✅ **Server-Side Widget Preferences** with per-user header widget sync
