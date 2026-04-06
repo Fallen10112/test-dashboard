@@ -98,7 +98,7 @@ $pageTitle = "Dashboard Showcase";
 					</div>
 					<div class="user-dropdown-divider"></div>
 					<a href="user.php" class="user-dropdown-item">Account Settings</a>
-					<a href="widget-settings.php" class="user-dropdown-item">Widget Settings</a>
+					<a href="ui-customization.php" class="user-dropdown-item">UI Customization</a>
 					<a href="dev-tools.php" class="user-dropdown-item">Dev Tools</a>
 					<form method="POST" action="login.php">
 						<input type="hidden" name="action" value="logout">

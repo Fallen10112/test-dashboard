@@ -12,7 +12,7 @@ test-dashboard/
 │   ├── data.php           # Data management page (CRUD operations)
 │   ├── reports.php        # Reports & analytics with PDF/CSV export
 │   ├── audit.php          # Audit trail history viewer
-│   ├── widget-settings.php# Per-user header widget visibility controls
+│   ├── ui-customization.php# Per-user header widget visibility controls
 │   └── dev-tools.php      # Modular dev tools with category-based utilities
 ├── includes/
 │   ├── header.php         # HTML head and fixed-height title bar
@@ -103,7 +103,7 @@ test-dashboard/
 - **Always Visible**: Displayed in the top-right of the fixed header for quick status checks
 
 ### 🧩 Widget Customization (Per User)
-- **Dedicated Page**: `Widget Settings` page allows each user to choose which header widgets are visible
+- **Dedicated Page**: `UI Customization` page allows each user to choose which header widgets are visible
 - **Current Options**: `Entries`, `Edits`, `Adds Today`, `Deletes Today`, `Local Time`
 - **Server-Side Storage**: Preferences are persisted in SQL and loaded on every page request
 - **Cross-Device Sync**: The same account sees the same widget visibility choices on different devices
@@ -219,7 +219,7 @@ test-dashboard/
 - **pages/data.php**: Data management interface with CRUD operations and bulk delete selection
 - **pages/reports.php**: Report generation with multiple export options
 - **pages/audit.php**: Audit trail viewer with search, plus table/timeline display toggle
-- **pages/widget-settings.php**: Per-user header widget visibility controls (4 current widget options)
+- **pages/ui-customization.php**: Per-user header widget visibility controls (4 current widget options)
 - **pages/dev-tools.php**: Category-driven maintenance and QA utilities (`System` default, `Notifications` optional)
 
 #### Include Files (Reusable Components)

@@ -2,15 +2,15 @@
 <?php include '../includes/navigation.php'; ?>
 
 	<main class="main-content">
-		<section class="content-section active" id="widget-settings-container">
-			<h2>Widget Settings</h2>
-			<div class="account-card widget-settings-card">
+		<section class="content-section active" id="ui-customization-container">
+			<h2>UI Customization</h2>
+			<div class="account-card ui-customization-card">
 				<h3>Header Metrics Visibility</h3>
 				<p>Select which metric widgets are shown in the top-right header. Preferences are saved to your account and sync across devices.</p>
 
-				<div id="widget-settings-status" hidden aria-live="polite"></div>
+				<div id="ui-customization-status" hidden aria-live="polite"></div>
 
-				<form id="widget-settings-form" class="account-form" autocomplete="off">
+				<form id="ui-customization-form" class="account-form" autocomplete="off">
 					<div class="widget-options-grid">
 						<label class="widget-option-item" for="widget-total-entries">
 							<input type="checkbox" id="widget-total-entries" name="total_entries" checked>
@@ -39,7 +39,7 @@
 					</div>
 
 					<div class="form-actions">
-						<button type="submit" class="btn btn-primary" id="widget-settings-save-btn">Save Preferences</button>
+						<button type="submit" class="btn btn-primary" id="ui-customization-save-btn">Save Preferences</button>
 					</div>
 				</form>
 			</div>

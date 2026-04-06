@@ -51,8 +51,8 @@ $(document).ready(function() {
 		}
 	}
 
-	if ($('#widget-settings-container').length > 0 && typeof setupWidgetSettingsPageHandlers === 'function') {
-		setupWidgetSettingsPageHandlers();
+	if ($('#ui-customization-container').length > 0 && typeof setupUiCustomizationPageHandlers === 'function') {
+		setupUiCustomizationPageHandlers();
 	}
 });
 

@@ -1,11 +1,11 @@
-function setupWidgetSettingsPageHandlers() {
-	const $form = $('#widget-settings-form');
+function setupUiCustomizationPageHandlers() {
+	const $form = $('#ui-customization-form');
 	if ($form.length === 0) {
 		return;
 	}
 
-	const $status = $('#widget-settings-status');
-	const $saveBtn = $('#widget-settings-save-btn');
+	const $status = $('#ui-customization-status');
+	const $saveBtn = $('#ui-customization-save-btn');
 
 	function setStatus(message, isError) {
 		if (!$status.length) {
@@ -57,7 +57,7 @@ function setupWidgetSettingsPageHandlers() {
 		}).fail(function(xhr) {
 			const msg = xhr && xhr.responseJSON && xhr.responseJSON.message
 				? xhr.responseJSON.message
-				: 'Unable to load widget settings right now.';
+				: 'Unable to load UI customization settings right now.';
 			setStatus(msg, true);
 		}).always(function() {
 			$saveBtn.prop('disabled', false).text('Save Preferences');
@@ -87,7 +87,7 @@ function setupWidgetSettingsPageHandlers() {
 			if (window.DashboardHeaderWidgets && typeof window.DashboardHeaderWidgets.load === 'function') {
 				window.DashboardHeaderWidgets.load();
 			}
-			setStatus('Widget preferences saved.', false);
+			setStatus('UI customization preferences saved.', false);
 			showToast({
 				type: 'success',
 				title: 'Preferences Saved',
