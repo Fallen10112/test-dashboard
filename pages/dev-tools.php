@@ -123,11 +123,11 @@ try {
 		if ($postError !== '') {
 			$_SESSION['test_notif_error'] = $postError;
 		}
-		header('Location: test-notifications.php');
+		header('Location: dev-tools.php');
 		exit;
 	}
 } catch (Throwable $e) {
-	$error = 'Unable to load notification test tools right now.';
+	$error = 'Unable to load dev tools right now.';
 }
 ?>
 <?php include '../includes/header.php'; ?>
@@ -135,9 +135,9 @@ try {
 
 	<main class="main-content">
 		<section class="content-section active">
-			<h2>Test Notification System</h2>
+			<h2>Dev Tools</h2>
 			<div class="account-card">
-				<h3>Create Test Notification</h3>
+				<h3>Create Notification</h3>
 				<p>Send a test notification to a selected user for validation and QA.</p>
 
 				<?php if ($error !== ''): ?>
@@ -148,7 +148,7 @@ try {
 				<div class="success" role="status"><?php echo htmlspecialchars($success, ENT_QUOTES, 'UTF-8'); ?></div>
 				<?php endif; ?>
 
-				<form method="POST" action="test-notifications.php" class="account-form" autocomplete="off">
+				<form method="POST" action="dev-tools.php" class="account-form" autocomplete="off">
 					<input type="hidden" name="action" value="create">
 					<input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>">
 					<div class="form-group">
@@ -200,7 +200,7 @@ try {
 					</div>
 
 					<div class="form-actions">
-						<button type="submit" class="btn btn-primary">Send Test Notification</button>
+						<button type="submit" class="btn btn-primary">Send Notification</button>
 					</div>
 				</form>
 
