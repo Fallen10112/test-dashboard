@@ -10,6 +10,8 @@ let currentPagedItems = [];
 const virtualRowHeightPx = 52;
 const virtualOverscanRows = 6;
 const dataPageSizeStorageKey = 'data-page-size';
+let dataRealtimePollTimerId = null;
+let isDataRealtimePollInFlight = false;
 
 
 function setupDataPageHandlers() {
@@ -156,7 +158,7 @@ function buildDataPageRequestParams() {
 }
 
 
-function loadDataPage(callback) {
+function loadDataPage(callback, onComplete) {
 	$.ajax({
 		url: '../api.php',
 		type: 'GET',
@@ -167,6 +169,9 @@ function loadDataPage(callback) {
 			if (typeof callback === 'function') {
 				callback(response || {});
 			}
+			if (typeof onComplete === 'function') {
+				onComplete();
+			}
 		},
 		error: function() {
 			$('#data-container').html('<p class="error">Error loading data. Please refresh the page.</p>');
@@ -176,6 +181,46 @@ function loadDataPage(callback) {
 			currentTotalDataCount = 0;
 			updateBulkDeleteButtonState();
 			updateFilteredExportButtonsState();
+			if (typeof onComplete === 'function') {
+				onComplete();
+			}
+		}
+	});
+}
+
+
+function startDataPageRealtimeSync() {
+	if (dataRealtimePollTimerId !== null) {
+		clearInterval(dataRealtimePollTimerId);
+		dataRealtimePollTimerId = null;
+	}
+
+	const poll = function() {
+		if (document.visibilityState === 'hidden') {
+			return;
+		}
+		if (isDataRealtimePollInFlight) {
+			return;
+		}
+		if ($('#record-modal').length > 0 && !$('#record-modal').hasClass('hidden')) {
+			return;
+		}
+
+		isDataRealtimePollInFlight = true;
+		loadDataPage(function() {
+			if (typeof loadHeaderMetrics === 'function') {
+				loadHeaderMetrics();
+			}
+		}, function() {
+			isDataRealtimePollInFlight = false;
+		});
+	};
+
+	dataRealtimePollTimerId = setInterval(poll, 3000);
+
+	document.addEventListener('visibilitychange', function() {
+		if (document.visibilityState === 'visible') {
+			poll();
 		}
 	});
 }

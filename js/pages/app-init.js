@@ -30,6 +30,9 @@ $(document).ready(function() {
 		} else {
 			loadData();
 		}
+		if (typeof startDataPageRealtimeSync === 'function') {
+			startDataPageRealtimeSync();
+		}
 	}
 
 	if ($('#report-container').length > 0 && typeof setupReportsPageHandlers === 'function') {
@@ -42,6 +45,9 @@ $(document).ready(function() {
 		}
 		if (typeof setupAuditTrailPageHandlers === 'function') {
 			setupAuditTrailPageHandlers();
+		}
+		if (typeof startAuditTrailRealtimeSync === 'function') {
+			startAuditTrailRealtimeSync();
 		}
 	}
 

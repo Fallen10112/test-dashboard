@@ -1,6 +1,8 @@
 let currentAuditView = 'table';
 let auditCurrentPage = 1;
 let auditPageSize = 25;
+let auditRealtimePollTimerId = null;
+let isAuditRealtimePollInFlight = false;
 
 function setupAuditTrailPageHandlers() {
 	const debouncedAuditFilter = debounce(filterAuditTrail, 180);
@@ -52,7 +54,7 @@ function setAuditView(viewMode) {
 }
 
 
-function loadAuditTrail() {
+function loadAuditTrail(onComplete) {
 	$.ajax({
 		url: '../api.php?action=audit_trail',
 		type: 'GET',
@@ -60,9 +62,48 @@ function loadAuditTrail() {
 		success: function(data) {
 			allAuditTrail = data;
 			displayAuditTrail(data);
+			if (typeof onComplete === 'function') {
+				onComplete();
+			}
 		},
 		error: function() {
 			$('#audit-container').html('<p class="error">Error loading audit trail. Please refresh the page.</p>');
+			if (typeof onComplete === 'function') {
+				onComplete();
+			}
+		}
+	});
+}
+
+
+function startAuditTrailRealtimeSync() {
+	if (auditRealtimePollTimerId !== null) {
+		clearInterval(auditRealtimePollTimerId);
+		auditRealtimePollTimerId = null;
+	}
+
+	const poll = function() {
+		if (document.visibilityState === 'hidden') {
+			return;
+		}
+		if (isAuditRealtimePollInFlight) {
+			return;
+		}
+
+		isAuditRealtimePollInFlight = true;
+		loadAuditTrail(function() {
+			if (typeof loadHeaderMetrics === 'function') {
+				loadHeaderMetrics();
+			}
+			isAuditRealtimePollInFlight = false;
+		});
+	};
+
+	auditRealtimePollTimerId = setInterval(poll, 3000);
+
+	document.addEventListener('visibilitychange', function() {
+		if (document.visibilityState === 'visible') {
+			poll();
 		}
 	});
 }
