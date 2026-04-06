@@ -20,6 +20,7 @@ let sessionVisibilityHandlerRef = null;
 
 
 let headerNotifications = [];
+let headerUnreadNotificationCount = 0;
 function setupUserAvatarDropdown() {
 	const btn = document.getElementById('user-avatar-btn');
 	const dropdown = document.getElementById('user-dropdown');
@@ -30,6 +31,15 @@ function setupUserAvatarDropdown() {
 		const isOpen = !dropdown.hidden;
 		dropdown.hidden = isOpen;
 		btn.setAttribute('aria-expanded', String(!isOpen));
+
+		if (isOpen === false) {
+			const notificationsDropdown = document.getElementById('notifications-dropdown');
+			const notificationsBtn = document.getElementById('notifications-btn');
+			if (notificationsDropdown && !notificationsDropdown.hidden && notificationsBtn) {
+				notificationsDropdown.hidden = true;
+				notificationsBtn.setAttribute('aria-expanded', 'false');
+			}
+		}
 	});
 
 	document.addEventListener('click', function(e) {
@@ -242,6 +252,7 @@ function setupGlobalAjaxSessionGuard() {
 function renderHeaderNotifications() {
 	const listEl = document.getElementById('notifications-list');
 	const countEl = document.getElementById('notifications-count');
+	const markAllReadBtn = document.getElementById('notifications-mark-all-read');
 	if (!listEl || !countEl) {
 		return;
 	}
@@ -255,12 +266,18 @@ function renderHeaderNotifications() {
 		listEl.appendChild(emptyEl);
 		countEl.textContent = '';
 		countEl.hidden = true;
+		if (markAllReadBtn) {
+			markAllReadBtn.hidden = true;
+		}
 		return;
 	}
 
 	headerNotifications.forEach(function(notification) {
 		const itemEl = document.createElement('div');
 		itemEl.className = 'notification-item';
+		if (notification.isRead !== true) {
+			itemEl.classList.add('notification-item-unread');
+		}
 
 		const titleEl = document.createElement('div');
 		titleEl.className = 'notification-item-title';
@@ -270,20 +287,32 @@ function renderHeaderNotifications() {
 		messageEl.className = 'notification-item-message';
 		messageEl.textContent = String(notification.message || '');
 
+		const timeEl = document.createElement('div');
+		timeEl.className = 'notification-item-time';
+		timeEl.textContent = String(notification.timestamp || '').trim();
+
 		itemEl.appendChild(titleEl);
 		itemEl.appendChild(messageEl);
+		if (timeEl.textContent !== '') {
+			itemEl.appendChild(timeEl);
+		}
 		listEl.appendChild(itemEl);
 	});
 
-	const count = headerNotifications.length;
+	if (markAllReadBtn) {
+		markAllReadBtn.hidden = headerUnreadNotificationCount < 1;
+	}
+
+	const count = headerUnreadNotificationCount;
 	countEl.textContent = String(count > 99 ? '99+' : count);
 	countEl.hidden = count === 0;
 }
 
 
-function setHeaderNotifications(notifications) {
+function setHeaderNotifications(notifications, unreadCount) {
 	if (!Array.isArray(notifications)) {
 		headerNotifications = [];
+		headerUnreadNotificationCount = 0;
 		renderHeaderNotifications();
 		return;
 	}
@@ -293,30 +322,131 @@ function setHeaderNotifications(notifications) {
 			return item && (item.title || item.message);
 		})
 		.map(function(item) {
+			const datePart = String(item.date || '').trim();
+			const timePart = String(item.time || '').trim();
+			const timestamp = [datePart, timePart].filter(function(v) { return v !== ''; }).join(' ');
 			return {
+				id: Number(item.id || 0),
 				title: String(item.title || 'Notification'),
-				message: String(item.message || '')
+				message: String(item.message || ''),
+				isRead: item.is_read === true || item.isRead === true,
+				timestamp: timestamp
 			};
 		});
 
+	if (typeof unreadCount === 'number' && unreadCount >= 0) {
+		headerUnreadNotificationCount = unreadCount;
+	} else {
+		headerUnreadNotificationCount = headerNotifications.filter(function(item) {
+			return item.isRead !== true;
+		}).length;
+	}
+
 	renderHeaderNotifications();
+}
+
+
+function loadHeaderNotificationsFromServer() {
+	return $.ajax({
+		url: '../api.php?action=notifications&limit=25',
+		type: 'GET',
+		dataType: 'json'
+	}).done(function(response) {
+		if (response && response.success === true) {
+			setHeaderNotifications(response.items || [], Number(response.unread_count || 0));
+		}
+	}).fail(function(xhr) {
+		handleSessionAuthFailure(xhr);
+	});
+}
+
+
+function createNotificationOnServer(item) {
+	return $.ajax({
+		url: '../api.php',
+		type: 'POST',
+		contentType: 'application/json',
+		dataType: 'json',
+		data: JSON.stringify({
+			action: 'notification_create',
+			title: String((item && item.title) || 'Notification'),
+			message: String((item && item.message) || ''),
+			type: String((item && item.type) || 'info')
+		})
+	}).done(function(response) {
+		if (response && response.success === true) {
+			setHeaderNotifications(response.items || [], Number(response.unread_count || 0));
+		}
+	}).fail(function(xhr) {
+		handleSessionAuthFailure(xhr);
+	});
+}
+
+
+function markAllHeaderNotificationsRead() {
+	return $.ajax({
+		url: '../api.php',
+		type: 'POST',
+		contentType: 'application/json',
+		dataType: 'json',
+		data: JSON.stringify({
+			action: 'notifications_mark_all_read'
+		})
+	}).done(function(response) {
+		if (response && response.success === true) {
+			setHeaderNotifications(response.items || [], Number(response.unread_count || 0));
+		}
+	}).fail(function(xhr) {
+		handleSessionAuthFailure(xhr);
+	});
+}
+
+
+function markHeaderNotificationRead(notificationId) {
+	return $.ajax({
+		url: '../api.php',
+		type: 'POST',
+		contentType: 'application/json',
+		dataType: 'json',
+		data: JSON.stringify({
+			action: 'notification_mark_read',
+			id: Number(notificationId || 0)
+		})
+	}).done(function(response) {
+		if (response && response.success === true) {
+			setHeaderNotifications(response.items || [], Number(response.unread_count || 0));
+		}
+	}).fail(function(xhr) {
+		handleSessionAuthFailure(xhr);
+	});
 }
 
 
 function setupNotificationDropdown() {
 	const btn = document.getElementById('notifications-btn');
 	const dropdown = document.getElementById('notifications-dropdown');
+	const markAllReadBtn = document.getElementById('notifications-mark-all-read');
 	if (!btn || !dropdown) {
 		return;
 	}
 
-	renderHeaderNotifications();
+	loadHeaderNotificationsFromServer();
 
 	btn.addEventListener('click', function(e) {
 		e.stopPropagation();
 		const isOpen = !dropdown.hidden;
 		dropdown.hidden = isOpen;
 		btn.setAttribute('aria-expanded', String(!isOpen));
+		if (isOpen === false) {
+			loadHeaderNotificationsFromServer();
+		}
+
+		const userDropdown = document.getElementById('user-dropdown');
+		const userBtn = document.getElementById('user-avatar-btn');
+		if (userDropdown && !userDropdown.hidden && userBtn) {
+			userDropdown.hidden = true;
+			userBtn.setAttribute('aria-expanded', 'false');
+		}
 	});
 
 	document.addEventListener('click', function(e) {
@@ -334,23 +464,37 @@ function setupNotificationDropdown() {
 		}
 	});
 
+	if (markAllReadBtn) {
+		markAllReadBtn.addEventListener('click', function(e) {
+			e.preventDefault();
+			e.stopPropagation();
+			markAllHeaderNotificationsRead();
+		});
+	}
+
 	window.DashboardNotifications = {
 		set: function(items) {
 			setHeaderNotifications(items);
 		},
+		refresh: function() {
+			return loadHeaderNotificationsFromServer();
+		},
 		add: function(item) {
 			if (!item || (!item.title && !item.message)) {
-				return;
+				return $.Deferred().resolve().promise();
 			}
-			headerNotifications.unshift({
-				title: String(item.title || 'Notification'),
-				message: String(item.message || '')
-			});
-			renderHeaderNotifications();
+			return createNotificationOnServer(item);
 		},
 		clear: function() {
 			headerNotifications = [];
+			headerUnreadNotificationCount = 0;
 			renderHeaderNotifications();
+		},
+		markAllRead: function() {
+			return markAllHeaderNotificationsRead();
+		},
+		markRead: function(notificationId) {
+			return markHeaderNotificationRead(notificationId);
 		}
 	};
 }

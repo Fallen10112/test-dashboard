@@ -75,6 +75,7 @@ function requireApiSessionAuthentication() {
 	startAuthSession();
 	$user = getAuthUser();
 	if ($user !== null) {
+		$GLOBALS['auth_user'] = $user;
 		return;
 	}
 
@@ -199,6 +200,125 @@ function getDataPayload(PDO $pdo) {
 	$stmt = $pdo->query('SELECT id, title, description FROM records WHERE deleted_at IS NULL ORDER BY id ASC');
 	$items = $stmt->fetchAll();
 	return ['items' => is_array($items) ? $items : []];
+}
+
+
+function getApiAuthUserId() {
+	$authUser = $GLOBALS['auth_user'] ?? null;
+	$userId = isset($authUser['id']) ? (int)$authUser['id'] : 0;
+	if ($userId < 1) {
+		respondJson(401, [
+			'success' => false,
+			'message' => 'Authentication required.',
+			'reason' => 'unauthenticated',
+		]);
+	}
+	return $userId;
+}
+
+
+function ensureNotificationsTable(PDO $pdo) {
+	$pdo->exec(
+		'CREATE TABLE IF NOT EXISTS notifications (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			user_id BIGINT UNSIGNED NOT NULL,
+			title VARCHAR(160) NOT NULL,
+			message TEXT NOT NULL,
+			notification_type VARCHAR(50) NOT NULL DEFAULT "info",
+			is_read TINYINT(1) NOT NULL DEFAULT 0,
+			read_at DATETIME NULL,
+			created_at DATETIME NOT NULL,
+			PRIMARY KEY (id),
+			KEY idx_notifications_user_created (user_id, created_at),
+			KEY idx_notifications_user_read (user_id, is_read),
+			CONSTRAINT fk_notifications_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+	);
+}
+
+
+function getNotificationsPayload(PDO $pdo, $userId, $limit = 25) {
+	ensureNotificationsTable($pdo);
+
+	$safeLimit = (int)$limit;
+	if ($safeLimit < 1) {
+		$safeLimit = 25;
+	}
+	if ($safeLimit > 100) {
+		$safeLimit = 100;
+	}
+
+	$countStmt = $pdo->prepare('SELECT COUNT(*) FROM notifications WHERE user_id = :user_id AND is_read = 0');
+	$countStmt->execute([':user_id' => $userId]);
+	$unreadCount = (int)$countStmt->fetchColumn();
+
+	$listStmt = $pdo->prepare(
+		'SELECT id, title, message, notification_type, is_read, DATE_FORMAT(created_at, "%Y-%m-%d") AS `date`, DATE_FORMAT(created_at, "%H:%i:%s") AS `time`
+		 FROM notifications
+		 WHERE user_id = :user_id
+		 ORDER BY id DESC
+		 LIMIT :limit'
+	);
+	$listStmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
+	$listStmt->bindValue(':limit', $safeLimit, PDO::PARAM_INT);
+	$listStmt->execute();
+	$rows = $listStmt->fetchAll();
+
+	$items = [];
+	foreach ($rows as $row) {
+		$items[] = [
+			'id' => (int)$row['id'],
+			'title' => (string)($row['title'] ?? ''),
+			'message' => (string)($row['message'] ?? ''),
+			'type' => (string)($row['notification_type'] ?? 'info'),
+			'is_read' => ((int)($row['is_read'] ?? 0)) === 1,
+			'date' => (string)($row['date'] ?? ''),
+			'time' => (string)($row['time'] ?? ''),
+		];
+	}
+
+	return [
+		'success' => true,
+		'unread_count' => $unreadCount,
+		'items' => $items,
+	];
+}
+
+
+function createNotification(PDO $pdo, $userId, $title, $message, $type = 'info') {
+	ensureNotificationsTable($pdo);
+
+	$normalizedTitle = trim((string)$title);
+	$normalizedMessage = trim((string)$message);
+	$normalizedType = trim((string)$type);
+
+	if ($normalizedTitle === '' && $normalizedMessage === '') {
+		return ['success' => false, 'message' => 'Notification title or message is required'];
+	}
+	if ($normalizedTitle === '') {
+		$normalizedTitle = 'Notification';
+	}
+	if ($normalizedType === '') {
+		$normalizedType = 'info';
+	}
+
+	$stmt = $pdo->prepare(
+		'INSERT INTO notifications (user_id, title, message, notification_type, is_read, created_at)
+		 VALUES (:user_id, :title, :message, :notification_type, 0, :created_at)'
+	);
+	$ok = $stmt->execute([
+		':user_id' => $userId,
+		':title' => substr($normalizedTitle, 0, 160),
+		':message' => substr($normalizedMessage, 0, 1000),
+		':notification_type' => substr($normalizedType, 0, 50),
+		':created_at' => getDashboardSqlTimestamp(),
+	]);
+
+	if (!$ok) {
+		return ['success' => false, 'message' => 'Failed to save notification'];
+	}
+
+	return ['success' => true, 'id' => (int)$pdo->lastInsertId()];
 }
 
 
@@ -415,6 +535,72 @@ if ($method === 'POST') {
 			respondJson(200, ['success' => true, 'message' => 'Audit entries added']);
 		}
 		respondJson(500, ['success' => false, 'message' => 'Failed to save audit entries']);
+	}
+
+	if ($postAction === 'notification_create') {
+		$userId = getApiAuthUserId();
+		$created = createNotification(
+			$pdo,
+			$userId,
+			$data['title'] ?? '',
+			$data['message'] ?? '',
+			$data['type'] ?? 'info'
+		);
+
+		if (!$created['success']) {
+			respondJson(400, ['success' => false, 'message' => $created['message'] ?? 'Failed to save notification']);
+		}
+
+		$payload = getNotificationsPayload($pdo, $userId, 25);
+		respondJson(200, [
+			'success' => true,
+			'message' => 'Notification created',
+			'notification_id' => (int)$created['id'],
+			'unread_count' => (int)$payload['unread_count'],
+			'items' => $payload['items'],
+		]);
+	}
+
+	if ($postAction === 'notification_mark_read') {
+		$userId = getApiAuthUserId();
+		ensureNotificationsTable($pdo);
+		$notificationId = isset($data['id']) ? (int)$data['id'] : 0;
+		if ($notificationId < 1) {
+			respondJson(400, ['success' => false, 'message' => 'A valid notification id is required']);
+		}
+
+		$updateStmt = $pdo->prepare('UPDATE notifications SET is_read = 1, read_at = :read_at WHERE id = :id AND user_id = :user_id');
+		$updateStmt->execute([
+			':read_at' => getDashboardSqlTimestamp(),
+			':id' => $notificationId,
+			':user_id' => $userId,
+		]);
+
+		$payload = getNotificationsPayload($pdo, $userId, 25);
+		respondJson(200, [
+			'success' => true,
+			'message' => 'Notification marked as read',
+			'unread_count' => (int)$payload['unread_count'],
+			'items' => $payload['items'],
+		]);
+	}
+
+	if ($postAction === 'notifications_mark_all_read') {
+		$userId = getApiAuthUserId();
+		ensureNotificationsTable($pdo);
+		$updateStmt = $pdo->prepare('UPDATE notifications SET is_read = 1, read_at = :read_at WHERE user_id = :user_id AND is_read = 0');
+		$updateStmt->execute([
+			':read_at' => getDashboardSqlTimestamp(),
+			':user_id' => $userId,
+		]);
+
+		$payload = getNotificationsPayload($pdo, $userId, 25);
+		respondJson(200, [
+			'success' => true,
+			'message' => 'All notifications marked as read',
+			'unread_count' => (int)$payload['unread_count'],
+			'items' => $payload['items'],
+		]);
 	}
 
 	if ($postAction === 'data_create') {
@@ -645,6 +831,13 @@ if ($method === 'GET') {
 
 	if ($action === 'logs') {
 		echo json_encode(getLogsPayload($pdo));
+		exit;
+	}
+
+	if ($action === 'notifications') {
+		$userId = getApiAuthUserId();
+		$limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 25;
+		echo json_encode(getNotificationsPayload($pdo, $userId, $limit));
 		exit;
 	}
 

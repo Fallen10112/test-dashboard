@@ -235,6 +235,7 @@ Authentication (required):
 | `GET api.php?action=data_filtered_export` | Full filtered/sorted data (no pagination) | `search`, `sortColumn`, `sortOrder` |
 | `GET api.php?action=audit_trail` | Full audit history | none |
 | `GET api.php?action=logs` | Full activity logs | none |
+| `GET api.php?action=notifications` | User notification inbox + unread count | `limit` (optional, max 100) |
 | `GET api.php` | Full raw data payload | none |
 
 Auth usage pattern for every GET endpoint:
@@ -253,6 +254,9 @@ All POST endpoints require `Content-Type: application/json` and JSON body contai
 | `data_bulk_delete` | Delete many records | `ids` (array) |
 | `add_audit_entry` | Write one audit entry | `changeType`, `recordId`, `fieldName`, `oldValue`, `newValue` |
 | `add_audit_entries` | Write multiple audit entries | `entries` (array of audit entry objects) |
+| `notification_create` | Create one in-app notification for current user | `title` or `message`, optional `type` |
+| `notification_mark_read` | Mark one notification as read | `id` |
+| `notifications_mark_all_read` | Mark all notifications as read for current user | `action` |
 | `reset_data` | Reset data/logs/audit to sample state | `action` |
 
 Auth usage pattern for every POST endpoint:
@@ -294,6 +298,7 @@ Auth usage pattern for every POST endpoint:
 - **records** (SQL table): Main data storage
 - **activity_log** (SQL table): Administrative activity logs
 - **audit_log** (SQL table): Complete change history
+- **notifications** (SQL table): Per-user in-app notifications with unread/read tracking
 
 ## Usage Examples
 

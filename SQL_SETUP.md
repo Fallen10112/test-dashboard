@@ -29,6 +29,7 @@ Recommended defaults:
 - records: Main records table for application data.
 - audit_log: Immutable change tracking table.
 - activity_log: Readable operational events table.
+- notifications: Per-user notification inbox with read state.
 - user_sessions: Login session tracking.
 - password_reset_tokens: Password reset flow support.
 
@@ -263,6 +264,51 @@ Columns:
 
 ---
 
+## 13) notifications
+
+Purpose:
+
+Stores user-scoped in-app notifications for the header bell and dropdown.
+
+Columns:
+
+- id (BIGINT UNSIGNED, PK, AUTO_INCREMENT): Notification row ID.
+- user_id (BIGINT UNSIGNED, NOT NULL, FK -> users.id): Notification owner.
+- title (VARCHAR(160), NOT NULL): Short notification headline.
+- message (TEXT, NOT NULL): Notification body text.
+- notification_type (VARCHAR(50), NOT NULL, default 'info'): Classification such as info/success/warning/error.
+- is_read (TINYINT(1), NOT NULL, default 0): Read marker (0 unread, 1 read).
+- read_at (DATETIME, NULL): Timestamp when user marked it read.
+- created_at (DATETIME, NOT NULL): Notification creation time.
+
+Recommended indexes:
+
+- INDEX idx_notifications_user_created (user_id, created_at)
+- INDEX idx_notifications_user_read (user_id, is_read)
+
+Example DDL:
+
+```sql
+CREATE TABLE notifications (
+	id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+	user_id BIGINT UNSIGNED NOT NULL,
+	title VARCHAR(160) NOT NULL,
+	message TEXT NOT NULL,
+	notification_type VARCHAR(50) NOT NULL DEFAULT 'info',
+	is_read TINYINT(1) NOT NULL DEFAULT 0,
+	read_at DATETIME NULL,
+	created_at DATETIME NOT NULL,
+	PRIMARY KEY (id),
+	KEY idx_notifications_user_created (user_id, created_at),
+	KEY idx_notifications_user_read (user_id, is_read),
+	CONSTRAINT fk_notifications_user FOREIGN KEY (user_id)
+		REFERENCES users(id)
+		ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+```
+
+---
+
 ## Recommended Permission Keys
 
 - read: View data.
@@ -278,6 +324,7 @@ Columns:
 - records
 - activity_log
 - audit_log
+- notifications
 - users
 - roles
 - permissions
