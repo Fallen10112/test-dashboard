@@ -165,6 +165,29 @@ test-dashboard/
   - Data Edit success now shows a confirmation toast
   - Bulk Delete confirmation prompt now uses custom toast actions
 
+### 🔔 In-App Notification Center
+- **Header Bell Icon**: Located in the top-right corner of the fixed header bar
+- **Unread Badge**: Badge displays unread notification count (99+ for very high counts)
+- **Notification Dropdown**: Click the bell to open a scrollable dropdown with all notifications
+- **Compact Display**: Notifications shown as single-line items with titles and truncated messages ending with `...`
+- **Interactive Click-to-View**: Click any notification to display full details in a persistent toast
+- **Details Toast Metadata**:
+  - Full title and message
+  - Creation date/time
+  - Sender name (if not a system notification)
+  - Mark as Read button (only shown for unread notifications)
+  - Delete button
+  - Close button
+- **Quick Actions in Dropdown**:
+  - Mark individual notification as read (checkmark button)
+  - Delete individual notification (X button)
+  - Mark all as read (header-level action)
+  - Delete all (header-level action)
+- **Real-Time Sync**: Notifications automatically poll from the server every 3 seconds
+- **Visibility-Aware Polling**: Polling pauses when the browser tab is hidden or unfocused
+- **Toast Integration**: New incoming notifications show as top-center toasts with auto-dismiss
+- **Data Validation**: Notification titles limited to 64 characters (enforced client and server-side)
+
 ### 🧹 Bulk Actions (Data Page Only)
 - **Multi-Select Support**: Use row checkboxes and Select All in the Data table
 - **Single Bulk Action**: Bulk delete selected records from the Data page
@@ -288,7 +311,7 @@ All POST endpoints require `Content-Type: application/json` and JSON body contai
 | `data_bulk_delete` | Delete many records | `ids` (array) |
 | `add_audit_entry` | Write one audit entry | `changeType`, `recordId`, `fieldName`, `oldValue`, `newValue` |
 | `add_audit_entries` | Write multiple audit entries | `entries` (array of audit entry objects) |
-| `notification_create` | Create one in-app notification for current user | `title` or `message`, optional `type` |
+| `notification_create` | Create one in-app notification for current user | `title` or `message`, optional `type` (title max 64 chars) |
 | `notification_mark_read` | Mark one notification as read | `id` |
 | `notifications_mark_all_read` | Mark all notifications as read for current user | `action` |
 | `widget_preferences_update` | Save current user's header widget visibility settings | `widgets` (object with `total_entries`, `total_edits`, `adds_today`, `deletes_today`, `local_time`) |
