@@ -71,10 +71,68 @@ function requireAuth(): void {
 	startAuthSession();
 	$user = getAuthUser();
 	if ($user === null) {
+		$reason = getAuthInvalidationReason();
+		if ($reason === 'replaced') {
+			$_SESSION['auth_flash_toast'] = [
+				'type' => 'warning',
+				'title' => 'Signed Out',
+				'message' => 'You were signed out because this account logged in on another device.',
+			];
+		} elseif ($reason === 'expired') {
+			$_SESSION['auth_flash_toast'] = [
+				'type' => 'info',
+				'title' => 'Session Expired',
+				'message' => 'Your session expired. Please sign in again.',
+			];
+		}
+
+		clearAuthSessionState();
 		header('Location: login.php');
 		exit();
 	}
 	$GLOBALS['auth_user'] = $user;
+}
+
+function getAuthInvalidationReason(): ?string {
+	if (!isset($_SESSION['auth_token'], $_SESSION['auth_user_id'])) {
+		return null;
+	}
+
+	$tokenHash = hash('sha256', $_SESSION['auth_token']);
+
+	try {
+		$pdo = getDashboardPdo();
+		$stmt = $pdo->prepare(
+			'SELECT revoked_at, expires_at
+			   FROM user_sessions
+			  WHERE session_token_hash = :hash
+			    AND user_id = :uid
+			  LIMIT 1'
+		);
+		$stmt->execute([':hash' => $tokenHash, ':uid' => (int) $_SESSION['auth_user_id']]);
+		$row = $stmt->fetch();
+
+		if (!$row) {
+			return 'missing';
+		}
+
+		if (!empty($row['revoked_at'])) {
+			return 'replaced';
+		}
+
+		if (!empty($row['expires_at']) && strtotime((string) $row['expires_at']) <= time()) {
+			return 'expired';
+		}
+
+		return 'invalid';
+	} catch (Throwable $e) {
+		return 'invalid';
+	}
+}
+
+function clearAuthSessionState(): void {
+	unset($_SESSION['auth_token'], $_SESSION['auth_user_id']);
+	session_regenerate_id(true);
 }
 
 function loginUser(string $identifier, string $password): bool {
@@ -116,6 +174,14 @@ function loginUser(string $identifier, string $password): bool {
 		$expiresAt = date('Y-m-d H:i:s', time() + AUTH_SESSION_LIFETIME);
 		$ip        = isset($_SERVER['REMOTE_ADDR']) ? substr($_SERVER['REMOTE_ADDR'], 0, 45) : null;
 		$ua        = isset($_SERVER['HTTP_USER_AGENT']) ? substr($_SERVER['HTTP_USER_AGENT'], 0, 255) : null;
+
+		// Single-device policy: revoke all other active sessions before creating a new one.
+		$pdo->prepare(
+			'UPDATE user_sessions
+			    SET revoked_at = NOW()
+			  WHERE user_id = :uid
+			    AND revoked_at IS NULL'
+		)->execute([':uid' => $user['id']]);
 
 		$pdo->prepare(
 			'INSERT INTO user_sessions (user_id, session_token_hash, expires_at, ip_address, user_agent, created_at)

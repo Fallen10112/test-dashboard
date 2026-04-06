@@ -65,6 +65,7 @@ $pageTitle = "Dashboard Showcase";
 						<span class="user-dropdown-email"><?php echo $_headerEmail; ?></span>
 					</div>
 					<div class="user-dropdown-divider"></div>
+					<a href="user.php" class="user-dropdown-item">Account Settings</a>
 					<form method="POST" action="login.php">
 						<input type="hidden" name="action" value="logout">
 						<button type="submit" class="user-dropdown-item user-dropdown-signout">Sign Out</button>

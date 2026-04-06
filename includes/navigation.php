@@ -5,6 +5,7 @@
 			<li><a href="../pages/data.php" class="nav-link <?php echo (basename($_SERVER['PHP_SELF']) === 'data.php') ? 'active' : ''; ?>">Data</a></li>
 			<li><a href="../pages/reports.php" class="nav-link <?php echo (basename($_SERVER['PHP_SELF']) === 'reports.php') ? 'active' : ''; ?>">Reports</a></li>
 			<li><a href="../pages/audit.php" class="nav-link <?php echo (basename($_SERVER['PHP_SELF']) === 'audit.php') ? 'active' : ''; ?>">Audit Trail</a></li>
+			<li><a href="../pages/user.php" class="nav-link <?php echo (basename($_SERVER['PHP_SELF']) === 'user.php') ? 'active' : ''; ?>">Account</a></li>
 		</ul>
 		
 		

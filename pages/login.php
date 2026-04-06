@@ -17,6 +17,12 @@ if (getAuthUser() !== null) {
 }
 
 $error = '';
+$flashToast = null;
+
+if (isset($_SESSION['auth_flash_toast']) && is_array($_SESSION['auth_flash_toast'])) {
+	$flashToast = $_SESSION['auth_flash_toast'];
+	unset($_SESSION['auth_flash_toast']);
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	$identifier = trim($_POST['identifier'] ?? '');
@@ -86,6 +92,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 			</form>
 		</div>
 	</div>
+
+	<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+	<script src="../js/core/shared.js"></script>
+	<?php if (is_array($flashToast)): ?>
+	<script>
+		$(function() {
+			showToast({
+				type: <?php echo json_encode((string)($flashToast['type'] ?? 'info'), JSON_UNESCAPED_SLASHES); ?>,
+				title: <?php echo json_encode((string)($flashToast['title'] ?? 'Notice'), JSON_UNESCAPED_SLASHES); ?>,
+				message: <?php echo json_encode((string)($flashToast['message'] ?? ''), JSON_UNESCAPED_SLASHES); ?>,
+				showOkayButton: true,
+				autoCloseMs: 5000
+			});
+		});
+	</script>
+	<?php endif; ?>
 
 </body>
 </html>

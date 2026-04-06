@@ -5,6 +5,7 @@ ini_set('display_errors', '0');
 header('Content-Type: application/json');
 
 require_once __DIR__ . '/includes/sql_helpers.php';
+require_once __DIR__ . '/includes/auth.php';
 
 $action = $_GET['action'] ?? null;
 
@@ -67,6 +68,51 @@ function requireApiKeyAuthentication() {
 	if ($providedApiKey === '' || !hash_equals($expectedApiKey, $providedApiKey)) {
 		respondJson(401, ['success' => false, 'message' => 'Unauthorized: valid API key required']);
 	}
+}
+
+
+function requireApiSessionAuthentication() {
+	startAuthSession();
+	$user = getAuthUser();
+	if ($user !== null) {
+		return;
+	}
+
+	$reason = getAuthInvalidationReason();
+	if ($reason === 'replaced') {
+		$_SESSION['auth_flash_toast'] = [
+			'type' => 'warning',
+			'title' => 'Signed Out',
+			'message' => 'You were signed out because this account logged in on another device.',
+		];
+		clearAuthSessionState();
+		respondJson(401, [
+			'success' => false,
+			'message' => 'Session ended because this account was used to log in on another device.',
+			'reason' => 'session_replaced',
+		]);
+	}
+
+	if ($reason === 'expired') {
+		$_SESSION['auth_flash_toast'] = [
+			'type' => 'info',
+			'title' => 'Session Expired',
+			'message' => 'Your session expired. Please sign in again.',
+		];
+		clearAuthSessionState();
+		respondJson(401, [
+			'success' => false,
+			'message' => 'Session expired. Please sign in again.',
+			'reason' => 'session_expired',
+		]);
+	}
+
+	clearAuthSessionState();
+	respondJson(401, [
+		'success' => false,
+		'message' => 'Authentication required.',
+		'reason' => 'unauthenticated',
+	]);
 }
 
 
@@ -323,6 +369,7 @@ if ($method === 'OPTIONS') {
 }
 
 requireApiKeyAuthentication();
+requireApiSessionAuthentication();
 
 try {
 	$pdo = getDashboardPdo();
@@ -587,6 +634,10 @@ if ($method === 'POST') {
 
 
 if ($method === 'GET') {
+	if ($action === 'session_status') {
+		respondJson(200, ['success' => true, 'authenticated' => true]);
+	}
+
 	if ($action === 'audit_trail') {
 		echo json_encode(getAuditPayload($pdo));
 		exit;

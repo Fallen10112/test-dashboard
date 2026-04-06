@@ -2,6 +2,8 @@ $(document).ready(function() {
 	initializeTheme();
 	setupResetButtonHandler();
 	setupUserAvatarDropdown();
+	setupGlobalAjaxSessionGuard();
+	setupSessionEnforcementPoller();
 	loadHeaderMetrics();
 
 	if ($('#data-container').length > 0) {

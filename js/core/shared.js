@@ -13,6 +13,10 @@ let currentPagedItems = [];
 const virtualRowHeightPx = 52;
 const virtualOverscanRows = 6;
 const dataPageSizeStorageKey = 'data-page-size';
+let isHandlingForcedLogout = false;
+let sessionPollTimerId = null;
+let sessionPollFnRef = null;
+let sessionVisibilityHandlerRef = null;
 
 
 function setupUserAvatarDropdown() {
@@ -170,6 +174,112 @@ function showToast(options) {
 			closeToast($toast, settings.onClose);
 		}, settings.autoCloseMs);
 	}
+}
+
+
+function redirectToLoginPage() {
+	window.location.href = '../pages/login.php';
+}
+
+
+function getForcedLogoutMessage(reason, fallbackMessage) {
+	if (reason === 'session_replaced') {
+		return 'You were signed out because this account logged in on another device.';
+	}
+	if (reason === 'session_expired') {
+		return 'Your session expired. Please sign in again.';
+	}
+	return fallbackMessage || 'Your session is no longer valid. Please sign in again.';
+}
+
+
+function handleSessionAuthFailure(xhr) {
+	if (!xhr || xhr.status !== 401) {
+		return false;
+	}
+
+	const response = xhr.responseJSON || {};
+	const reason = String(response.reason || '');
+	const knownReason = reason === 'session_replaced' || reason === 'session_expired' || reason === 'unauthenticated';
+	if (!knownReason) {
+		return false;
+	}
+
+	if (isHandlingForcedLogout) {
+		return true;
+	}
+	isHandlingForcedLogout = true;
+
+	if (sessionPollTimerId !== null) {
+		clearInterval(sessionPollTimerId);
+		sessionPollTimerId = null;
+	}
+
+	showToast({
+		type: 'warning',
+		title: 'Signed Out',
+		message: getForcedLogoutMessage(reason, response.message),
+		showOkayButton: true,
+		autoCloseMs: 0
+	});
+
+	setTimeout(function() {
+		redirectToLoginPage();
+	}, 1200);
+
+	return true;
+}
+
+
+function setupGlobalAjaxSessionGuard() {
+	$(document).off('ajaxError.sessionGuard').on('ajaxError.sessionGuard', function(event, xhr) {
+		handleSessionAuthFailure(xhr);
+	});
+}
+
+
+function setupSessionEnforcementPoller() {
+	if (sessionPollTimerId !== null) {
+		clearInterval(sessionPollTimerId);
+		sessionPollTimerId = null;
+	}
+
+	const apiKey = String(window.DASHBOARD_API_KEY || '').trim();
+	if (apiKey === '') {
+		return;
+	}
+
+	if (sessionPollFnRef !== null) {
+		window.removeEventListener('focus', sessionPollFnRef);
+	}
+	if (sessionVisibilityHandlerRef !== null) {
+		document.removeEventListener('visibilitychange', sessionVisibilityHandlerRef);
+	}
+
+	const poll = function() {
+		if (document.visibilityState === 'hidden' || isHandlingForcedLogout) {
+			return;
+		}
+
+		$.ajax({
+			url: '../api.php?action=session_status',
+			type: 'GET',
+			dataType: 'json'
+		}).fail(function(xhr) {
+			handleSessionAuthFailure(xhr);
+		});
+	};
+	sessionPollFnRef = poll;
+	window.addEventListener('focus', sessionPollFnRef);
+	sessionVisibilityHandlerRef = function() {
+		if (document.visibilityState === 'visible' && sessionPollFnRef) {
+			sessionPollFnRef();
+		}
+	};
+	document.addEventListener('visibilitychange', sessionVisibilityHandlerRef);
+
+	poll();
+	sessionPollTimerId = setInterval(poll, 2000);
 }
 
 

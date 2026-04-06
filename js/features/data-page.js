@@ -228,6 +228,9 @@ function performDataMutation(payload, onSuccess, errorMessage) {
 			}
 		},
 		error: function(xhr) {
+			if (typeof handleSessionAuthFailure === 'function' && handleSessionAuthFailure(xhr)) {
+				return;
+			}
 			const response = xhr && xhr.responseJSON ? xhr.responseJSON : null;
 			showToast({ type: 'error', title: 'Action Failed', message: (response && response.message) || errorMessage || 'The request could not be completed.', showOkayButton: true, autoCloseMs: 3000 });
 		}
