@@ -1011,118 +1011,393 @@ function toggleTheme() {
 }
 
 
-function setupResetButtonHandler() {
-	if ($('#reset-data-btn').length === 0) {
+function setupDevToolsMaintenanceHandlers() {
+	const resetActions = [
+		{
+			buttonId: '#reset-activity-log-btn',
+			action: 'reset_activity_log',
+			confirmTitle: 'Reset Activity Log?',
+			confirmMessage: 'This will clear all entries from the activity_log table.',
+			successTitle: 'Activity Log Reset',
+			successMessage: 'The activity_log table has been reset successfully.'
+		},
+		{
+			buttonId: '#reset-audit-log-btn',
+			action: 'reset_audit_log',
+			confirmTitle: 'Reset Audit Log?',
+			confirmMessage: 'This will clear all entries from the audit_log table.',
+			successTitle: 'Audit Log Reset',
+			successMessage: 'The audit_log table has been reset successfully.'
+		},
+		{
+			buttonId: '#reset-records-btn',
+			action: 'reset_records',
+			confirmTitle: 'Reset Records?',
+			confirmMessage: 'This will reset the records table and restore 3 sample entries.',
+			successTitle: 'Records Reset',
+			successMessage: 'The records table has been reset to 3 sample entries.'
+		},
+		{
+			buttonId: '#reset-notif-table-btn',
+			action: 'reset_notifications_table',
+			confirmTitle: 'Reset Notifications Table?',
+			confirmMessage: 'This will clear all entries from the notifications table.',
+			successTitle: 'Notifications Table Reset',
+			successMessage: 'The notifications table has been reset successfully.'
+		},
+		{
+			buttonId: '#reset-all-btn',
+			action: 'reset_all',
+			confirmTitle: 'Reset all?',
+			confirmMessage: 'This will reset activity_log, audit_log, records (to 3 sample entries), and notifications tables.',
+			successTitle: 'Reset All Complete',
+			successMessage: 'All target tables were reset successfully.'
+		}
+	];
+
+	const hasAnyButtons = resetActions.some(function(cfg) {
+		return $(cfg.buttonId).length > 0;
+	});
+	if (!hasAnyButtons) {
 		return;
 	}
 
-	$('#reset-data-btn').on('click', function() {
-		showToast({
-			type: 'warning',
-			title: 'Reset Dashboard Data?',
-			message: 'This will clear all entries, logs, and audit trail, then restore 3 sample entries.',
-			autoCloseMs: 0,
-			buttons: [
-				{
-					label: 'Cancel',
-					className: 'btn-secondary'
-				},
-				{
-					label: 'Reset Data',
-					className: 'btn-danger',
-					onClick: function() {
-						$.ajax({
-							url: '../api.php',
-							type: 'POST',
-							contentType: 'application/json',
-							data: JSON.stringify({ action: 'reset_data' }),
-							success: function() {
-								showToast({
-									type: 'success',
-									title: 'Data Reset Complete',
-									message: 'Your dashboard has been reset to the sample test state.',
-									showOkayButton: true,
-									autoCloseMs: 3000,
-									onClose: function() {
-										const currentPageName = window.location.pathname.split('/').pop() || 'home.php';
-										window.location.href = '../pages/' + currentPageName;
+	resetActions.forEach(function(cfg) {
+		const $button = $(cfg.buttonId);
+		if ($button.length === 0) {
+			return;
+		}
+
+		$button.on('click', function() {
+			showToast({
+				type: 'warning',
+				title: cfg.confirmTitle,
+				message: cfg.confirmMessage,
+				autoCloseMs: 0,
+				buttons: [
+					{ label: 'Cancel', className: 'btn-secondary' },
+					{
+						label: 'Proceed',
+						className: 'btn-danger',
+						onClick: function() {
+							$.ajax({
+								url: '../api.php',
+								type: 'POST',
+								contentType: 'application/json',
+								dataType: 'json',
+								data: JSON.stringify({ action: cfg.action }),
+								success: function() {
+									if (typeof loadHeaderMetrics === 'function') {
+										loadHeaderMetrics();
 									}
-								});
-							},
-							error: function(xhr, status, error) {
-								const responseMessage = xhr && xhr.responseJSON && xhr.responseJSON.message
-									? xhr.responseJSON.message
-									: '';
-								const fallbackMessage = (xhr && xhr.status === 403)
-									? 'Reset is only available when APP_MODE is demo.'
-									: ('Error resetting data: ' + error);
-								showToast({
-									type: 'error',
-									title: 'Reset Failed',
-									message: responseMessage || fallbackMessage,
-									showOkayButton: true,
-									autoCloseMs: 3000
-								});
-							}
-						});
+									showToast({
+										type: 'success',
+										title: cfg.successTitle,
+										message: cfg.successMessage,
+										showOkayButton: true,
+										autoCloseMs: 3000,
+										onClose: function() {
+											window.location.reload();
+										}
+									});
+								},
+								error: function(xhr, status, error) {
+									const responseMessage = xhr && xhr.responseJSON && xhr.responseJSON.message
+										? xhr.responseJSON.message
+										: '';
+									showToast({
+										type: 'error',
+										title: 'Reset Failed',
+										message: responseMessage || ('Error resetting table: ' + error),
+										showOkayButton: true,
+										autoCloseMs: 3000
+									});
+								}
+							});
+						}
 					}
-				}
-			]
+				]
+			});
 		});
 	});
 }
 
 
-function setupResetNotificationsTableHandler() {
-	if ($('#reset-notif-table-btn').length === 0) {
+function setupDevToolsUserManagementHandlers() {
+	const $createButton = $('#dev-users-create-btn');
+	const $updateDetectButton = $('#dev-users-update-detect-btn');
+	const $updateButton = $('#dev-users-update-btn');
+	const $deleteDetectButton = $('#dev-users-delete-detect-btn');
+	const $deleteButton = $('#dev-users-delete-btn');
+
+	if ($createButton.length === 0 && $updateDetectButton.length === 0 && $deleteDetectButton.length === 0) {
 		return;
 	}
 
-	$('#reset-notif-table-btn').on('click', function() {
+	let updateTargetUserId = 0;
+	let deleteTargetUserId = 0;
+	let updateDetectedLabel = '';
+	let deleteDetectedLabel = '';
+	const currentUserId = parseInt($('#dev-tools-current-user-id').val(), 10) || 0;
+
+	const setInlineResult = function(selector, message, isError) {
+		const $target = $(selector);
+		if ($target.length === 0) {
+			return;
+		}
+
+		$target.removeClass('is-error is-success');
+		if (message && String(message).trim() !== '') {
+			$target.text(String(message));
+			$target.addClass(isError ? 'is-error' : 'is-success');
+			$target.removeAttr('hidden');
+		} else {
+			$target.text('');
+			$target.attr('hidden', 'hidden');
+		}
+	};
+
+	const apiPost = function(action, payload) {
+		const requestPayload = $.extend({ action: action }, payload || {});
+		return $.ajax({
+			url: '../api.php',
+			type: 'POST',
+			contentType: 'application/json',
+			dataType: 'json',
+			data: JSON.stringify(requestPayload)
+		});
+	};
+
+	const userLabel = function(user) {
+		if (!user || typeof user !== 'object') {
+			return '';
+		}
+		const id = String(user.id || '');
+		const displayName = String(user.display_name || '');
+		return 'Detected user ' + id + ', ' + (displayName !== '' ? displayName : '(no display name)');
+	};
+
+	const setUpdateControlsEnabled = function(enabled) {
+		const canEdit = !!enabled;
+		$('#dev-users-update-email').prop('disabled', !canEdit);
+		$('#dev-users-update-username').prop('disabled', !canEdit);
+		$('#dev-users-update-display-name').prop('disabled', !canEdit);
+		$('#dev-users-update-status').prop('disabled', !canEdit);
+		$('#dev-users-update-reset-password').prop('disabled', !canEdit);
+		$updateButton.prop('disabled', !canEdit);
+	};
+
+	setUpdateControlsEnabled(false);
+
+	$('#dev-users-update-lookup').on('input', function() {
+		updateTargetUserId = 0;
+		updateDetectedLabel = '';
+		setUpdateControlsEnabled(false);
+		setInlineResult('#dev-users-update-detected', '', false);
+	});
+
+	$('#dev-users-delete-lookup').on('input', function() {
+		deleteTargetUserId = 0;
+		deleteDetectedLabel = '';
+		$deleteButton.prop('disabled', true);
+		setInlineResult('#dev-users-delete-detected', '', false);
+	});
+
+	const lookupUser = function(lookupValue, onSuccess, onError) {
+		const lookup = String(lookupValue || '').trim();
+		if (lookup === '') {
+			onError('Enter a username or id first.');
+			return;
+		}
+
+		apiPost('admin_user_lookup', { lookup: lookup })
+			.done(function(response) {
+				if (response && response.success && response.user) {
+					onSuccess(response.user);
+					return;
+				}
+				onError('User not found.');
+			})
+			.fail(function(xhr) {
+				const message = xhr && xhr.responseJSON && xhr.responseJSON.message
+					? xhr.responseJSON.message
+					: 'User lookup failed.';
+				onError(message);
+			});
+	};
+
+	$createButton.on('click', function() {
+		setInlineResult('#dev-users-create-result', '', false);
+		const email = String($('#dev-users-create-email').val() || '').trim();
+		const username = String($('#dev-users-create-username').val() || '').trim();
+		const displayName = String($('#dev-users-create-display-name').val() || '').trim();
+		const status = String($('#dev-users-create-status').val() || 'active').toLowerCase();
+
+		apiPost('admin_user_create', {
+			email: email,
+			username: username,
+			display_name: displayName,
+			status: status
+		}).done(function(response) {
+			if (!response || !response.success) {
+				setInlineResult('#dev-users-create-result', 'Failed to create user.', true);
+				return;
+			}
+
+			const generatedPassword = String(response.generated_password || '');
+			const user = response.user || {};
+			setInlineResult(
+				'#dev-users-create-result',
+				'User created. ' + userLabel(user) + ' | Generated password: ' + generatedPassword,
+				false
+			);
+			showToast({
+				type: 'success',
+				title: 'User Created',
+				message: 'Generated password: ' + generatedPassword,
+				showOkayButton: true,
+				autoCloseMs: 0
+			});
+		}).fail(function(xhr) {
+			const message = xhr && xhr.responseJSON && xhr.responseJSON.message
+				? xhr.responseJSON.message
+				: 'Failed to create user.';
+			setInlineResult('#dev-users-create-result', message, true);
+		});
+	});
+
+	$updateDetectButton.on('click', function() {
+		setInlineResult('#dev-users-update-result', '', false);
+		lookupUser($('#dev-users-update-lookup').val(), function(user) {
+			updateTargetUserId = parseInt(user.id, 10) || 0;
+			updateDetectedLabel = userLabel(user);
+			$('#dev-users-update-email').val(String(user.email || ''));
+			$('#dev-users-update-username').val(String(user.username || ''));
+			$('#dev-users-update-display-name').val(String(user.display_name || ''));
+			$('#dev-users-update-status').val(String(user.status || 'active').toLowerCase());
+			setUpdateControlsEnabled(updateTargetUserId > 0);
+			setInlineResult('#dev-users-update-detected', updateDetectedLabel, false);
+		}, function(message) {
+			updateTargetUserId = 0;
+			updateDetectedLabel = '';
+			setUpdateControlsEnabled(false);
+			setInlineResult('#dev-users-update-detected', message, true);
+		});
+	});
+
+	$updateButton.on('click', function() {
+		if (updateTargetUserId < 1) {
+			setInlineResult('#dev-users-update-result', 'Detect a user before updating.', true);
+			return;
+		}
+
+		apiPost('admin_user_update', {
+			user_id: updateTargetUserId,
+			email: String($('#dev-users-update-email').val() || '').trim(),
+			username: String($('#dev-users-update-username').val() || '').trim(),
+			display_name: String($('#dev-users-update-display-name').val() || '').trim(),
+			status: String($('#dev-users-update-status').val() || 'active').toLowerCase(),
+			reset_password: $('#dev-users-update-reset-password').is(':checked')
+		}).done(function(response) {
+			if (!response || !response.success) {
+				setInlineResult('#dev-users-update-result', 'Failed to update user.', true);
+				return;
+			}
+
+			const user = response.user || {};
+			const generatedPassword = String(response.generated_password || '');
+			let message = 'User updated. ' + userLabel(user);
+			if (generatedPassword !== '') {
+				message += ' | New random password: ' + generatedPassword;
+				showToast({
+					type: 'success',
+					title: 'Password Reset',
+					message: 'New random password: ' + generatedPassword,
+					showOkayButton: true,
+					autoCloseMs: 0
+				});
+			}
+			setInlineResult('#dev-users-update-result', message, false);
+			updateDetectedLabel = userLabel(user);
+			setInlineResult('#dev-users-update-detected', updateDetectedLabel, false);
+			$('#dev-users-update-reset-password').prop('checked', false);
+		}).fail(function(xhr) {
+			const message = xhr && xhr.responseJSON && xhr.responseJSON.message
+				? xhr.responseJSON.message
+				: 'Failed to update user.';
+			setInlineResult('#dev-users-update-result', message, true);
+		});
+	});
+
+	$deleteDetectButton.on('click', function() {
+		setInlineResult('#dev-users-delete-result', '', false);
+		lookupUser($('#dev-users-delete-lookup').val(), function(user) {
+			deleteTargetUserId = parseInt(user.id, 10) || 0;
+			deleteDetectedLabel = userLabel(user);
+			if (currentUserId > 0 && deleteTargetUserId === currentUserId) {
+				$deleteButton.prop('disabled', true);
+				setInlineResult('#dev-users-delete-detected', deleteDetectedLabel, false);
+				setInlineResult('#dev-users-delete-result', 'You cannot force delete your own account.', true);
+				return;
+			}
+			$deleteButton.prop('disabled', deleteTargetUserId < 1);
+			setInlineResult('#dev-users-delete-detected', deleteDetectedLabel, false);
+		}, function(message) {
+			deleteTargetUserId = 0;
+			deleteDetectedLabel = '';
+			$deleteButton.prop('disabled', true);
+			setInlineResult('#dev-users-delete-detected', message, true);
+		});
+	});
+
+	$deleteButton.on('click', function() {
+		if (deleteTargetUserId < 1) {
+			setInlineResult('#dev-users-delete-result', 'Detect a user before deleting.', true);
+			return;
+		}
+		if (currentUserId > 0 && deleteTargetUserId === currentUserId) {
+			$deleteButton.prop('disabled', true);
+			setInlineResult('#dev-users-delete-result', 'You cannot force delete your own account.', true);
+			return;
+		}
+
 		showToast({
 			type: 'warning',
-			title: 'Reset Notifications Table?',
-			message: 'This will delete all notifications and reset IDs to start at 1.',
+			title: 'Force Delete User?',
+			message: (deleteDetectedLabel !== '' ? deleteDetectedLabel + '. ' : '') + 'This permanently removes this user. This cannot be undone.',
 			autoCloseMs: 0,
 			buttons: [
+				{ label: 'Cancel', className: 'btn-secondary' },
 				{
-					label: 'Cancel',
-					className: 'btn-secondary'
-				},
-				{
-					label: 'Reset Table',
+					label: 'Force Delete',
 					className: 'btn-danger',
 					onClick: function() {
-						$.ajax({
-							url: '../api.php',
-							type: 'POST',
-							contentType: 'application/json',
-							data: JSON.stringify({ action: 'reset_notifications_table' }),
-							success: function() {
-								showToast({
-									type: 'success',
-									title: 'Notifications Table Reset',
-									message: 'The notifications table has been cleared and reset to fresh state.',
-									showOkayButton: true,
-									autoCloseMs: 3000,
-									onClose: function() {
-										window.location.reload();
-									}
-								});
-							},
-							error: function(xhr, status, error) {
-								const responseMessage = xhr && xhr.responseJSON && xhr.responseJSON.message
-									? xhr.responseJSON.message
-									: '';
-								showToast({
-									type: 'error',
-									title: 'Reset Failed',
-									message: responseMessage || ('Error resetting table: ' + error),
-									showOkayButton: true,
-									autoCloseMs: 3000
-								});
+						apiPost('admin_user_force_delete', { user_id: deleteTargetUserId })
+							.done(function(response) {
+								if (!response || !response.success) {
+									setInlineResult('#dev-users-delete-result', 'Failed to force delete user.', true);
+									return;
+								}
+
+								const deleted = response.deleted_user || {};
+								setInlineResult(
+									'#dev-users-delete-result',
+									'Force deleted user #' + String(deleted.id || deleteTargetUserId) + ' (' + String(deleted.username || '') + ')',
+									false
+								);
+								setInlineResult('#dev-users-delete-detected', '', false);
+								deleteTargetUserId = 0;
+								deleteDetectedLabel = '';
+								$deleteButton.prop('disabled', true);
+								$('#dev-users-delete-lookup').val('');
 							}
-						});
+							)
+							.fail(function(xhr) {
+								const message = xhr && xhr.responseJSON && xhr.responseJSON.message
+									? xhr.responseJSON.message
+									: 'Failed to force delete user.';
+								setInlineResult('#dev-users-delete-result', message, true);
+							});
 					}
 				}
 			]

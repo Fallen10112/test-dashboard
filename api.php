@@ -236,6 +236,255 @@ function getApiAuthUserDisplayName() {
 }
 
 
+function generateRandomPasswordPlaintext($length = 16) {
+	$targetLength = (int)$length;
+	if ($targetLength < 12) {
+		$targetLength = 12;
+	}
+	if ($targetLength > 64) {
+		$targetLength = 64;
+	}
+
+	$alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%^*()-_=+';
+	$maxIndex = strlen($alphabet) - 1;
+	$result = '';
+	for ($i = 0; $i < $targetLength; $i += 1) {
+		$randomIndex = random_int(0, $maxIndex);
+		$result .= $alphabet[$randomIndex];
+	}
+	return $result;
+}
+
+
+function normalizeDevToolsUserLookupQuery($value) {
+	return trim((string)$value);
+}
+
+
+function dashboardTableExists(PDO $pdo, $tableName) {
+	$table = trim((string)$tableName);
+	if ($table === '') {
+		return false;
+	}
+	$stmt = $pdo->prepare('SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = :table_name LIMIT 1');
+	$stmt->execute([':table_name' => $table]);
+	return (bool)$stmt->fetchColumn();
+}
+
+
+function getUserByIdOrUsername(PDO $pdo, $lookupQuery) {
+	$query = normalizeDevToolsUserLookupQuery($lookupQuery);
+	if ($query === '') {
+		return null;
+	}
+
+	$idCandidate = ctype_digit($query) ? (int)$query : 0;
+	$stmt = $pdo->prepare(
+		'SELECT id, email, username, display_name, status, DATE_FORMAT(created_at, "%Y-%m-%d %H:%i:%s") AS created_at
+		 FROM users
+		 WHERE deleted_at IS NULL
+		   AND (id = :id_candidate OR username = :username_candidate)
+		 LIMIT 1'
+	);
+	$stmt->execute([
+		':id_candidate' => $idCandidate,
+		':username_candidate' => $query,
+	]);
+	$row = $stmt->fetch();
+	if (!$row) {
+		return null;
+	}
+
+	return [
+		'id' => (int)$row['id'],
+		'email' => (string)($row['email'] ?? ''),
+		'username' => (string)($row['username'] ?? ''),
+		'display_name' => (string)($row['display_name'] ?? ''),
+		'status' => (string)($row['status'] ?? ''),
+		'created_at' => (string)($row['created_at'] ?? ''),
+	];
+}
+
+
+function createDevToolsUser(PDO $pdo, $email, $username, $displayName, $status) {
+	$normalizedEmail = trim((string)$email);
+	$normalizedUsername = trim((string)$username);
+	$normalizedDisplayName = trim((string)$displayName);
+	$normalizedStatus = strtolower(trim((string)$status));
+
+	if ($normalizedEmail === '' || !filter_var($normalizedEmail, FILTER_VALIDATE_EMAIL)) {
+		return ['success' => false, 'message' => 'A valid email is required'];
+	}
+	if ($normalizedUsername === '') {
+		return ['success' => false, 'message' => 'Username is required'];
+	}
+	if (!in_array($normalizedStatus, ['active', 'disabled'], true)) {
+		$normalizedStatus = 'active';
+	}
+
+	$passwordPlain = generateRandomPasswordPlaintext(16);
+	$passwordHash = password_hash($passwordPlain, PASSWORD_BCRYPT, ['cost' => 12]);
+	$now = getDashboardSqlTimestamp();
+
+	try {
+		$stmt = $pdo->prepare(
+			'INSERT INTO users (email, username, password_hash, display_name, status, created_at, updated_at, deleted_at)
+			 VALUES (:email, :username, :password_hash, :display_name, :status, :created_at, :updated_at, NULL)'
+		);
+		$stmt->execute([
+			':email' => substr($normalizedEmail, 0, 255),
+			':username' => substr($normalizedUsername, 0, 100),
+			':password_hash' => $passwordHash,
+			':display_name' => $normalizedDisplayName !== '' ? substr($normalizedDisplayName, 0, 150) : null,
+			':status' => $normalizedStatus,
+			':created_at' => $now,
+			':updated_at' => $now,
+		]);
+	} catch (Throwable $e) {
+		return ['success' => false, 'message' => 'Failed to create user (email/username may already exist)'];
+	}
+
+	$userId = (int)$pdo->lastInsertId();
+	return [
+		'success' => true,
+		'user_id' => $userId,
+		'generated_password' => $passwordPlain,
+	];
+}
+
+
+function updateDevToolsUser(PDO $pdo, $targetUserId, array $updates, $resetPassword) {
+	$userId = (int)$targetUserId;
+	if ($userId < 1) {
+		return ['success' => false, 'message' => 'A valid user id is required'];
+	}
+
+	$checkStmt = $pdo->prepare('SELECT id FROM users WHERE id = :id AND deleted_at IS NULL LIMIT 1');
+	$checkStmt->execute([':id' => $userId]);
+	if (!$checkStmt->fetch()) {
+		return ['success' => false, 'message' => 'User not found'];
+	}
+
+	$fields = [];
+	$params = [':id' => $userId, ':updated_at' => getDashboardSqlTimestamp()];
+
+	if (array_key_exists('email', $updates)) {
+		$email = trim((string)$updates['email']);
+		if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+			return ['success' => false, 'message' => 'A valid email is required'];
+		}
+		$fields[] = 'email = :email';
+		$params[':email'] = substr($email, 0, 255);
+	}
+
+	if (array_key_exists('username', $updates)) {
+		$username = trim((string)$updates['username']);
+		if ($username === '') {
+			return ['success' => false, 'message' => 'Username is required'];
+		}
+		$fields[] = 'username = :username';
+		$params[':username'] = substr($username, 0, 100);
+	}
+
+	if (array_key_exists('display_name', $updates)) {
+		$displayName = trim((string)$updates['display_name']);
+		$fields[] = 'display_name = :display_name';
+		$params[':display_name'] = $displayName !== '' ? substr($displayName, 0, 150) : null;
+	}
+
+	if (array_key_exists('status', $updates)) {
+		$status = strtolower(trim((string)$updates['status']));
+		if (!in_array($status, ['active', 'disabled'], true)) {
+			return ['success' => false, 'message' => 'Status must be active or disabled'];
+		}
+		$fields[] = 'status = :status';
+		$params[':status'] = $status;
+	}
+
+	$generatedPassword = null;
+	if ($resetPassword) {
+		$generatedPassword = generateRandomPasswordPlaintext(16);
+		$fields[] = 'password_hash = :password_hash';
+		$params[':password_hash'] = password_hash($generatedPassword, PASSWORD_BCRYPT, ['cost' => 12]);
+	}
+
+	if (empty($fields)) {
+		return ['success' => false, 'message' => 'No updates were provided'];
+	}
+
+	$fields[] = 'updated_at = :updated_at';
+	try {
+		$stmt = $pdo->prepare('UPDATE users SET ' . implode(', ', $fields) . ' WHERE id = :id');
+		$stmt->execute($params);
+	} catch (Throwable $e) {
+		return ['success' => false, 'message' => 'Failed to update user (email/username may already exist)'];
+	}
+
+	return [
+		'success' => true,
+		'generated_password' => $generatedPassword,
+	];
+}
+
+
+function forceDeleteUserHard(PDO $pdo, $targetUserId, $currentUserId) {
+	$userId = (int)$targetUserId;
+	$actorId = (int)$currentUserId;
+	if ($userId < 1) {
+		return ['success' => false, 'message' => 'A valid user id is required'];
+	}
+	if ($actorId > 0 && $userId === $actorId) {
+		return ['success' => false, 'message' => 'You cannot force delete your currently signed-in account'];
+	}
+
+	$userStmt = $pdo->prepare('SELECT id, username, email FROM users WHERE id = :id AND deleted_at IS NULL LIMIT 1');
+	$userStmt->execute([':id' => $userId]);
+	$target = $userStmt->fetch();
+	if (!$target) {
+		return ['success' => false, 'message' => 'User not found'];
+	}
+
+	try {
+		$pdo->beginTransaction();
+		if (dashboardTableExists($pdo, 'user_sessions')) {
+			$pdo->prepare('DELETE FROM user_sessions WHERE user_id = :id')->execute([':id' => $userId]);
+		}
+		if (dashboardTableExists($pdo, 'password_reset_tokens')) {
+			$pdo->prepare('DELETE FROM password_reset_tokens WHERE user_id = :id')->execute([':id' => $userId]);
+		}
+		if (dashboardTableExists($pdo, 'user_roles')) {
+			$pdo->prepare('DELETE FROM user_roles WHERE user_id = :id OR assigned_by_user_id = :id')->execute([':id' => $userId]);
+		}
+		if (dashboardTableExists($pdo, 'user_permissions')) {
+			$pdo->prepare('DELETE FROM user_permissions WHERE user_id = :id OR granted_by_user_id = :id')->execute([':id' => $userId]);
+		}
+		if (dashboardTableExists($pdo, 'user_widget_preferences')) {
+			$pdo->prepare('DELETE FROM user_widget_preferences WHERE user_id = :id')->execute([':id' => $userId]);
+		}
+		if (dashboardTableExists($pdo, 'notifications')) {
+			$pdo->prepare('UPDATE notifications SET sent_by_user_id = NULL WHERE sent_by_user_id = :id')->execute([':id' => $userId]);
+			$pdo->prepare('DELETE FROM notifications WHERE user_id = :id')->execute([':id' => $userId]);
+		}
+		$pdo->prepare('DELETE FROM users WHERE id = :id')->execute([':id' => $userId]);
+		$pdo->commit();
+	} catch (Throwable $e) {
+		if ($pdo->inTransaction()) {
+			$pdo->rollBack();
+		}
+		return ['success' => false, 'message' => 'Failed to force delete user'];
+	}
+
+	return [
+		'success' => true,
+		'deleted_user' => [
+			'id' => (int)$target['id'],
+			'username' => (string)($target['username'] ?? ''),
+			'email' => (string)($target['email'] ?? ''),
+		],
+	];
+}
+
+
 function enforceApiRateLimit(string $bucketKey, int $limit, int $windowSeconds) {
 	startAuthSession();
 	$now = time();
@@ -803,6 +1052,72 @@ if ($method === 'POST') {
 	$data = is_array($data) ? $data : [];
 	$postAction = $data['action'] ?? '';
 
+	if ($postAction === 'reset_activity_log') {
+		$userId = getApiAuthUserId();
+		try {
+			resetActivityLogTable($pdo);
+			writeAuditEvent($pdo, [
+				'record_type' => 'system',
+				'record_id' => null,
+				'action' => 'reset',
+				'details' => 'Activity log table reset',
+				'source_user_id' => $userId,
+			]);
+			respondJson(200, ['success' => true, 'message' => 'Activity log table reset successfully']);
+		} catch (Throwable $e) {
+			respondJson(500, ['success' => false, 'message' => 'Failed to reset activity log table']);
+		}
+	}
+
+	if ($postAction === 'reset_audit_log') {
+		try {
+			resetAuditLogEntries($pdo);
+			respondJson(200, ['success' => true, 'message' => 'Audit log table reset successfully']);
+		} catch (Throwable $e) {
+			respondJson(500, ['success' => false, 'message' => 'Failed to reset audit log table']);
+		}
+	}
+
+	if ($postAction === 'reset_records') {
+		if (!resetRecordsTableToSample($pdo)) {
+			respondJson(500, ['success' => false, 'message' => 'Failed to reset records table']);
+		}
+
+		writeAuditEvent($pdo, [
+			'record_type' => 'record',
+			'record_id' => null,
+			'action' => 'reset',
+			'details' => 'Records table reset to 3 sample entries',
+			'source_user_id' => getApiAuthUserId(),
+		]);
+
+		respondJson(200, ['success' => true, 'message' => 'Records table reset successfully']);
+	}
+
+	if ($postAction === 'reset_all') {
+		$userId = getApiAuthUserId();
+		try {
+			resetActivityLogTable($pdo);
+			resetAuditLogEntries($pdo);
+			if (!resetRecordsTableToSample($pdo)) {
+				respondJson(500, ['success' => false, 'message' => 'Failed to reset records table']);
+			}
+			$pdo->exec('TRUNCATE TABLE notifications');
+
+			writeAuditEvent($pdo, [
+				'record_type' => 'system',
+				'record_id' => null,
+				'action' => 'reset',
+				'details' => 'Reset all executed for activity_log, audit_log, records, and notifications',
+				'source_user_id' => $userId,
+			]);
+
+			respondJson(200, ['success' => true, 'message' => 'All target tables reset successfully']);
+		} catch (Throwable $e) {
+			respondJson(500, ['success' => false, 'message' => 'Failed to run reset all operation']);
+		}
+	}
+
 	if ($postAction === 'reset_data') {
 		if (APP_MODE !== 'demo') {
 			respondJson(403, ['success' => false, 'message' => 'Reset is only allowed in demo mode']);
@@ -820,6 +1135,112 @@ if ($method === 'POST') {
 		}
 
 		respondJson(500, ['success' => false, 'message' => 'Failed to reset data']);
+	}
+
+	if ($postAction === 'admin_user_lookup') {
+		$userId = getApiAuthUserId();
+		enforceApiRateLimit('admin_user_lookup_' . $userId, 120, 60);
+		$lookup = $data['lookup'] ?? '';
+		$user = getUserByIdOrUsername($pdo, $lookup);
+		if (!$user) {
+			respondJson(404, ['success' => false, 'message' => 'User not found']);
+		}
+
+		respondJson(200, [
+			'success' => true,
+			'message' => 'User found',
+			'user' => $user,
+		]);
+	}
+
+	if ($postAction === 'admin_user_create') {
+		$actorUserId = getApiAuthUserId();
+		enforceApiRateLimit('admin_user_create_' . $actorUserId, 20, 60);
+		$result = createDevToolsUser(
+			$pdo,
+			$data['email'] ?? '',
+			$data['username'] ?? '',
+			$data['display_name'] ?? '',
+			$data['status'] ?? 'active'
+		);
+
+		if (!$result['success']) {
+			respondJson(400, ['success' => false, 'message' => $result['message'] ?? 'Failed to create user']);
+		}
+
+		$createdUser = getUserByIdOrUsername($pdo, (string)($result['user_id'] ?? '0'));
+		writeAuditEvent($pdo, [
+			'record_type' => 'users',
+			'record_id' => (int)($result['user_id'] ?? 0),
+			'action' => 'create',
+			'details' => 'Dev tools created user #' . (int)($result['user_id'] ?? 0),
+			'source_user_id' => $actorUserId,
+		]);
+
+		respondJson(200, [
+			'success' => true,
+			'message' => 'User created successfully',
+			'user' => $createdUser,
+			'generated_password' => (string)($result['generated_password'] ?? ''),
+		]);
+	}
+
+	if ($postAction === 'admin_user_update') {
+		$actorUserId = getApiAuthUserId();
+		enforceApiRateLimit('admin_user_update_' . $actorUserId, 30, 60);
+		$targetId = isset($data['user_id']) ? (int)$data['user_id'] : 0;
+		$updates = [
+			'email' => $data['email'] ?? '',
+			'username' => $data['username'] ?? '',
+			'display_name' => $data['display_name'] ?? '',
+			'status' => $data['status'] ?? 'active',
+		];
+		$resetPassword = !empty($data['reset_password']);
+
+		$result = updateDevToolsUser($pdo, $targetId, $updates, $resetPassword);
+		if (!$result['success']) {
+			respondJson(400, ['success' => false, 'message' => $result['message'] ?? 'Failed to update user']);
+		}
+
+		$updatedUser = getUserByIdOrUsername($pdo, (string)$targetId);
+		writeAuditEvent($pdo, [
+			'record_type' => 'users',
+			'record_id' => $targetId,
+			'action' => 'update',
+			'details' => 'Dev tools updated user #' . $targetId,
+			'source_user_id' => $actorUserId,
+		]);
+
+		respondJson(200, [
+			'success' => true,
+			'message' => 'User updated successfully',
+			'user' => $updatedUser,
+			'generated_password' => $result['generated_password'],
+		]);
+	}
+
+	if ($postAction === 'admin_user_force_delete') {
+		$actorUserId = getApiAuthUserId();
+		enforceApiRateLimit('admin_user_force_delete_' . $actorUserId, 12, 60);
+		$targetId = isset($data['user_id']) ? (int)$data['user_id'] : 0;
+		$result = forceDeleteUserHard($pdo, $targetId, $actorUserId);
+		if (!$result['success']) {
+			respondJson(400, ['success' => false, 'message' => $result['message'] ?? 'Failed to force delete user']);
+		}
+
+		writeAuditEvent($pdo, [
+			'record_type' => 'users',
+			'record_id' => $targetId,
+			'action' => 'delete',
+			'details' => 'Dev tools force deleted user #' . $targetId,
+			'source_user_id' => $actorUserId,
+		]);
+
+		respondJson(200, [
+			'success' => true,
+			'message' => 'User force deleted successfully',
+			'deleted_user' => $result['deleted_user'],
+		]);
 	}
 
 	if ($postAction === 'reset_notifications_table') {

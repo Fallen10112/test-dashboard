@@ -90,8 +90,10 @@ test-dashboard/
 - **Category Selector**: Choose between `System` and `Notifications` to load only relevant tools
 - **Default Category**: `System` is selected by default
 - **System Tools**:
-  - `Reset Notification Table` maintenance action
-  - `Reset Audit/Acitivty/Records` full demo reset button (visible in demo mode)
+  - `Reset Activity Log` maintenance action
+  - `Reset Audit Log` maintenance action
+  - `Reset Records` maintenance action (restores 3 sample entries)
+  - `Reset Notifications Table` maintenance action
 - **Notifications Tools**: Includes the `Create Notification` test form for QA flows
 
 ### 📌 Header Analytics Widgets
@@ -132,13 +134,15 @@ test-dashboard/
 - **Configuration Location**: Edit `.env` file in the `config/` directory or use system environment variables
 - **Default Behavior**: Demo mode resets on index visit; production mode does not
 
-### 🔄 Reset Data Functionality
-- **Reset Button Location**: Located on Dev Tools page under `System` category
-- **Button Label**: `Reset Audit/Acitivty/Records`
-- **Complete Reset**: Clears all entries, logs, and audit trail
-- **Fresh Start**: Restores 3 sample test entries for demonstration
-- **Toast Confirmation Prompt**: Uses custom top-center prompt with action buttons (Cancel/Reset)
-- **Safe Operation**: Immediately reloads page with fresh data
+### 🔄 Maintenance Reset Actions
+- **Button Location**: Located on Dev Tools page under `System` category
+- **Available Buttons**:
+  - `Reset Activity Log`
+  - `Reset Audit Log`
+  - `Reset Records`
+  - `Reset Notifications Table`
+- **Toast Confirmation Prompt**: Each action uses a custom top-center confirmation prompt before execution
+- **Safe Operation**: Page reloads after successful maintenance action
 
 ### 🔔 Custom Toast Notification System
 - **Top-Center Toasts**: Small notifications shown at the top-center of the page
@@ -146,7 +150,7 @@ test-dashboard/
 - **Interactive Option**: Toasts can include action buttons (for example, confirmation prompts)
 - **Dismiss Option**: Success/error toasts support an `Okay` button or auto-fade after 3 seconds
 - **Implemented Flows**:
-  - Reset Data confirmation prompt now uses custom toast actions instead of browser confirm
+  - Dev Tools maintenance reset confirmations use custom toast actions instead of browser confirm
   - Data Add success now shows a confirmation toast
   - Data Edit success now shows a confirmation toast
   - Bulk Delete confirmation prompt now uses custom toast actions
@@ -367,14 +371,13 @@ Auth usage pattern for every POST endpoint:
 2. Click to switch between Light and Dark mode
 3. Theme preference saves automatically and persists across pages
 
-### Reset Data
+### Run Maintenance Reset Action
 1. Go to Dev Tools page
 2. Select `System` in the category dropdown (default)
-3. Click `Reset Audit/Acitivty/Records`
+3. Click one target action (`Reset Activity Log`, `Reset Audit Log`, `Reset Records`, or `Reset Notifications Table`)
 4. Confirm the action in the custom top-center toast prompt
-5. All entries, logs, and audit trail are cleared
-6. Dashboard restores 3 sample test entries for a fresh start
-7. Page automatically reloads with reset data
+5. The selected table reset runs
+6. Page automatically reloads after completion
 
 ### Toast Notifications
 1. Add or edit a record on the Data page

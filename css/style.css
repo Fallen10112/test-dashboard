@@ -2536,12 +2536,14 @@ body.dark-mode .widget-option-label {
 }
 
 .dev-tools-card {
-    max-width: 720px;
+    max-width: none;
+    width: 100%;
     margin-bottom: 22px;
 }
 
 .dev-tool-module {
-    max-width: 720px;
+    max-width: none;
+    width: 100%;
     margin-bottom: 22px;
 }
 
@@ -2557,6 +2559,80 @@ body.dark-mode .widget-option-label {
     margin-top: 10px;
 }
 
+.dev-tool-module[data-dev-tool-category="users"] {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    align-items: start;
+}
+
+.dev-tool-module[data-dev-tool-category="users"] > h3,
+.dev-tool-module[data-dev-tool-category="users"] > p {
+    grid-column: 1 / -1;
+}
+
+.dev-tool-module[data-dev-tool-category="users"] > p {
+    margin-bottom: 4px;
+}
+
+.dev-tools-user-section {
+    margin: 0;
+    padding: 14px;
+    border: 1px solid rgba(15, 23, 42, 0.15);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.32);
+}
+
+.dev-tools-user-section h4 {
+    margin: 0 0 10px;
+}
+
+.dev-tools-user-section input:disabled,
+.dev-tools-user-section select:disabled,
+.dev-tools-user-section textarea:disabled,
+.dev-tools-user-section button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.dev-tools-inline-result {
+    margin-top: 10px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+.dev-tools-inline-result.is-success {
+    background: #ecfdf3;
+    color: #14532d;
+    border: 1px solid #86efac;
+}
+
+.dev-tools-inline-result.is-error {
+    background: #fef2f2;
+    color: #7f1d1d;
+    border: 1px solid #fca5a5;
+}
+
+body.dark-mode .dev-tools-user-section {
+    border-color: rgba(203, 213, 225, 0.22);
+    background: rgba(15, 23, 42, 0.35);
+}
+
+body.dark-mode .dev-tools-inline-result.is-success {
+    background: rgba(16, 185, 129, 0.12);
+    color: #a7f3d0;
+    border-color: rgba(16, 185, 129, 0.45);
+}
+
+body.dark-mode .dev-tools-inline-result.is-error {
+    background: rgba(248, 113, 113, 0.14);
+    color: #fecaca;
+    border-color: rgba(248, 113, 113, 0.45);
+}
+
 body.dark-mode .account-card {
     background: #2a2a2a;
     border-color: #3d3d3d;
@@ -2569,5 +2645,11 @@ body.dark-mode .account-card h3 {
 
 body.dark-mode .account-card p {
     color: #9ca3af;
+}
+
+@media (max-width: 980px) {
+    .dev-tool-module[data-dev-tool-category="users"] {
+        grid-template-columns: 1fr;
+    }
 }
 

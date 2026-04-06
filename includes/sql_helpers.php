@@ -207,6 +207,78 @@ function resetAuditLogTable(PDO $pdo) {
 	ensureAuditLogSchema($pdo);
 }
 
+function resetActivityLogTable(PDO $pdo) {
+	ensureActivityLogSchema($pdo);
+	$pdo->exec('TRUNCATE TABLE activity_log');
+}
+
+function resetAuditLogEntries(PDO $pdo) {
+	ensureAuditLogSchema($pdo);
+	$pdo->exec('TRUNCATE TABLE audit_log');
+}
+
+function resetRecordsTableToSample(PDO $pdo) {
+	$sampleItems = [
+		['title' => 'Sample Entry 1', 'description' => 'This is a test entry to demonstrate the system.'],
+		['title' => 'Sample Entry 2', 'description' => 'Another test entry showing the data management features.'],
+		['title' => 'Sample Entry 3', 'description' => 'A third test entry to provide a complete example.'],
+	];
+
+	try {
+		$pdo->exec('DELETE FROM records');
+		$pdo->exec('ALTER TABLE records AUTO_INCREMENT = 1');
+
+		$hasCreatedByUserId = doesTableColumnExist($pdo, 'records', 'created_by_user_id');
+		$hasUpdatedByUserId = doesTableColumnExist($pdo, 'records', 'updated_by_user_id');
+		$hasCreatedAt = doesTableColumnExist($pdo, 'records', 'created_at');
+		$hasUpdatedAt = doesTableColumnExist($pdo, 'records', 'updated_at');
+
+		$columns = ['title', 'description'];
+		$placeholders = [':title', ':description'];
+		if ($hasCreatedByUserId) {
+			$columns[] = 'created_by_user_id';
+			$placeholders[] = ':created_by_user_id';
+		}
+		if ($hasUpdatedByUserId) {
+			$columns[] = 'updated_by_user_id';
+			$placeholders[] = ':updated_by_user_id';
+		}
+		if ($hasCreatedAt) {
+			$columns[] = 'created_at';
+			$placeholders[] = ':created_at';
+		}
+		if ($hasUpdatedAt) {
+			$columns[] = 'updated_at';
+			$placeholders[] = ':updated_at';
+		}
+
+		$insertRecord = $pdo->prepare('INSERT INTO records (' . implode(', ', $columns) . ') VALUES (' . implode(', ', $placeholders) . ')');
+		$now = getDashboardSqlTimestamp();
+		foreach ($sampleItems as $item) {
+			$params = [
+				':title' => $item['title'],
+				':description' => $item['description'],
+			];
+			if ($hasCreatedByUserId) {
+				$params[':created_by_user_id'] = null;
+			}
+			if ($hasUpdatedByUserId) {
+				$params[':updated_by_user_id'] = null;
+			}
+			if ($hasCreatedAt) {
+				$params[':created_at'] = $now;
+			}
+			if ($hasUpdatedAt) {
+				$params[':updated_at'] = $now;
+			}
+			$insertRecord->execute($params);
+		}
+		return true;
+	} catch (Throwable $e) {
+		return false;
+	}
+}
+
 function writeAuditEvent(PDO $pdo, array $entry) {
 	ensureAuditLogSchema($pdo);
 

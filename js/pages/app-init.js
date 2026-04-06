@@ -1,7 +1,7 @@
 $(document).ready(function() {
 	initializeTheme();
-	setupResetButtonHandler();
-	setupResetNotificationsTableHandler();
+	setupDevToolsMaintenanceHandlers();
+	setupDevToolsUserManagementHandlers();
 	setupDevToolsCategorySelector();
 	setupNotificationDropdown();
 	setupUserAvatarDropdown();
