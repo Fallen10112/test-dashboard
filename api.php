@@ -217,11 +217,37 @@ function getApiAuthUserId() {
 }
 
 
+function getApiAuthUserDisplayName() {
+	$authUser = $GLOBALS['auth_user'] ?? null;
+	if (!is_array($authUser)) {
+		return 'A user';
+	}
+
+	$displayName = trim((string)($authUser['display_name'] ?? ''));
+	if ($displayName !== '') {
+		return $displayName;
+	}
+
+	$username = trim((string)($authUser['username'] ?? ''));
+	if ($username !== '') {
+		return $username;
+	}
+
+	$email = trim((string)($authUser['email'] ?? ''));
+	if ($email !== '') {
+		return $email;
+	}
+
+	return 'A user';
+}
+
+
 function ensureNotificationsTable(PDO $pdo) {
 	$pdo->exec(
 		'CREATE TABLE IF NOT EXISTS notifications (
 			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 			user_id BIGINT UNSIGNED NOT NULL,
+			sent_by_user_id BIGINT UNSIGNED NULL,
 			title VARCHAR(160) NOT NULL,
 			message TEXT NOT NULL,
 			notification_type VARCHAR(50) NOT NULL DEFAULT "info",
@@ -231,6 +257,8 @@ function ensureNotificationsTable(PDO $pdo) {
 			PRIMARY KEY (id),
 			KEY idx_notifications_user_created (user_id, created_at),
 			KEY idx_notifications_user_read (user_id, is_read),
+			KEY idx_notifications_sent_by (sent_by_user_id),
+			CONSTRAINT fk_notifications_sent_by_user FOREIGN KEY (sent_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
 			CONSTRAINT fk_notifications_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
 	);
@@ -253,10 +281,14 @@ function getNotificationsPayload(PDO $pdo, $userId, $limit = 25) {
 	$unreadCount = (int)$countStmt->fetchColumn();
 
 	$listStmt = $pdo->prepare(
-		'SELECT id, title, message, notification_type, is_read, DATE_FORMAT(created_at, "%Y-%m-%d") AS `date`, DATE_FORMAT(created_at, "%H:%i:%s") AS `time`
-		 FROM notifications
-		 WHERE user_id = :user_id
-		 ORDER BY id DESC
+		'SELECT n.id, n.title, n.message, n.notification_type, n.is_read,
+		        DATE_FORMAT(n.created_at, "%Y-%m-%d") AS `date`, DATE_FORMAT(n.created_at, "%H:%i:%s") AS `time`,
+		        n.sent_by_user_id,
+		        COALESCE(NULLIF(u.display_name, ""), NULLIF(u.username, ""), u.email) AS sent_by_display_name
+		 FROM notifications n
+		 LEFT JOIN users u ON u.id = n.sent_by_user_id
+		 WHERE n.user_id = :user_id
+		 ORDER BY n.id DESC
 		 LIMIT :limit'
 	);
 	$listStmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
@@ -272,6 +304,8 @@ function getNotificationsPayload(PDO $pdo, $userId, $limit = 25) {
 			'message' => (string)($row['message'] ?? ''),
 			'type' => (string)($row['notification_type'] ?? 'info'),
 			'is_read' => ((int)($row['is_read'] ?? 0)) === 1,
+			'sent_by_user_id' => isset($row['sent_by_user_id']) ? (int)$row['sent_by_user_id'] : null,
+			'sent_by_display_name' => isset($row['sent_by_display_name']) ? (string)$row['sent_by_display_name'] : '',
 			'date' => (string)($row['date'] ?? ''),
 			'time' => (string)($row['time'] ?? ''),
 		];
@@ -285,7 +319,7 @@ function getNotificationsPayload(PDO $pdo, $userId, $limit = 25) {
 }
 
 
-function createNotification(PDO $pdo, $userId, $title, $message, $type = 'info') {
+function createNotification(PDO $pdo, $userId, $title, $message, $type = 'info', $sentByUserId = null) {
 	ensureNotificationsTable($pdo);
 
 	$normalizedTitle = trim((string)$title);
@@ -302,12 +336,21 @@ function createNotification(PDO $pdo, $userId, $title, $message, $type = 'info')
 		$normalizedType = 'info';
 	}
 
+	$normalizedSentByUserId = null;
+	if ($sentByUserId !== null && $sentByUserId !== '') {
+		$parsedSentBy = (int)$sentByUserId;
+		if ($parsedSentBy > 0) {
+			$normalizedSentByUserId = $parsedSentBy;
+		}
+	}
+
 	$stmt = $pdo->prepare(
-		'INSERT INTO notifications (user_id, title, message, notification_type, is_read, created_at)
-		 VALUES (:user_id, :title, :message, :notification_type, 0, :created_at)'
+		'INSERT INTO notifications (user_id, sent_by_user_id, title, message, notification_type, is_read, created_at)
+		 VALUES (:user_id, :sent_by_user_id, :title, :message, :notification_type, 0, :created_at)'
 	);
 	$ok = $stmt->execute([
 		':user_id' => $userId,
+		':sent_by_user_id' => $normalizedSentByUserId,
 		':title' => substr($normalizedTitle, 0, 160),
 		':message' => substr($normalizedMessage, 0, 1000),
 		':notification_type' => substr($normalizedType, 0, 50),
@@ -319,6 +362,44 @@ function createNotification(PDO $pdo, $userId, $title, $message, $type = 'info')
 	}
 
 	return ['success' => true, 'id' => (int)$pdo->lastInsertId()];
+}
+
+
+function notifyOriginalSenderOfRecipientAction(PDO $pdo, $recipientUserId, $originalSenderUserId, $recipientDisplayName, $verbPastTense, $originalNotificationTitle = '', $originalNotificationSentAt = '') {
+	$senderId = (int)$originalSenderUserId;
+	$recipientId = (int)$recipientUserId;
+	if ($senderId < 1 || $recipientId < 1 || $senderId === $recipientId) {
+		return;
+	}
+
+	$verb = trim((string)$verbPastTense);
+	if ($verb === '') {
+		return;
+	}
+
+	$actorName = trim((string)$recipientDisplayName);
+	if ($actorName === '') {
+		$actorName = 'A user';
+	}
+
+	$notificationTitle = trim((string)$originalNotificationTitle);
+	if ($notificationTitle === '') {
+		$notificationTitle = 'Untitled Notification';
+	}
+
+	$sentAtLabel = trim((string)$originalNotificationSentAt);
+	if ($sentAtLabel === '') {
+		$sentAtLabel = getDashboardSqlTimestamp();
+	}
+
+	createNotification(
+		$pdo,
+		$senderId,
+		'Recipient Update',
+		$actorName . ' has ' . $verb . ' the notification "' . $notificationTitle . '" that you sent on "' . $sentAtLabel . '".',
+		'info',
+		null
+	);
 }
 
 
@@ -544,7 +625,8 @@ if ($method === 'POST') {
 			$userId,
 			$data['title'] ?? '',
 			$data['message'] ?? '',
-			$data['type'] ?? 'info'
+			$data['type'] ?? 'info',
+			$data['sent_by_user_id'] ?? null
 		);
 
 		if (!$created['success']) {
@@ -569,12 +651,34 @@ if ($method === 'POST') {
 			respondJson(400, ['success' => false, 'message' => 'A valid notification id is required']);
 		}
 
+		$selectStmt = $pdo->prepare('SELECT id, sent_by_user_id, is_read, title, DATE_FORMAT(created_at, "%Y-%m-%d %H:%i:%s") AS sent_at_label FROM notifications WHERE id = :id AND user_id = :user_id LIMIT 1');
+		$selectStmt->execute([
+			':id' => $notificationId,
+			':user_id' => $userId,
+		]);
+		$notification = $selectStmt->fetch();
+		if (!$notification) {
+			respondJson(404, ['success' => false, 'message' => 'Notification not found']);
+		}
+
 		$updateStmt = $pdo->prepare('UPDATE notifications SET is_read = 1, read_at = :read_at WHERE id = :id AND user_id = :user_id');
 		$updateStmt->execute([
 			':read_at' => getDashboardSqlTimestamp(),
 			':id' => $notificationId,
 			':user_id' => $userId,
 		]);
+
+		if ((int)($notification['is_read'] ?? 0) === 0) {
+			notifyOriginalSenderOfRecipientAction(
+				$pdo,
+				$userId,
+				(int)($notification['sent_by_user_id'] ?? 0),
+				getApiAuthUserDisplayName(),
+					'read',
+					(string)($notification['title'] ?? ''),
+					(string)($notification['sent_at_label'] ?? '')
+			);
+		}
 
 		$payload = getNotificationsPayload($pdo, $userId, 25);
 		respondJson(200, [
@@ -588,16 +692,110 @@ if ($method === 'POST') {
 	if ($postAction === 'notifications_mark_all_read') {
 		$userId = getApiAuthUserId();
 		ensureNotificationsTable($pdo);
+
+		$pendingSenderStmt = $pdo->prepare('SELECT sent_by_user_id, title, DATE_FORMAT(created_at, "%Y-%m-%d %H:%i:%s") AS sent_at_label FROM notifications WHERE user_id = :user_id AND is_read = 0 AND sent_by_user_id IS NOT NULL');
+		$pendingSenderStmt->execute([':user_id' => $userId]);
+		$pendingSenderRows = $pendingSenderStmt->fetchAll();
+
 		$updateStmt = $pdo->prepare('UPDATE notifications SET is_read = 1, read_at = :read_at WHERE user_id = :user_id AND is_read = 0');
 		$updateStmt->execute([
 			':read_at' => getDashboardSqlTimestamp(),
 			':user_id' => $userId,
 		]);
 
+		$recipientDisplayName = getApiAuthUserDisplayName();
+		foreach ($pendingSenderRows as $row) {
+			notifyOriginalSenderOfRecipientAction(
+				$pdo,
+				$userId,
+				(int)($row['sent_by_user_id'] ?? 0),
+				$recipientDisplayName,
+					'read',
+					(string)($row['title'] ?? ''),
+					(string)($row['sent_at_label'] ?? '')
+			);
+		}
+
 		$payload = getNotificationsPayload($pdo, $userId, 25);
 		respondJson(200, [
 			'success' => true,
 			'message' => 'All notifications marked as read',
+			'unread_count' => (int)$payload['unread_count'],
+			'items' => $payload['items'],
+		]);
+	}
+
+	if ($postAction === 'notification_delete') {
+		$userId = getApiAuthUserId();
+		ensureNotificationsTable($pdo);
+		$notificationId = isset($data['id']) ? (int)$data['id'] : 0;
+		if ($notificationId < 1) {
+			respondJson(400, ['success' => false, 'message' => 'A valid notification id is required']);
+		}
+
+		$selectStmt = $pdo->prepare('SELECT id, sent_by_user_id, title, DATE_FORMAT(created_at, "%Y-%m-%d %H:%i:%s") AS sent_at_label FROM notifications WHERE id = :id AND user_id = :user_id LIMIT 1');
+		$selectStmt->execute([
+			':id' => $notificationId,
+			':user_id' => $userId,
+		]);
+		$notification = $selectStmt->fetch();
+		if (!$notification) {
+			respondJson(404, ['success' => false, 'message' => 'Notification not found']);
+		}
+
+		$deleteStmt = $pdo->prepare('DELETE FROM notifications WHERE id = :id AND user_id = :user_id');
+		$deleteStmt->execute([
+			':id' => $notificationId,
+			':user_id' => $userId,
+		]);
+
+		notifyOriginalSenderOfRecipientAction(
+			$pdo,
+			$userId,
+			(int)($notification['sent_by_user_id'] ?? 0),
+			getApiAuthUserDisplayName(),
+			'deleted',
+			(string)($notification['title'] ?? ''),
+			(string)($notification['sent_at_label'] ?? '')
+		);
+
+		$payload = getNotificationsPayload($pdo, $userId, 25);
+		respondJson(200, [
+			'success' => true,
+			'message' => 'Notification deleted',
+			'unread_count' => (int)$payload['unread_count'],
+			'items' => $payload['items'],
+		]);
+	}
+
+	if ($postAction === 'notifications_delete_all') {
+		$userId = getApiAuthUserId();
+		ensureNotificationsTable($pdo);
+
+		$senderStmt = $pdo->prepare('SELECT sent_by_user_id, title, DATE_FORMAT(created_at, "%Y-%m-%d %H:%i:%s") AS sent_at_label FROM notifications WHERE user_id = :user_id AND sent_by_user_id IS NOT NULL');
+		$senderStmt->execute([':user_id' => $userId]);
+		$senderRows = $senderStmt->fetchAll();
+
+		$deleteStmt = $pdo->prepare('DELETE FROM notifications WHERE user_id = :user_id');
+		$deleteStmt->execute([':user_id' => $userId]);
+
+		$recipientDisplayName = getApiAuthUserDisplayName();
+		foreach ($senderRows as $row) {
+			notifyOriginalSenderOfRecipientAction(
+				$pdo,
+				$userId,
+				(int)($row['sent_by_user_id'] ?? 0),
+				$recipientDisplayName,
+				'deleted',
+				(string)($row['title'] ?? ''),
+				(string)($row['sent_at_label'] ?? '')
+			);
+		}
+
+		$payload = getNotificationsPayload($pdo, $userId, 25);
+		respondJson(200, [
+			'success' => true,
+			'message' => 'All notifications deleted',
 			'unread_count' => (int)$payload['unread_count'],
 			'items' => $payload['items'],
 		]);

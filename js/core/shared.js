@@ -17,10 +17,15 @@ let isHandlingForcedLogout = false;
 let sessionPollTimerId = null;
 let sessionPollFnRef = null;
 let sessionVisibilityHandlerRef = null;
+let notificationPollTimerId = null;
+let notificationPollFnRef = null;
+let notificationVisibilityHandlerRef = null;
 
 
 let headerNotifications = [];
 let headerUnreadNotificationCount = 0;
+let hasNotificationBaselineLoaded = false;
+let knownNotificationIds = new Set();
 function setupUserAvatarDropdown() {
 	const btn = document.getElementById('user-avatar-btn');
 	const dropdown = document.getElementById('user-dropdown');
@@ -226,6 +231,11 @@ function handleSessionAuthFailure(xhr) {
 		sessionPollTimerId = null;
 	}
 
+	if (notificationPollTimerId !== null) {
+		clearInterval(notificationPollTimerId);
+		notificationPollTimerId = null;
+	}
+
 	showToast({
 		type: 'warning',
 		title: 'Signed Out',
@@ -253,6 +263,7 @@ function renderHeaderNotifications() {
 	const listEl = document.getElementById('notifications-list');
 	const countEl = document.getElementById('notifications-count');
 	const markAllReadBtn = document.getElementById('notifications-mark-all-read');
+	const deleteAllBtn = document.getElementById('notifications-delete-all');
 	if (!listEl || !countEl) {
 		return;
 	}
@@ -269,6 +280,9 @@ function renderHeaderNotifications() {
 		if (markAllReadBtn) {
 			markAllReadBtn.hidden = true;
 		}
+		if (deleteAllBtn) {
+			deleteAllBtn.hidden = true;
+		}
 		return;
 	}
 
@@ -279,9 +293,50 @@ function renderHeaderNotifications() {
 			itemEl.classList.add('notification-item-unread');
 		}
 
+		const topRowEl = document.createElement('div');
+		topRowEl.className = 'notification-item-top-row';
+
 		const titleEl = document.createElement('div');
 		titleEl.className = 'notification-item-title';
 		titleEl.textContent = String(notification.title || 'Notification');
+		topRowEl.appendChild(titleEl);
+
+		const actionWrapEl = document.createElement('div');
+		actionWrapEl.className = 'notification-item-actions';
+
+		if (notification.isRead !== true && Number(notification.id || 0) > 0) {
+			const markReadBtn = document.createElement('button');
+			markReadBtn.type = 'button';
+			markReadBtn.className = 'notification-item-mark-read-btn';
+			markReadBtn.textContent = '\u2713';
+			markReadBtn.title = 'Mark as read';
+			markReadBtn.setAttribute('aria-label', 'Mark notification as read');
+			markReadBtn.addEventListener('click', function(e) {
+				e.preventDefault();
+				e.stopPropagation();
+				markHeaderNotificationRead(notification.id);
+			});
+			actionWrapEl.appendChild(markReadBtn);
+		}
+
+		if (Number(notification.id || 0) > 0) {
+			const deleteBtn = document.createElement('button');
+			deleteBtn.type = 'button';
+			deleteBtn.className = 'notification-item-delete-btn';
+			deleteBtn.textContent = '\u2715';
+			deleteBtn.title = 'Delete notification';
+			deleteBtn.setAttribute('aria-label', 'Delete notification');
+			deleteBtn.addEventListener('click', function(e) {
+				e.preventDefault();
+				e.stopPropagation();
+				deleteHeaderNotification(notification.id);
+			});
+			actionWrapEl.appendChild(deleteBtn);
+		}
+
+		if (actionWrapEl.childElementCount > 0) {
+			topRowEl.appendChild(actionWrapEl);
+		}
 
 		const messageEl = document.createElement('div');
 		messageEl.className = 'notification-item-message';
@@ -291,16 +346,33 @@ function renderHeaderNotifications() {
 		timeEl.className = 'notification-item-time';
 		timeEl.textContent = String(notification.timestamp || '').trim();
 
-		itemEl.appendChild(titleEl);
-		itemEl.appendChild(messageEl);
+		const senderName = String(notification.sentByDisplayName || '').trim();
+		const senderEl = document.createElement('div');
+		senderEl.className = 'notification-item-sender';
+		senderEl.textContent = senderName !== '' ? ('Sent by ' + senderName) : '';
+
+		const metaEl = document.createElement('div');
+		metaEl.className = 'notification-item-meta';
 		if (timeEl.textContent !== '') {
-			itemEl.appendChild(timeEl);
+			metaEl.appendChild(timeEl);
+		}
+		if (senderEl.textContent !== '') {
+			metaEl.appendChild(senderEl);
+		}
+
+		itemEl.appendChild(topRowEl);
+		itemEl.appendChild(messageEl);
+		if (metaEl.childElementCount > 0) {
+			itemEl.appendChild(metaEl);
 		}
 		listEl.appendChild(itemEl);
 	});
 
 	if (markAllReadBtn) {
 		markAllReadBtn.hidden = headerUnreadNotificationCount < 1;
+	}
+	if (deleteAllBtn) {
+		deleteAllBtn.hidden = headerNotifications.length < 1;
 	}
 
 	const count = headerUnreadNotificationCount;
@@ -309,15 +381,32 @@ function renderHeaderNotifications() {
 }
 
 
+function showIncomingNotificationToast(notification) {
+	if (!notification || (!notification.title && !notification.message)) {
+		return;
+	}
+
+	showToast({
+		type: 'info',
+		title: String(notification.title || 'New Notification'),
+		message: String(notification.message || ''),
+		autoCloseMs: 2600,
+		showOkayButton: false
+	});
+}
+
+
 function setHeaderNotifications(notifications, unreadCount) {
 	if (!Array.isArray(notifications)) {
 		headerNotifications = [];
 		headerUnreadNotificationCount = 0;
+		hasNotificationBaselineLoaded = true;
+		knownNotificationIds = new Set();
 		renderHeaderNotifications();
 		return;
 	}
 
-	headerNotifications = notifications
+	const mappedNotifications = notifications
 		.filter(function(item) {
 			return item && (item.title || item.message);
 		})
@@ -330,9 +419,26 @@ function setHeaderNotifications(notifications, unreadCount) {
 				title: String(item.title || 'Notification'),
 				message: String(item.message || ''),
 				isRead: item.is_read === true || item.isRead === true,
+				sentByDisplayName: String(item.sent_by_display_name || item.sentByDisplayName || ''),
 				timestamp: timestamp
 			};
 		});
+
+	const nextKnownIds = new Set();
+	const incomingNotifications = [];
+	mappedNotifications.forEach(function(item) {
+		const parsedId = Number(item.id || 0);
+		if (parsedId > 0) {
+			nextKnownIds.add(parsedId);
+			if (hasNotificationBaselineLoaded && !knownNotificationIds.has(parsedId)) {
+				incomingNotifications.push(item);
+			}
+		}
+	});
+
+	headerNotifications = mappedNotifications;
+	knownNotificationIds = nextKnownIds;
+	hasNotificationBaselineLoaded = true;
 
 	if (typeof unreadCount === 'number' && unreadCount >= 0) {
 		headerUnreadNotificationCount = unreadCount;
@@ -343,6 +449,14 @@ function setHeaderNotifications(notifications, unreadCount) {
 	}
 
 	renderHeaderNotifications();
+
+	incomingNotifications
+		.sort(function(a, b) {
+			return Number(a.id || 0) - Number(b.id || 0);
+		})
+		.forEach(function(notification) {
+			showIncomingNotificationToast(notification);
+		});
 }
 
 
@@ -403,6 +517,11 @@ function markAllHeaderNotificationsRead() {
 
 
 function markHeaderNotificationRead(notificationId) {
+	const parsedId = Number(notificationId || 0);
+	if (!Number.isFinite(parsedId) || parsedId < 1) {
+		return $.Deferred().resolve().promise();
+	}
+
 	return $.ajax({
 		url: '../api.php',
 		type: 'POST',
@@ -410,7 +529,7 @@ function markHeaderNotificationRead(notificationId) {
 		dataType: 'json',
 		data: JSON.stringify({
 			action: 'notification_mark_read',
-			id: Number(notificationId || 0)
+			id: parsedId
 		})
 	}).done(function(response) {
 		if (response && response.success === true) {
@@ -422,15 +541,95 @@ function markHeaderNotificationRead(notificationId) {
 }
 
 
+function deleteHeaderNotification(notificationId) {
+	const parsedId = Number(notificationId || 0);
+	if (!Number.isFinite(parsedId) || parsedId < 1) {
+		return $.Deferred().resolve().promise();
+	}
+
+	return $.ajax({
+		url: '../api.php',
+		type: 'POST',
+		contentType: 'application/json',
+		dataType: 'json',
+		data: JSON.stringify({
+			action: 'notification_delete',
+			id: parsedId
+		})
+	}).done(function(response) {
+		if (response && response.success === true) {
+			setHeaderNotifications(response.items || [], Number(response.unread_count || 0));
+		}
+	}).fail(function(xhr) {
+		handleSessionAuthFailure(xhr);
+	});
+}
+
+
+function deleteAllHeaderNotifications() {
+	return $.ajax({
+		url: '../api.php',
+		type: 'POST',
+		contentType: 'application/json',
+		dataType: 'json',
+		data: JSON.stringify({
+			action: 'notifications_delete_all'
+		})
+	}).done(function(response) {
+		if (response && response.success === true) {
+			setHeaderNotifications(response.items || [], Number(response.unread_count || 0));
+		}
+	}).fail(function(xhr) {
+		handleSessionAuthFailure(xhr);
+	});
+}
+
+
+function setupNotificationRealtimeSync() {
+	if (notificationPollTimerId !== null) {
+		clearInterval(notificationPollTimerId);
+		notificationPollTimerId = null;
+	}
+
+	if (notificationPollFnRef !== null) {
+		window.removeEventListener('focus', notificationPollFnRef);
+	}
+	if (notificationVisibilityHandlerRef !== null) {
+		document.removeEventListener('visibilitychange', notificationVisibilityHandlerRef);
+	}
+
+	const poll = function() {
+		if (document.visibilityState === 'hidden' || isHandlingForcedLogout) {
+			return;
+		}
+		loadHeaderNotificationsFromServer();
+	};
+
+	notificationPollFnRef = poll;
+	window.addEventListener('focus', notificationPollFnRef);
+	notificationVisibilityHandlerRef = function() {
+		if (document.visibilityState === 'visible' && notificationPollFnRef) {
+			notificationPollFnRef();
+		}
+	};
+	document.addEventListener('visibilitychange', notificationVisibilityHandlerRef);
+
+	poll();
+	notificationPollTimerId = setInterval(poll, 3000);
+}
+
+
 function setupNotificationDropdown() {
 	const btn = document.getElementById('notifications-btn');
 	const dropdown = document.getElementById('notifications-dropdown');
 	const markAllReadBtn = document.getElementById('notifications-mark-all-read');
+	const deleteAllBtn = document.getElementById('notifications-delete-all');
 	if (!btn || !dropdown) {
 		return;
 	}
 
 	loadHeaderNotificationsFromServer();
+	setupNotificationRealtimeSync();
 
 	btn.addEventListener('click', function(e) {
 		e.stopPropagation();
@@ -472,6 +671,14 @@ function setupNotificationDropdown() {
 		});
 	}
 
+	if (deleteAllBtn) {
+		deleteAllBtn.addEventListener('click', function(e) {
+			e.preventDefault();
+			e.stopPropagation();
+			deleteAllHeaderNotifications();
+		});
+	}
+
 	window.DashboardNotifications = {
 		set: function(items) {
 			setHeaderNotifications(items);
@@ -495,6 +702,12 @@ function setupNotificationDropdown() {
 		},
 		markRead: function(notificationId) {
 			return markHeaderNotificationRead(notificationId);
+		},
+		delete: function(notificationId) {
+			return deleteHeaderNotification(notificationId);
+		},
+		deleteAll: function() {
+			return deleteAllHeaderNotifications();
 		}
 	};
 }

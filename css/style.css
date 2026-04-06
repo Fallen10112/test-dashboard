@@ -1818,6 +1818,12 @@ body.dark-mode .custom-toast-message {
     color: #1f2937;
 }
 
+.notifications-header-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+
 .notifications-mark-read-btn {
     border: none;
     background: transparent;
@@ -1830,6 +1836,21 @@ body.dark-mode .custom-toast-message {
 
 .notifications-mark-read-btn:hover {
     color: #3730a3;
+    text-decoration: underline;
+}
+
+.notifications-delete-all-btn {
+    border: none;
+    background: transparent;
+    color: #b42318;
+    font-size: 0.78em;
+    font-weight: 700;
+    cursor: pointer;
+    padding: 4px 0;
+}
+
+.notifications-delete-all-btn:hover {
+    color: #8f1b13;
     text-decoration: underline;
 }
 
@@ -1873,6 +1894,70 @@ body.dark-mode .custom-toast-message {
     margin-bottom: 4px;
 }
 
+.notification-item-top-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.notification-item-top-row .notification-item-title {
+    margin-bottom: 0;
+    flex: 1;
+}
+
+.notification-item-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.notification-item-mark-read-btn {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 1px solid #c7d2fe;
+    background: #eef2ff;
+    color: #4338ca;
+    font-size: 0.75em;
+    font-weight: 700;
+    line-height: 1;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.notification-item-mark-read-btn:hover {
+    background: #dbe4ff;
+    border-color: #a5b4fc;
+}
+
+.notification-item-delete-btn {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 1px solid #f5c2c7;
+    background: #fff1f2;
+    color: #b42318;
+    font-size: 0.68em;
+    font-weight: 700;
+    line-height: 1;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.notification-item-delete-btn:hover {
+    background: #ffe4e6;
+    border-color: #fda4af;
+}
+
 .notification-item-message {
     font-size: 0.82em;
     color: #4b5563;
@@ -1883,6 +1968,26 @@ body.dark-mode .custom-toast-message {
     margin-top: 7px;
     font-size: 0.74em;
     color: #6b7280;
+}
+
+.notification-item-meta {
+    margin-top: 7px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.notification-item-meta .notification-item-time {
+    margin-top: 0;
+}
+
+.notification-item-sender {
+    margin-left: auto;
+    font-size: 0.72em;
+    color: #4b5563;
+    text-align: right;
+    white-space: nowrap;
 }
 
 body.dark-mode .notifications-btn {
@@ -1918,6 +2023,14 @@ body.dark-mode .notifications-mark-read-btn:hover {
     color: #c7d2fe;
 }
 
+body.dark-mode .notifications-delete-all-btn {
+    color: #fca5a5;
+}
+
+body.dark-mode .notifications-delete-all-btn:hover {
+    color: #fecaca;
+}
+
 body.dark-mode .notifications-dropdown-divider {
     background: #3d3d3d;
 }
@@ -1940,12 +2053,38 @@ body.dark-mode .notification-item-title {
     color: #f3f4f6;
 }
 
+body.dark-mode .notification-item-mark-read-btn {
+    background: #2d3650;
+    border-color: #4b5f93;
+    color: #c7d2fe;
+}
+
+body.dark-mode .notification-item-mark-read-btn:hover {
+    background: #384465;
+    border-color: #7c91cc;
+}
+
+body.dark-mode .notification-item-delete-btn {
+    background: #3a1f24;
+    border-color: #7a3945;
+    color: #fecaca;
+}
+
+body.dark-mode .notification-item-delete-btn:hover {
+    background: #4a262d;
+    border-color: #a54a57;
+}
+
 body.dark-mode .notification-item-message {
     color: #d1d5db;
 }
 
 body.dark-mode .notification-item-time {
     color: #9ca3af;
+}
+
+body.dark-mode .notification-item-sender {
+    color: #b8c1d3;
 }
 
 .user-avatar-btn {

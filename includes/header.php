@@ -66,7 +66,10 @@ $pageTitle = "Dashboard Showcase";
 				<div class="notifications-dropdown" id="notifications-dropdown" hidden>
 					<div class="notifications-dropdown-header">
 						<span class="notifications-dropdown-title">Notifications</span>
-						<button type="button" class="notifications-mark-read-btn" id="notifications-mark-all-read" hidden>Mark all read</button>
+						<div class="notifications-header-actions">
+							<button type="button" class="notifications-mark-read-btn" id="notifications-mark-all-read" hidden>Mark all read</button>
+							<button type="button" class="notifications-delete-all-btn" id="notifications-delete-all" hidden>Delete all</button>
+						</div>
 					</div>
 					<div class="notifications-dropdown-divider"></div>
 					<div class="notifications-list" id="notifications-list" role="list" aria-live="polite">

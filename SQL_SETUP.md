@@ -274,6 +274,7 @@ Columns:
 
 - id (BIGINT UNSIGNED, PK, AUTO_INCREMENT): Notification row ID.
 - user_id (BIGINT UNSIGNED, NOT NULL, FK -> users.id): Notification owner.
+- sent_by_user_id (BIGINT UNSIGNED, NULL, FK -> users.id): Optional sender when pushed by another user; null for system-generated notifications.
 - title (VARCHAR(160), NOT NULL): Short notification headline.
 - message (TEXT, NOT NULL): Notification body text.
 - notification_type (VARCHAR(50), NOT NULL, default 'info'): Classification such as info/success/warning/error.
@@ -285,6 +286,7 @@ Recommended indexes:
 
 - INDEX idx_notifications_user_created (user_id, created_at)
 - INDEX idx_notifications_user_read (user_id, is_read)
+- INDEX idx_notifications_sent_by (sent_by_user_id)
 
 ---
 
