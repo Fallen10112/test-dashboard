@@ -508,6 +508,18 @@ function renderHeaderNotifications() {
 		bodyEl.appendChild(iconEl);
 		bodyEl.appendChild(contentEl);
 		itemEl.appendChild(bodyEl);
+
+		// Make notification item clickable to show full details
+		itemEl.style.cursor = 'pointer';
+		itemEl.addEventListener('click', function(e) {
+			// Don't trigger on button clicks
+			const clickedButton = e.target.closest('.notification-item-mark-read-btn, .notification-item-delete-btn');
+			if (clickedButton) {
+				return;
+			}
+			showNotificationDetailsToast(notification);
+		});
+
 		listEl.appendChild(itemEl);
 	});
 
@@ -521,6 +533,85 @@ function renderHeaderNotifications() {
 	const count = headerUnreadNotificationCount;
 	countEl.textContent = String(count > 99 ? '99+' : count);
 	countEl.hidden = count === 0;
+}
+
+
+function showNotificationDetailsToast(notification) {
+	if (!notification || (!notification.title && !notification.message)) {
+		return;
+	}
+
+	ensureToastHost();
+
+	const settings = {
+		type: String(notification.type || 'info'),
+		title: String(notification.title || 'Notification'),
+		message: String(notification.message || ''),
+		timestamp: String(notification.timestamp || '').trim(),
+		sentByDisplayName: String(notification.sentByDisplayName || '').trim(),
+		id: Number(notification.id || 0),
+		isRead: notification.isRead === true
+	};
+
+	const $host = $('#toast-host');
+	$host.empty();
+
+	const $toast = $('<div class="custom-toast custom-toast-details" role="status"></div>');
+	$toast.addClass('custom-toast-' + settings.type);
+
+	const $content = $('<div class="custom-toast-content"></div>');
+	if (settings.title) {
+		$content.append($('<h4 class="custom-toast-title"></h4>').text(settings.title));
+	}
+	if (settings.message) {
+		$content.append($('<p class="custom-toast-message"></p>').text(settings.message));
+	}
+
+	// Add meta information
+	const $meta = $('<div class="custom-toast-meta"></div>');
+	if (settings.timestamp) {
+		$meta.append($('<div class="custom-toast-meta-item"></div>').text('Date: ' + settings.timestamp));
+	}
+	if (settings.sentByDisplayName) {
+		$meta.append($('<div class="custom-toast-meta-item"></div>').text('From: ' + settings.sentByDisplayName));
+	}
+	if ($meta.children().length > 0) {
+		$content.append($meta);
+	}
+
+	$toast.append($content);
+
+	const $actions = $('<div class="custom-toast-actions"></div>');
+
+	// Mark as read button (if not already read)
+	if (!settings.isRead && settings.id > 0) {
+		const $markReadBtn = $('<button type="button" class="btn btn-sm btn-secondary">Mark as Read</button>');
+		$markReadBtn.on('click', function() {
+			closeToast($toast);
+			markHeaderNotificationRead(settings.id);
+		});
+		$actions.append($markReadBtn);
+	}
+
+	// Delete button
+	if (settings.id > 0) {
+		const $deleteBtn = $('<button type="button" class="btn btn-sm btn-danger">Delete</button>');
+		$deleteBtn.on('click', function() {
+			closeToast($toast);
+			deleteHeaderNotification(settings.id);
+		});
+		$actions.append($deleteBtn);
+	}
+
+	// Close button
+	const $closeBtn = $('<button type="button" class="btn btn-sm btn-secondary">Close</button>');
+	$closeBtn.on('click', function() {
+		closeToast($toast);
+	});
+	$actions.append($closeBtn);
+
+	$toast.append($actions);
+	$host.append($toast);
 }
 
 
@@ -622,6 +713,20 @@ function loadHeaderNotificationsFromServer() {
 
 
 function createNotificationOnServer(item) {
+	const title = String((item && item.title) || 'Notification');
+	
+	// Validate title length
+	if (title.length > 64) {
+		showToast({
+			type: 'error',
+			title: 'Validation Error',
+			message: 'Notification title must not exceed 64 characters',
+			autoCloseMs: 3000,
+			showOkayButton: false
+		});
+		return $.Deferred().reject().promise();
+	}
+
 	return $.ajax({
 		url: '../api.php',
 		type: 'POST',
@@ -629,13 +734,21 @@ function createNotificationOnServer(item) {
 		dataType: 'json',
 		data: JSON.stringify({
 			action: 'notification_create',
-			title: String((item && item.title) || 'Notification'),
+			title: title,
 			message: String((item && item.message) || ''),
 			type: String((item && item.type) || 'info')
 		})
 	}).done(function(response) {
 		if (response && response.success === true) {
 			setHeaderNotifications(response.items || [], Number(response.unread_count || 0));
+		} else if (response && response.success === false) {
+			showToast({
+				type: 'error',
+				title: 'Notification Error',
+				message: String(response.message || 'Failed to create notification'),
+				autoCloseMs: 3000,
+				showOkayButton: false
+			});
 		}
 	}).fail(function(xhr) {
 		handleSessionAuthFailure(xhr);

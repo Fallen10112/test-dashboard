@@ -858,6 +858,26 @@ body {
     font-size: 0.95em;
 }
 
+.custom-toast-meta {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #e5e7eb;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.custom-toast-meta-item {
+    font-size: 0.85em;
+    color: #6b7280;
+    line-height: 1.4;
+}
+
+.custom-toast-details {
+    min-width: 320px;
+    max-width: 400px;
+}
+
 .custom-toast-actions {
     display: flex;
     justify-content: flex-end;
@@ -1479,6 +1499,14 @@ body.dark-mode .custom-toast-message {
     color: #d0d0d0;
 }
 
+body.dark-mode .custom-toast-meta {
+    border-top-color: #4a4a4a;
+}
+
+body.dark-mode .custom-toast-meta-item {
+    color: #a0a0a0;
+}
+
 @media (max-width: 900px) {
     body {
         overflow-y: auto;
@@ -2058,6 +2086,9 @@ body.dark-mode .custom-toast-message {
     font-weight: 600;
     color: #1f2937;
     margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .notification-item-top-row {
@@ -2128,6 +2159,9 @@ body.dark-mode .custom-toast-message {
     font-size: 0.82em;
     color: #4b5563;
     line-height: 1.4;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .notification-item-time {

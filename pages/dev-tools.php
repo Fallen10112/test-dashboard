@@ -84,33 +84,39 @@ try {
 					$sentByUserId = $currentUserId > 0 ? $currentUserId : null;
 				}
 
-				$insertStmt = $pdo->prepare(
-					'INSERT INTO notifications (user_id, sent_by_user_id, title, message, notification_type, is_read, created_at)
-					 VALUES (:user_id, :sent_by_user_id, :title, :message, :notification_type, 0, :created_at)'
-				);
-				$ok = $insertStmt->execute([
-					':user_id' => $recipientUserId,
-					':sent_by_user_id' => $sentByUserId,
-					':title' => substr($title !== '' ? $title : 'Notification', 0, 160),
-					':message' => substr($message, 0, 1000),
-					':notification_type' => substr($type, 0, 50),
-					':created_at' => getDashboardSqlTimestamp(),
-				]);
-
-				if ($ok) {
-					$recipientLabel = 'user #' . $recipientUserId;
-					$senderLabel = $sentByUserId === null ? 'System' : ('user #' . (int)$sentByUserId);
-					writeAuditEvent($pdo, [
-						'record_type' => 'notification',
-						'record_id' => (int)$pdo->lastInsertId(),
-						'action' => 'notification_sent',
-						'details' => 'Notification (' . substr($title !== '' ? $title : '', 0, 160) . '): Sent | From ' . $senderLabel . ' to ' . $recipientLabel,
-						'source_user_id' => $currentUserId > 0 ? $currentUserId : null,
-						'target_user_id' => $recipientUserId,
-					]);
-					$postSuccess = 'Test notification sent successfully.';
+				// Validate title length
+				$titleForValidation = $title !== '' ? $title : 'Notification';
+				if (mb_strlen($titleForValidation, 'UTF-8') > 64) {
+					$postError = 'Notification title must not exceed 64 characters';
 				} else {
-					$postError = 'Failed to send test notification.';
+					$insertStmt = $pdo->prepare(
+						'INSERT INTO notifications (user_id, sent_by_user_id, title, message, notification_type, is_read, created_at)
+						 VALUES (:user_id, :sent_by_user_id, :title, :message, :notification_type, 0, :created_at)'
+					);
+					$ok = $insertStmt->execute([
+						':user_id' => $recipientUserId,
+						':sent_by_user_id' => $sentByUserId,
+						':title' => substr($titleForValidation, 0, 160),
+						':message' => substr($message, 0, 1000),
+						':notification_type' => substr($type, 0, 50),
+						':created_at' => getDashboardSqlTimestamp(),
+					]);
+
+					if ($ok) {
+						$recipientLabel = 'user #' . $recipientUserId;
+						$senderLabel = $sentByUserId === null ? 'System' : ('user #' . (int)$sentByUserId);
+						writeAuditEvent($pdo, [
+							'record_type' => 'notification',
+							'record_id' => (int)$pdo->lastInsertId(),
+							'action' => 'notification_sent',
+							'details' => 'Notification (' . substr($title !== '' ? $title : '', 0, 160) . '): Sent | From ' . $senderLabel . ' to ' . $recipientLabel,
+							'source_user_id' => $currentUserId > 0 ? $currentUserId : null,
+							'target_user_id' => $recipientUserId,
+						]);
+						$postSuccess = 'Test notification sent successfully.';
+					} else {
+						$postError = 'Failed to send test notification.';
+					}
 				}
 			}
 		}
@@ -186,9 +192,7 @@ try {
 
 					<div class="form-group">
 						<label for="notification-title">Notification Title</label>
-						<input type="text" id="notification-title" name="title" maxlength="160" placeholder="Enter title">
-					</div>
-
+					<input type="text" id="notification-title" name="title" maxlength="64" placeholder="Enter title">
 					<div class="form-group">
 						<label for="notification-message">Notification Message</label>
 						<textarea id="notification-message" name="message" maxlength="1000" required placeholder="Enter notification message"></textarea>

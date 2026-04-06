@@ -617,6 +617,11 @@ function createNotification(PDO $pdo, $userId, $title, $message, $type = 'info',
 		$normalizedType = 'info';
 	}
 
+	// Validate title length (max 64 characters)
+	if (mb_strlen($normalizedTitle, 'UTF-8') > 64) {
+		return ['success' => false, 'message' => 'Notification title must not exceed 64 characters'];
+	}
+
 	$normalizedSentByUserId = null;
 	if ($sentByUserId !== null && $sentByUserId !== '') {
 		$parsedSentBy = (int)$sentByUserId;
