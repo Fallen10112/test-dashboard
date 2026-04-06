@@ -1,6 +1,7 @@
 $(document).ready(function() {
 	initializeTheme();
 	setupResetButtonHandler();
+	setupResetNotificationsTableHandler();
 	setupNotificationDropdown();
 	setupUserAvatarDropdown();
 	setupGlobalAjaxSessionGuard();

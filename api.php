@@ -602,6 +602,15 @@ if ($method === 'POST') {
 		respondJson(500, ['success' => false, 'message' => 'Failed to reset data']);
 	}
 
+	if ($postAction === 'reset_notifications_table') {
+		try {
+			$pdo->exec('TRUNCATE TABLE notifications');
+			respondJson(200, ['success' => true, 'message' => 'Notifications table reset successfully']);
+		} catch (Throwable $e) {
+			respondJson(500, ['success' => false, 'message' => 'Failed to reset notifications table']);
+		}
+	}
+
 	if ($postAction === 'add_audit_entry') {
 		$success = addAuditEntry($pdo, $data['changeType'] ?? '', $data['recordId'] ?? '', $data['fieldName'] ?? '', $data['oldValue'] ?? '', $data['newValue'] ?? '');
 		if ($success) {

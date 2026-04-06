@@ -1882,6 +1882,84 @@ body.dark-mode .custom-toast-message {
     background: #ffffff;
 }
 
+.notification-item-body {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.notification-item-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.notification-item-type-icon {
+    width: 20px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 0.72em;
+    font-weight: 800;
+    line-height: 1;
+    margin-top: 1px;
+}
+
+.notification-item-type-info .notification-item-type-icon {
+    border-radius: 50%;
+    border: 1px solid #93c5fd;
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+.notification-item-type-success {
+    background: #f0fdf4;
+    border-color: #bbf7d0;
+}
+
+.notification-item-type-success .notification-item-type-icon {
+    border-radius: 50%;
+    border: 1px solid #86efac;
+    background: #dcfce7;
+    color: #166534;
+}
+
+.notification-item-type-warning,
+.notification-item-type-warn {
+    background: #fff7ed;
+    border-color: #fed7aa;
+}
+
+.notification-item-type-warning .notification-item-type-icon,
+.notification-item-type-warn .notification-item-type-icon {
+    border-radius: 50%;
+    border: none;
+    background: #fb923c;
+    color: #ffffff;
+}
+
+.notification-item-type-warning .notification-item-type-icon::after,
+.notification-item-type-warn .notification-item-type-icon::after {
+    content: '?';
+}
+
+.notification-item-type-error {
+    background: #fef2f2;
+    border-color: #fecaca;
+}
+
+.notification-item-type-error .notification-item-type-icon {
+    border-radius: 50%;
+    border: none;
+    background: #ef4444;
+    color: #ffffff;
+}
+
+.notification-item-type-error .notification-item-type-icon::after {
+    content: '!';
+}
+
 .notification-item-unread {
     border-color: #c7d2fe;
     background: #f8faff;
@@ -2044,9 +2122,56 @@ body.dark-mode .notification-item {
     border-color: #3d3d3d;
 }
 
+body.dark-mode .notification-item-type-info {
+    background: #252f42;
+    border-color: #3f5a89;
+}
+
+body.dark-mode .notification-item-type-info .notification-item-type-icon {
+    border-color: #60a5fa;
+    background: #1f3a63;
+    color: #bfdbfe;
+}
+
+body.dark-mode .notification-item-type-success {
+    background: #1f3328;
+    border-color: #2f6a46;
+}
+
+body.dark-mode .notification-item-type-success .notification-item-type-icon {
+    border-color: #4ade80;
+    background: #1d4b2f;
+    color: #bbf7d0;
+}
+
+body.dark-mode .notification-item-type-warning,
+body.dark-mode .notification-item-type-warn {
+    background: #3a2b1c;
+    border-color: #9a6132;
+}
+
+body.dark-mode .notification-item-type-warning .notification-item-type-icon,
+body.dark-mode .notification-item-type-warn .notification-item-type-icon {
+    border-radius: 50%;
+    border: none;
+    background: #ea580c;
+    color: #ffffff;
+}
+
+body.dark-mode .notification-item-type-error {
+    background: #3f1f24;
+    border-color: #9f3b47;
+}
+
+body.dark-mode .notification-item-type-error .notification-item-type-icon {
+    border-radius: 50%;
+    border: none;
+    background: #dc2626;
+    color: #ffffff;
+}
+
 body.dark-mode .notification-item-unread {
-    background: #1f2535;
-    border-color: #394569;
+    border-color: #4968a3;
 }
 
 body.dark-mode .notification-item-title {

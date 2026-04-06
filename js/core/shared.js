@@ -289,9 +289,33 @@ function renderHeaderNotifications() {
 	headerNotifications.forEach(function(notification) {
 		const itemEl = document.createElement('div');
 		itemEl.className = 'notification-item';
+		const rawNotificationType = String(notification.type || 'info').trim().toLowerCase();
+		const notificationType = rawNotificationType === 'warn'
+			? 'warning'
+			: (rawNotificationType === 'err' ? 'error' : rawNotificationType);
+		itemEl.classList.add('notification-item-type-' + notificationType);
 		if (notification.isRead !== true) {
 			itemEl.classList.add('notification-item-unread');
 		}
+
+		const bodyEl = document.createElement('div');
+		bodyEl.className = 'notification-item-body';
+
+		const iconEl = document.createElement('span');
+		iconEl.className = 'notification-item-type-icon';
+		iconEl.setAttribute('aria-hidden', 'true');
+		if (notificationType === 'success') {
+			iconEl.textContent = '\u2713';
+		} else if (notificationType === 'warning') {
+			iconEl.textContent = '';
+		} else if (notificationType === 'error') {
+			iconEl.textContent = '';
+		} else {
+			iconEl.textContent = 'i';
+		}
+
+		const contentEl = document.createElement('div');
+		contentEl.className = 'notification-item-content';
 
 		const topRowEl = document.createElement('div');
 		topRowEl.className = 'notification-item-top-row';
@@ -360,11 +384,14 @@ function renderHeaderNotifications() {
 			metaEl.appendChild(senderEl);
 		}
 
-		itemEl.appendChild(topRowEl);
-		itemEl.appendChild(messageEl);
+		contentEl.appendChild(topRowEl);
+		contentEl.appendChild(messageEl);
 		if (metaEl.childElementCount > 0) {
-			itemEl.appendChild(metaEl);
+			contentEl.appendChild(metaEl);
 		}
+		bodyEl.appendChild(iconEl);
+		bodyEl.appendChild(contentEl);
+		itemEl.appendChild(bodyEl);
 		listEl.appendChild(itemEl);
 	});
 
@@ -414,10 +441,13 @@ function setHeaderNotifications(notifications, unreadCount) {
 			const datePart = String(item.date || '').trim();
 			const timePart = String(item.time || '').trim();
 			const timestamp = [datePart, timePart].filter(function(v) { return v !== ''; }).join(' ');
+			const rawType = String(item.type || item.notification_type || 'info').trim().toLowerCase();
+			const normalizedType = rawType === 'warn' ? 'warning' : (rawType === 'err' ? 'error' : rawType);
 			return {
 				id: Number(item.id || 0),
 				title: String(item.title || 'Notification'),
 				message: String(item.message || ''),
+				type: normalizedType,
 				isRead: item.is_read === true || item.isRead === true,
 				sentByDisplayName: String(item.sent_by_display_name || item.sentByDisplayName || ''),
 				timestamp: timestamp
@@ -924,6 +954,64 @@ function setupResetButtonHandler() {
 									type: 'error',
 									title: 'Reset Failed',
 									message: responseMessage || fallbackMessage,
+									showOkayButton: true,
+									autoCloseMs: 3000
+								});
+							}
+						});
+					}
+				}
+			]
+		});
+	});
+}
+
+
+function setupResetNotificationsTableHandler() {
+	if ($('#reset-notif-table-btn').length === 0) {
+		return;
+	}
+
+	$('#reset-notif-table-btn').on('click', function() {
+		showToast({
+			type: 'warning',
+			title: 'Reset Notifications Table?',
+			message: 'This will delete all notifications and reset IDs to start at 1.',
+			autoCloseMs: 0,
+			buttons: [
+				{
+					label: 'Cancel',
+					className: 'btn-secondary'
+				},
+				{
+					label: 'Reset Table',
+					className: 'btn-danger',
+					onClick: function() {
+						$.ajax({
+							url: '../api.php',
+							type: 'POST',
+							contentType: 'application/json',
+							data: JSON.stringify({ action: 'reset_notifications_table' }),
+							success: function() {
+								showToast({
+									type: 'success',
+									title: 'Notifications Table Reset',
+									message: 'The notifications table has been cleared and reset to fresh state.',
+									showOkayButton: true,
+									autoCloseMs: 3000,
+									onClose: function() {
+										window.location.reload();
+									}
+								});
+							},
+							error: function(xhr, status, error) {
+								const responseMessage = xhr && xhr.responseJSON && xhr.responseJSON.message
+									? xhr.responseJSON.message
+									: '';
+								showToast({
+									type: 'error',
+									title: 'Reset Failed',
+									message: responseMessage || ('Error resetting table: ' + error),
 									showOkayButton: true,
 									autoCloseMs: 3000
 								});
