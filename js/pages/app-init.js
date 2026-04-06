@@ -1,6 +1,7 @@
 $(document).ready(function() {
 	initializeTheme();
 	setupResetButtonHandler();
+	setupUserAvatarDropdown();
 	loadHeaderMetrics();
 
 	if ($('#data-container').length > 0) {

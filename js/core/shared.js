@@ -15,6 +15,35 @@ const virtualOverscanRows = 6;
 const dataPageSizeStorageKey = 'data-page-size';
 
 
+function setupUserAvatarDropdown() {
+	const btn = document.getElementById('user-avatar-btn');
+	const dropdown = document.getElementById('user-dropdown');
+	if (!btn || !dropdown) { return; }
+
+	btn.addEventListener('click', function(e) {
+		e.stopPropagation();
+		const isOpen = !dropdown.hidden;
+		dropdown.hidden = isOpen;
+		btn.setAttribute('aria-expanded', String(!isOpen));
+	});
+
+	document.addEventListener('click', function(e) {
+		if (!dropdown.hidden && !dropdown.contains(e.target) && e.target !== btn) {
+			dropdown.hidden = true;
+			btn.setAttribute('aria-expanded', 'false');
+		}
+	});
+
+	document.addEventListener('keydown', function(e) {
+		if (e.key === 'Escape' && !dropdown.hidden) {
+			dropdown.hidden = true;
+			btn.setAttribute('aria-expanded', 'false');
+			btn.focus();
+		}
+	});
+}
+
+
 function configureApiAuthentication() {
 	const apiKey = String(window.DASHBOARD_API_KEY || '').trim();
 	if (apiKey === '') {
