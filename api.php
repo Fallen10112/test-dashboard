@@ -1123,6 +1123,24 @@ if ($method === 'POST') {
 		}
 	}
 
+	if ($postAction === 'logout_all_users') {
+		$userId = getApiAuthUserId();
+		try {
+			writeAuditEvent($pdo, [
+				'record_type' => 'auth',
+				'record_id' => null,
+				'action' => 'reset',
+				'details' => 'All active user sessions were reset',
+				'source_user_id' => $userId,
+			]);
+			resetUserSessionsTable($pdo);
+			clearAuthSessionState();
+			respondJson(200, ['success' => true, 'message' => 'All users were logged out and sessions were reset']);
+		} catch (Throwable $e) {
+			respondJson(500, ['success' => false, 'message' => 'Failed to reset user sessions']);
+		}
+	}
+
 	if ($postAction === 'reset_all') {
 		$userId = getApiAuthUserId();
 		try {

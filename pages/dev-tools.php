@@ -237,6 +237,9 @@ try {
 					<button id="reset-notif-table-btn" class="btn btn-reset">Reset Notification Table</button>
 				</div>
 				<div class="dev-tools-actions-row">
+					<button id="logout-all-users-btn" class="btn btn-reset">Log out all users</button>
+				</div>
+				<div class="dev-tools-actions-row">
 					<button id="reset-all-btn" class="btn btn-reset">Reset all</button>
 				</div>
 			</div>

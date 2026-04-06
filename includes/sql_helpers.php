@@ -273,6 +273,10 @@ function resetUserWidgetPreferencesTable(PDO $pdo) {
 	return $seededCount;
 }
 
+function resetUserSessionsTable(PDO $pdo) {
+	$pdo->exec('TRUNCATE TABLE user_sessions');
+}
+
 function resetRecordsTableToSample(PDO $pdo) {
 	$sampleItems = [
 		['title' => 'Sample Entry 1', 'description' => 'This is a test entry to demonstrate the system.'],

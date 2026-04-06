@@ -1054,6 +1054,14 @@ function setupDevToolsMaintenanceHandlers() {
 			successMessage: 'The notifications table has been reset successfully.'
 		},
 		{
+			buttonId: '#logout-all-users-btn',
+			action: 'logout_all_users',
+			confirmTitle: 'Log out all users?',
+			confirmMessage: 'This will revoke all sessions and force every user to sign in again.',
+			successTitle: 'All Users Logged Out',
+			successMessage: 'All user sessions were reset successfully.'
+		},
+		{
 			buttonId: '#reset-all-btn',
 			action: 'reset_all',
 			confirmTitle: 'Reset all?',
@@ -1098,6 +1106,7 @@ function setupDevToolsMaintenanceHandlers() {
 									if (typeof loadHeaderMetrics === 'function') {
 										loadHeaderMetrics();
 									}
+									const shouldRedirectToLogin = cfg.action === 'logout_all_users';
 									showToast({
 										type: 'success',
 										title: cfg.successTitle,
@@ -1105,6 +1114,10 @@ function setupDevToolsMaintenanceHandlers() {
 										showOkayButton: true,
 										autoCloseMs: 3000,
 										onClose: function() {
+											if (shouldRedirectToLogin) {
+												window.location.href = 'login.php';
+												return;
+											}
 											window.location.reload();
 										}
 									});
