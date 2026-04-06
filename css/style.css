@@ -2467,6 +2467,28 @@ body.dark-mode .user-dropdown-signout:hover {
     margin-bottom: 14px;
 }
 
+.dev-tools-card {
+    max-width: 720px;
+    margin-bottom: 22px;
+}
+
+.dev-tool-module {
+    max-width: 720px;
+    margin-bottom: 22px;
+}
+
+.dev-tool-module[hidden] {
+    display: none !important;
+}
+
+.dev-tools-actions-row {
+    max-width: 220px;
+}
+
+.dev-tools-actions-row + .dev-tools-actions-row {
+    margin-top: 10px;
+}
+
 body.dark-mode .account-card {
     background: #2a2a2a;
     border-color: #3d3d3d;

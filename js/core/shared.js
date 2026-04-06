@@ -1004,6 +1004,58 @@ function setupResetNotificationsTableHandler() {
 }
 
 
+function setupDevToolsCategorySelector() {
+	const $selector = $('#dev-tools-system-selector');
+	if ($selector.length === 0) {
+		return;
+	}
+
+	const $modules = $('.dev-tool-module');
+	if ($modules.length === 0) {
+		return;
+	}
+
+	const devToolsCategoryStorageKey = 'dev-tools-selected-category';
+	const allowedCategories = $selector.find('option').map(function() {
+		return String($(this).val() || '').toLowerCase();
+	}).get();
+
+	const normalizeCategory = function(value) {
+		const normalized = String(value || '').toLowerCase();
+		return allowedCategories.indexOf(normalized) !== -1 ? normalized : '';
+	};
+
+	const applyCategory = function(category) {
+		$modules.each(function() {
+			const $module = $(this);
+			const moduleCategory = String($module.data('devToolCategory') || '').toLowerCase();
+			const shouldShow = moduleCategory === String(category || '').toLowerCase();
+
+			if (shouldShow) {
+				$module.removeAttr('hidden').removeClass('hidden');
+			} else {
+				$module.attr('hidden', 'hidden').addClass('hidden');
+			}
+		});
+	};
+
+	$selector.on('change', function() {
+		const selectedCategory = normalizeCategory($(this).val());
+		if (selectedCategory !== '') {
+			localStorage.setItem(devToolsCategoryStorageKey, selectedCategory);
+			applyCategory(selectedCategory);
+		}
+	});
+
+	const storedCategory = normalizeCategory(localStorage.getItem(devToolsCategoryStorageKey));
+	const initialCategory = storedCategory !== '' ? storedCategory : normalizeCategory($selector.val());
+	if (initialCategory !== '') {
+		$selector.val(initialCategory);
+		applyCategory(initialCategory);
+	}
+}
+
+
 function loadData(callback) {
 	$.ajax({
 		url: '../api.php',

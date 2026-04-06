@@ -136,7 +136,19 @@ try {
 	<main class="main-content">
 		<section class="content-section active">
 			<h2>Dev Tools</h2>
-			<div class="account-card">
+			<div class="account-card dev-tools-card">
+				<h3>Tool Category</h3>
+				<p>Select a system category to load its available tools below.</p>
+				<div class="form-group">
+					<label for="dev-tools-system-selector">System</label>
+					<select id="dev-tools-system-selector" name="dev_tools_system">
+						<option value="notifications">Notifications</option>
+						<option value="system" selected>System</option>
+					</select>
+				</div>
+			</div>
+
+			<div class="account-card dev-tool-module" data-dev-tool-category="notifications" hidden>
 				<h3>Create Notification</h3>
 				<p>Send a test notification to a selected user for validation and QA.</p>
 
@@ -203,14 +215,20 @@ try {
 						<button type="submit" class="btn btn-primary">Send Notification</button>
 					</div>
 				</form>
+			</div>
 
-				<div class="account-card" style="margin-top: 30px;">
-					<h3>Maintenance Tools</h3>
-					<p>Reset the notifications table for a fresh start.</p>
-					<div style="max-width: 200px;">
-						<button id="reset-notif-table-btn" class="btn btn-reset">Reset Notification Table</button>
-					</div>
+			<div class="account-card dev-tool-module" data-dev-tool-category="system">
+				<h3>Maintenance Tools</h3>
+				<p>Run maintenance actions like table cleanup and full demo reset.</p>
+				<div class="dev-tools-actions-row">
+					<button id="reset-notif-table-btn" class="btn btn-reset">Reset Notification Table</button>
 				</div>
+				<?php if (APP_MODE === 'demo'): ?>
+				<div class="dev-tools-actions-row">
+					<button id="reset-data-btn" class="btn btn-reset">Reset Audit/Acitivty/Records</button>
+				</div>
+				<?php endif; ?>
+			</div>
 			</section>
 		</main>
 

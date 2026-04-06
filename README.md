@@ -11,7 +11,8 @@ test-dashboard/
 │   ├── home.php           # Home/Welcome page with project overview
 │   ├── data.php           # Data management page (CRUD operations)
 │   ├── reports.php        # Reports & analytics with PDF/CSV export
-│   └── audit.php          # Audit trail history viewer
+│   ├── audit.php          # Audit trail history viewer
+│   └── dev-tools.php      # Modular dev tools with category-based utilities
 ├── includes/
 │   ├── header.php         # HTML head and fixed-height title bar
 │   ├── navigation.php     # Fixed left sidebar with scroll-safe navigation and utility controls
@@ -84,6 +85,14 @@ test-dashboard/
 - **Change Classification**: Clearly identifies ADD, EDIT, or DELETE operations
 - **Record Linking**: Associates changes with their respective record IDs
 
+### 🛠️ Dev Tools Page
+- **Category Selector**: Choose between `System` and `Notifications` to load only relevant tools
+- **Default Category**: `System` is selected by default
+- **System Tools**:
+  - `Reset Notification Table` maintenance action
+  - `Reset Audit/Acitivty/Records` full demo reset button (visible in demo mode)
+- **Notifications Tools**: Includes the `Create Notification` test form for QA flows
+
 ### 📌 Header Analytics Widgets
 - **Total Entries**: Live count of records in SQL
 - **Total Edits**: Total number of EDIT events in audit history
@@ -116,8 +125,8 @@ test-dashboard/
 - **Default Behavior**: Demo mode resets on index visit; production mode does not
 
 ### 🔄 Reset Data Functionality
-- **Reset Button**: Located in navigation sidebar, below the theme toggle
-- **Bottom Utility Area**: Anchored with the theme toggle in a dedicated sidebar footer section
+- **Reset Button Location**: Located on Dev Tools page under `System` category
+- **Button Label**: `Reset Audit/Acitivty/Records`
 - **Complete Reset**: Clears all entries, logs, and audit trail
 - **Fresh Start**: Restores 3 sample test entries for demonstration
 - **Toast Confirmation Prompt**: Uses custom top-center prompt with action buttons (Cancel/Reset)
@@ -202,10 +211,11 @@ test-dashboard/
 - **pages/data.php**: Data management interface with CRUD operations and bulk delete selection
 - **pages/reports.php**: Report generation with multiple export options
 - **pages/audit.php**: Audit trail viewer with search, plus table/timeline display toggle
+- **pages/dev-tools.php**: Category-driven maintenance and QA utilities (`System` default, `Notifications` optional)
 
 #### Include Files (Reusable Components)
 - **includes/header.php**: HTML head tags and fixed-height title bar
-- **includes/navigation.php**: Fixed left sidebar with independent menu scrolling and bottom utility controls
+- **includes/navigation.php**: Fixed left sidebar with independent menu scrolling and theme toggle utility controls
 - **includes/footer.php**: Closing HTML tags and page-aware script includes, including PDF library loading for Reports and Data pages
 
 #### Backend
@@ -346,11 +356,13 @@ Auth usage pattern for every POST endpoint:
 3. Theme preference saves automatically and persists across pages
 
 ### Reset Data
-1. Click the "Reset Data" button in the navigation sidebar (below the theme toggle)
-2. Confirm the action in the custom top-center toast prompt
-3. All entries, logs, and audit trail are cleared
-4. Dashboard restores 3 sample test entries for a fresh start
-5. Page automatically reloads with reset data
+1. Go to Dev Tools page
+2. Select `System` in the category dropdown (default)
+3. Click `Reset Audit/Acitivty/Records`
+4. Confirm the action in the custom top-center toast prompt
+5. All entries, logs, and audit trail are cleared
+6. Dashboard restores 3 sample test entries for a fresh start
+7. Page automatically reloads with reset data
 
 ### Toast Notifications
 1. Add or edit a record on the Data page
@@ -452,6 +464,7 @@ Auth usage pattern for every POST endpoint:
 - ✅ **Transactional SQL Writes** for multi-step operations
 - ✅ **Deployable Environment Modes** (`demo` and `production`) with configurable index reset behavior
 - ✅ **Modular JavaScript Loading** with shared core + page-specific feature modules
+- ✅ **Modular Dev Tools Page** with category-based utility rendering and `System` as default selection
 - ✅ **Mobile Responsive Shell** with phone-first layout overrides for header, navigation, controls, and content flow
 - ✅ **Small-Screen Table Handling** with touch scrolling support and safer table sizing
 
@@ -469,7 +482,6 @@ Auth usage pattern for every POST endpoint:
 - ✅ Audit Trail supports both Table and Timeline views
 - ✅ Data-page filtered exports log export events and include the full filtered/sorted dataset returned by the backend export endpoint
 - ✅ Data page rows-per-page preference persists across reloads
-- ✅ Legacy monolithic `js/script.js` has been retired in favor of modular files
 - ✅ For real phone testing on a local server, open the app using your computer's LAN IP (not `localhost`)
 
 ## Maintenance & Customization

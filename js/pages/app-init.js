@@ -2,6 +2,7 @@ $(document).ready(function() {
 	initializeTheme();
 	setupResetButtonHandler();
 	setupResetNotificationsTableHandler();
+	setupDevToolsCategorySelector();
 	setupNotificationDropdown();
 	setupUserAvatarDropdown();
 	setupGlobalAjaxSessionGuard();
