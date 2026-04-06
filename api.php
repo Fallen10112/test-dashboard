@@ -733,7 +733,7 @@ if ($method === 'POST') {
 			'record_type' => 'notification',
 			'record_id' => (int)$created['id'],
 			'action' => 'notification_sent',
-			'details' => 'Notification sent by user #' . $userId . ' to user #' . $userId . ': ' . substr((string)($data['title'] ?? 'Notification'), 0, 160),
+			'details' => 'Notification (' . substr((string)($data['title'] ?? ''), 0, 160) . '): Sent by user #' . $userId . ' to user #' . $userId,
 			'actor_user_id' => $userId,
 			'target_user_id' => $userId,
 		]);
@@ -779,7 +779,7 @@ if ($method === 'POST') {
 				'record_type' => 'notification',
 				'record_id' => $notificationId,
 				'action' => 'notification_read',
-				'details' => 'Unread -> Read',
+				'details' => 'Notification (' . substr((string)($notification['title'] ?? ''), 0, 160) . '): Unread -> Read',
 				'actor_user_id' => $userId,
 			]);
 
@@ -818,15 +818,13 @@ if ($method === 'POST') {
 			':user_id' => $userId,
 		]);
 
-		if (!empty($pendingSenderRows)) {
-			writeAuditEvent($pdo, [
-				'record_type' => 'notification',
-				'record_id' => null,
-				'action' => 'notification_mark_all_read',
-				'details' => 'Unread notifications present -> All notifications marked read',
-				'actor_user_id' => $userId,
-			]);
-		}
+		writeAuditEvent($pdo, [
+			'record_type' => 'notification',
+			'record_id' => null,
+			'action' => 'notification_mark_all_read',
+			'details' => 'Marked all notifications as read',
+			'actor_user_id' => $userId,
+		]);
 
 		$recipientDisplayName = getApiAuthUserDisplayName();
 		foreach ($pendingSenderRows as $row) {
@@ -879,7 +877,7 @@ if ($method === 'POST') {
 			'record_type' => 'notification',
 			'record_id' => $notificationId,
 			'action' => 'notification_deleted',
-			'details' => 'Notification existed -> Notification deleted',
+			'details' => 'Notification (' . substr((string)($notification['title'] ?? ''), 0, 160) . '): existed -> deleted',
 			'actor_user_id' => $userId,
 		]);
 
@@ -914,15 +912,13 @@ if ($method === 'POST') {
 		$deleteStmt = $pdo->prepare('DELETE FROM notifications WHERE user_id = :user_id');
 		$deleteStmt->execute([':user_id' => $userId]);
 
-		if (!empty($senderRows)) {
-			writeAuditEvent($pdo, [
-				'record_type' => 'notification',
-				'record_id' => null,
-				'action' => 'notification_delete_all',
-				'details' => 'Notifications existed -> All notifications deleted',
-				'actor_user_id' => $userId,
-			]);
-		}
+		writeAuditEvent($pdo, [
+			'record_type' => 'notification',
+			'record_id' => null,
+			'action' => 'notification_delete_all',
+			'details' => 'Deleted all notifications',
+			'actor_user_id' => $userId,
+		]);
 
 		$recipientDisplayName = getApiAuthUserDisplayName();
 		foreach ($senderRows as $row) {

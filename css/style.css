@@ -534,6 +534,22 @@ body {
     background: #e74c3c;
 }
 
+.timeline-dot-green {
+    background: #27ae60;
+}
+
+.timeline-dot-blue {
+    background: #3498db;
+}
+
+.timeline-dot-red {
+    background: #e74c3c;
+}
+
+.timeline-dot-orange {
+    background: #e67e22;
+}
+
 .timeline-card {
     background: #ffffff;
     border: 1px solid #e4e8f0;
@@ -1018,6 +1034,22 @@ body {
 
 .badge-delete {
     background: #e74c3c;
+}
+
+.badge-green {
+    background: #27ae60;
+}
+
+.badge-blue {
+    background: #3498db;
+}
+
+.badge-red {
+    background: #e74c3c;
+}
+
+.badge-orange {
+    background: #e67e22;
 }
 
 

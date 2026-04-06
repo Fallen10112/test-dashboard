@@ -104,7 +104,7 @@ try {
 						'record_type' => 'notification',
 						'record_id' => (int)$pdo->lastInsertId(),
 						'action' => 'notification_sent',
-						'details' => 'Queued -> Sent | From ' . $senderLabel . ' to ' . $recipientLabel . ': ' . substr($title !== '' ? $title : 'Notification', 0, 160),
+						'details' => 'Notification (' . substr($title !== '' ? $title : '', 0, 160) . '): Sent | From ' . $senderLabel . ' to ' . $recipientLabel,
 						'actor_user_id' => $currentUserId > 0 ? $currentUserId : null,
 						'target_user_id' => $recipientUserId,
 					]);
