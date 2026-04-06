@@ -19,6 +19,7 @@ let sessionPollFnRef = null;
 let sessionVisibilityHandlerRef = null;
 
 
+let headerNotifications = [];
 function setupUserAvatarDropdown() {
 	const btn = document.getElementById('user-avatar-btn');
 	const dropdown = document.getElementById('user-dropdown');
@@ -32,7 +33,7 @@ function setupUserAvatarDropdown() {
 	});
 
 	document.addEventListener('click', function(e) {
-		if (!dropdown.hidden && !dropdown.contains(e.target) && e.target !== btn) {
+		if (!dropdown.hidden && !dropdown.contains(e.target) && !btn.contains(e.target)) {
 			dropdown.hidden = true;
 			btn.setAttribute('aria-expanded', 'false');
 		}
@@ -235,6 +236,123 @@ function setupGlobalAjaxSessionGuard() {
 	$(document).off('ajaxError.sessionGuard').on('ajaxError.sessionGuard', function(event, xhr) {
 		handleSessionAuthFailure(xhr);
 	});
+}
+
+
+function renderHeaderNotifications() {
+	const listEl = document.getElementById('notifications-list');
+	const countEl = document.getElementById('notifications-count');
+	if (!listEl || !countEl) {
+		return;
+	}
+
+	listEl.innerHTML = '';
+
+	if (!Array.isArray(headerNotifications) || headerNotifications.length === 0) {
+		const emptyEl = document.createElement('div');
+		emptyEl.className = 'notifications-empty';
+		emptyEl.textContent = 'No notifications.';
+		listEl.appendChild(emptyEl);
+		countEl.textContent = '';
+		countEl.hidden = true;
+		return;
+	}
+
+	headerNotifications.forEach(function(notification) {
+		const itemEl = document.createElement('div');
+		itemEl.className = 'notification-item';
+
+		const titleEl = document.createElement('div');
+		titleEl.className = 'notification-item-title';
+		titleEl.textContent = String(notification.title || 'Notification');
+
+		const messageEl = document.createElement('div');
+		messageEl.className = 'notification-item-message';
+		messageEl.textContent = String(notification.message || '');
+
+		itemEl.appendChild(titleEl);
+		itemEl.appendChild(messageEl);
+		listEl.appendChild(itemEl);
+	});
+
+	const count = headerNotifications.length;
+	countEl.textContent = String(count > 99 ? '99+' : count);
+	countEl.hidden = count === 0;
+}
+
+
+function setHeaderNotifications(notifications) {
+	if (!Array.isArray(notifications)) {
+		headerNotifications = [];
+		renderHeaderNotifications();
+		return;
+	}
+
+	headerNotifications = notifications
+		.filter(function(item) {
+			return item && (item.title || item.message);
+		})
+		.map(function(item) {
+			return {
+				title: String(item.title || 'Notification'),
+				message: String(item.message || '')
+			};
+		});
+
+	renderHeaderNotifications();
+}
+
+
+function setupNotificationDropdown() {
+	const btn = document.getElementById('notifications-btn');
+	const dropdown = document.getElementById('notifications-dropdown');
+	if (!btn || !dropdown) {
+		return;
+	}
+
+	renderHeaderNotifications();
+
+	btn.addEventListener('click', function(e) {
+		e.stopPropagation();
+		const isOpen = !dropdown.hidden;
+		dropdown.hidden = isOpen;
+		btn.setAttribute('aria-expanded', String(!isOpen));
+	});
+
+	document.addEventListener('click', function(e) {
+		if (!dropdown.hidden && !dropdown.contains(e.target) && !btn.contains(e.target)) {
+			dropdown.hidden = true;
+			btn.setAttribute('aria-expanded', 'false');
+		}
+	});
+
+	document.addEventListener('keydown', function(e) {
+		if (e.key === 'Escape' && !dropdown.hidden) {
+			dropdown.hidden = true;
+			btn.setAttribute('aria-expanded', 'false');
+			btn.focus();
+		}
+	});
+
+	window.DashboardNotifications = {
+		set: function(items) {
+			setHeaderNotifications(items);
+		},
+		add: function(item) {
+			if (!item || (!item.title && !item.message)) {
+				return;
+			}
+			headerNotifications.unshift({
+				title: String(item.title || 'Notification'),
+				message: String(item.message || '')
+			});
+			renderHeaderNotifications();
+		},
+		clear: function() {
+			headerNotifications = [];
+			renderHeaderNotifications();
+		}
+	};
 }
 
 

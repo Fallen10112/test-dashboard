@@ -1725,6 +1725,182 @@ body.dark-mode .custom-toast-message {
     flex-shrink: 0;
 }
 
+.notifications-wrap {
+    position: relative;
+    flex-shrink: 0;
+}
+
+.notifications-btn {
+    position: relative;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    color: #ffffff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+    user-select: none;
+    padding: 0;
+}
+
+.notifications-btn:hover {
+    background: rgba(255, 255, 255, 0.34);
+    border-color: rgba(255, 255, 255, 0.7);
+    transform: scale(1.06);
+}
+
+.notifications-btn[aria-expanded="true"] {
+    background: rgba(255, 255, 255, 0.38);
+    border-color: #ffffff;
+}
+
+.notifications-bell {
+    font-size: 1.05em;
+    line-height: 1;
+}
+
+.notifications-count {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    background: #ef4444;
+    color: #ffffff;
+    font-size: 0.7em;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 5px;
+    border: 1px solid rgba(255, 255, 255, 0.85);
+}
+
+.notifications-count[hidden] {
+    display: none;
+}
+
+.notifications-dropdown {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    width: min(360px, 90vw);
+    max-height: 380px;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+    z-index: 2000;
+    overflow: hidden;
+    animation: dropdownFadeIn 0.15s ease;
+}
+
+.notifications-dropdown[hidden] {
+    display: none;
+}
+
+.notifications-dropdown-header {
+    padding: 12px 14px 10px;
+}
+
+.notifications-dropdown-title {
+    font-size: 0.9em;
+    font-weight: 700;
+    color: #1f2937;
+}
+
+.notifications-dropdown-divider {
+    height: 1px;
+    background: #f3f4f6;
+}
+
+.notifications-list {
+    max-height: 320px;
+    overflow-y: auto;
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.notifications-empty {
+    padding: 14px 10px;
+    color: #6b7280;
+    font-size: 0.88em;
+    text-align: center;
+}
+
+.notification-item {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 10px;
+    background: #ffffff;
+}
+
+.notification-item-title {
+    font-size: 0.86em;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 4px;
+}
+
+.notification-item-message {
+    font-size: 0.82em;
+    color: #4b5563;
+    line-height: 1.4;
+}
+
+body.dark-mode .notifications-btn {
+    background: rgba(0, 0, 0, 0.24);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+body.dark-mode .notifications-btn:hover {
+    background: rgba(0, 0, 0, 0.34);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+body.dark-mode .notifications-btn[aria-expanded="true"] {
+    background: rgba(0, 0, 0, 0.42);
+    border-color: rgba(255, 255, 255, 0.6);
+}
+
+body.dark-mode .notifications-dropdown {
+    background: #2a2a2a;
+    border-color: #3d3d3d;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+body.dark-mode .notifications-dropdown-title {
+    color: #e0e0e0;
+}
+
+body.dark-mode .notifications-dropdown-divider {
+    background: #3d3d3d;
+}
+
+body.dark-mode .notifications-empty {
+    color: #9ca3af;
+}
+
+body.dark-mode .notification-item {
+    background: #252525;
+    border-color: #3d3d3d;
+}
+
+body.dark-mode .notification-item-title {
+    color: #f3f4f6;
+}
+
+body.dark-mode .notification-item-message {
+    color: #d1d5db;
+}
+
 .user-avatar-btn {
     width: 38px;
     height: 38px;

@@ -50,6 +50,30 @@ $pageTitle = "Dashboard Showcase";
 				</div>
 			</div>
 
+			<div class="notifications-wrap" id="notifications-wrap">
+				<button
+					class="notifications-btn"
+					id="notifications-btn"
+					aria-expanded="false"
+					aria-haspopup="true"
+					aria-label="Open notifications"
+					title="Notifications"
+				>
+					<span class="notifications-bell" aria-hidden="true">&#128276;</span>
+					<span class="notifications-count" id="notifications-count" hidden>0</span>
+				</button>
+
+				<div class="notifications-dropdown" id="notifications-dropdown" hidden>
+					<div class="notifications-dropdown-header">
+						<span class="notifications-dropdown-title">Notifications</span>
+					</div>
+					<div class="notifications-dropdown-divider"></div>
+					<div class="notifications-list" id="notifications-list" role="list" aria-live="polite">
+						<div class="notifications-empty">No notifications.</div>
+					</div>
+				</div>
+			</div>
+
 			<div class="user-avatar-wrap" id="user-avatar-wrap">
 				<button
 					class="user-avatar-btn"
