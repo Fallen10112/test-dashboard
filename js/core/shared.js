@@ -1038,6 +1038,14 @@ function setupDevToolsMaintenanceHandlers() {
 			successMessage: 'The records table has been reset to 3 sample entries.'
 		},
 		{
+			buttonId: '#reset-widget-prefs-btn',
+			action: 'reset_widget_prefs',
+			confirmTitle: 'Reset Widget Prefs?',
+			confirmMessage: 'This will reset user_widget_preferences and reseed default widgets for all users.',
+			successTitle: 'Widget Prefs Reset',
+			successMessage: 'Widget preferences have been reset to defaults for all users.'
+		},
+		{
 			buttonId: '#reset-notif-table-btn',
 			action: 'reset_notifications_table',
 			confirmTitle: 'Reset Notifications Table?',
@@ -1129,15 +1137,19 @@ function setupDevToolsUserManagementHandlers() {
 	const $updateButton = $('#dev-users-update-btn');
 	const $deleteDetectButton = $('#dev-users-delete-detect-btn');
 	const $deleteButton = $('#dev-users-delete-btn');
+	const $widgetResetDetectButton = $('#dev-users-widget-reset-detect-btn');
+	const $widgetResetButton = $('#dev-users-widget-reset-btn');
 
-	if ($createButton.length === 0 && $updateDetectButton.length === 0 && $deleteDetectButton.length === 0) {
+	if ($createButton.length === 0 && $updateDetectButton.length === 0 && $deleteDetectButton.length === 0 && $widgetResetDetectButton.length === 0) {
 		return;
 	}
 
 	let updateTargetUserId = 0;
 	let deleteTargetUserId = 0;
+	let widgetResetTargetUserId = 0;
 	let updateDetectedLabel = '';
 	let deleteDetectedLabel = '';
+	let widgetResetDetectedLabel = '';
 	const currentUserId = parseInt($('#dev-tools-current-user-id').val(), 10) || 0;
 
 	const setInlineResult = function(selector, message, isError) {
@@ -1201,6 +1213,14 @@ function setupDevToolsUserManagementHandlers() {
 		deleteDetectedLabel = '';
 		$deleteButton.prop('disabled', true);
 		setInlineResult('#dev-users-delete-detected', '', false);
+	});
+
+	$('#dev-users-widget-reset-lookup').on('input', function() {
+		widgetResetTargetUserId = 0;
+		widgetResetDetectedLabel = '';
+		$widgetResetButton.prop('disabled', true);
+		setInlineResult('#dev-users-widget-reset-detected', '', false);
+		setInlineResult('#dev-users-widget-reset-result', '', false);
 	});
 
 	const lookupUser = function(lookupValue, onSuccess, onError) {
@@ -1397,6 +1417,60 @@ function setupDevToolsUserManagementHandlers() {
 									? xhr.responseJSON.message
 									: 'Failed to force delete user.';
 								setInlineResult('#dev-users-delete-result', message, true);
+							});
+					}
+				}
+			]
+		});
+	});
+
+	$widgetResetDetectButton.on('click', function() {
+		setInlineResult('#dev-users-widget-reset-result', '', false);
+		lookupUser($('#dev-users-widget-reset-lookup').val(), function(user) {
+			widgetResetTargetUserId = parseInt(user.id, 10) || 0;
+			widgetResetDetectedLabel = userLabel(user);
+			$widgetResetButton.prop('disabled', widgetResetTargetUserId < 1);
+			setInlineResult('#dev-users-widget-reset-detected', widgetResetDetectedLabel, false);
+		}, function(message) {
+			widgetResetTargetUserId = 0;
+			widgetResetDetectedLabel = '';
+			$widgetResetButton.prop('disabled', true);
+			setInlineResult('#dev-users-widget-reset-detected', message, true);
+		});
+	});
+
+	$widgetResetButton.on('click', function() {
+		if (widgetResetTargetUserId < 1) {
+			setInlineResult('#dev-users-widget-reset-result', 'Detect a user before resetting widget preferences.', true);
+			return;
+		}
+
+		showToast({
+			type: 'warning',
+			title: 'Reset Widget Preferences?',
+			message: (widgetResetDetectedLabel !== '' ? widgetResetDetectedLabel + '. ' : '') + 'This resets this user to default widget visibility.',
+			autoCloseMs: 0,
+			buttons: [
+				{ label: 'Cancel', className: 'btn-secondary' },
+				{
+					label: 'Reset',
+					className: 'btn-danger',
+					onClick: function() {
+						apiPost('admin_user_reset_widget_prefs', { user_id: widgetResetTargetUserId })
+							.done(function(response) {
+								if (!response || !response.success) {
+									setInlineResult('#dev-users-widget-reset-result', 'Failed to reset widget preferences.', true);
+									return;
+								}
+
+								setInlineResult('#dev-users-widget-reset-result', 'Widget preferences reset. ' + widgetResetDetectedLabel, false);
+							}
+							)
+							.fail(function(xhr) {
+								const message = xhr && xhr.responseJSON && xhr.responseJSON.message
+									? xhr.responseJSON.message
+									: 'Failed to reset widget preferences.';
+								setInlineResult('#dev-users-widget-reset-result', message, true);
 							});
 					}
 				}

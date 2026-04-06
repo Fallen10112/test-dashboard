@@ -325,8 +325,10 @@ function createDevToolsUser(PDO $pdo, $email, $username, $displayName, $status) 
 	$passwordPlain = generateRandomPasswordPlaintext(16);
 	$passwordHash = password_hash($passwordPlain, PASSWORD_BCRYPT, ['cost' => 12]);
 	$now = getDashboardSqlTimestamp();
+	$userId = 0;
 
 	try {
+		$pdo->beginTransaction();
 		$stmt = $pdo->prepare(
 			'INSERT INTO users (email, username, password_hash, display_name, status, created_at, updated_at, deleted_at)
 			 VALUES (:email, :username, :password_hash, :display_name, :status, :created_at, :updated_at, NULL)'
@@ -340,11 +342,17 @@ function createDevToolsUser(PDO $pdo, $email, $username, $displayName, $status) 
 			':created_at' => $now,
 			':updated_at' => $now,
 		]);
+
+		$userId = (int)$pdo->lastInsertId();
+		ensureDefaultHeaderWidgetPreferencesForUser($pdo, $userId);
+		$pdo->commit();
 	} catch (Throwable $e) {
+		if ($pdo->inTransaction()) {
+			$pdo->rollBack();
+		}
 		return ['success' => false, 'message' => 'Failed to create user (email/username may already exist)'];
 	}
 
-	$userId = (int)$pdo->lastInsertId();
 	return [
 		'success' => true,
 		'user_id' => $userId,
@@ -1094,6 +1102,27 @@ if ($method === 'POST') {
 		respondJson(200, ['success' => true, 'message' => 'Records table reset successfully']);
 	}
 
+	if ($postAction === 'reset_widget_prefs') {
+		$userId = getApiAuthUserId();
+		try {
+			$seededCount = (int)resetUserWidgetPreferencesTable($pdo);
+			writeAuditEvent($pdo, [
+				'record_type' => 'users',
+				'record_id' => null,
+				'action' => 'reset',
+				'details' => 'user_widget_preferences reset and reseeded for ' . $seededCount . ' users',
+				'source_user_id' => $userId,
+			]);
+			respondJson(200, [
+				'success' => true,
+				'message' => 'Widget preferences reset to defaults for ' . $seededCount . ' users',
+				'seeded_users' => $seededCount,
+			]);
+		} catch (Throwable $e) {
+			respondJson(500, ['success' => false, 'message' => 'Failed to reset widget preferences table']);
+		}
+	}
+
 	if ($postAction === 'reset_all') {
 		$userId = getApiAuthUserId();
 		try {
@@ -1240,6 +1269,36 @@ if ($method === 'POST') {
 			'success' => true,
 			'message' => 'User force deleted successfully',
 			'deleted_user' => $result['deleted_user'],
+		]);
+	}
+
+	if ($postAction === 'admin_user_reset_widget_prefs') {
+		$actorUserId = getApiAuthUserId();
+		enforceApiRateLimit('admin_user_reset_widget_prefs_' . $actorUserId, 30, 60);
+		$targetId = isset($data['user_id']) ? (int)$data['user_id'] : 0;
+		if ($targetId < 1) {
+			respondJson(400, ['success' => false, 'message' => 'A valid user id is required']);
+		}
+
+		$targetUser = getUserByIdOrUsername($pdo, (string)$targetId);
+		if (!$targetUser) {
+			respondJson(404, ['success' => false, 'message' => 'User not found']);
+		}
+
+		$updated = updateHeaderWidgetPreferences($pdo, $targetId, getDefaultHeaderWidgetPreferences());
+		writeAuditEvent($pdo, [
+			'record_type' => 'users',
+			'record_id' => $targetId,
+			'action' => 'reset',
+			'details' => 'Widget preferences reset to defaults for user #' . $targetId,
+			'source_user_id' => $actorUserId,
+		]);
+
+		respondJson(200, [
+			'success' => true,
+			'message' => 'Widget preferences reset for selected user',
+			'user' => $targetUser,
+			'widgets' => $updated['widgets'] ?? getDefaultHeaderWidgetPreferences(),
 		]);
 	}
 

@@ -231,6 +231,9 @@ try {
 					<button id="reset-records-btn" class="btn btn-reset">Reset Records</button>
 				</div>
 				<div class="dev-tools-actions-row">
+					<button id="reset-widget-prefs-btn" class="btn btn-reset">Reset Widget Prefs</button>
+				</div>
+				<div class="dev-tools-actions-row">
 					<button id="reset-notif-table-btn" class="btn btn-reset">Reset Notification Table</button>
 				</div>
 				<div class="dev-tools-actions-row">
@@ -330,6 +333,24 @@ try {
 							<button id="dev-users-delete-btn" type="button" class="btn btn-danger" disabled>Force Delete User</button>
 						</div>
 						<p id="dev-users-delete-result" class="dev-tools-inline-result" hidden></p>
+					</div>
+				</div>
+
+				<div class="dev-tools-user-section">
+					<h4>Reset Widget Preferences</h4>
+					<div class="account-form" autocomplete="off">
+						<div class="form-group">
+							<label for="dev-users-widget-reset-lookup">Lookup (username or id)</label>
+							<input type="text" id="dev-users-widget-reset-lookup" maxlength="100" placeholder="e.g. 12 or johndoe">
+						</div>
+						<div class="form-actions">
+							<button id="dev-users-widget-reset-detect-btn" type="button" class="btn btn-secondary">Detect User</button>
+						</div>
+						<p id="dev-users-widget-reset-detected" class="dev-tools-inline-result" hidden></p>
+						<div class="form-actions">
+							<button id="dev-users-widget-reset-btn" type="button" class="btn btn-primary" disabled>Reset Widget Preferences</button>
+						</div>
+						<p id="dev-users-widget-reset-result" class="dev-tools-inline-result" hidden></p>
 					</div>
 				</div>
 			</div>

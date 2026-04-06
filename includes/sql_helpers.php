@@ -217,6 +217,62 @@ function resetAuditLogEntries(PDO $pdo) {
 	$pdo->exec('TRUNCATE TABLE audit_log');
 }
 
+function resetUserWidgetPreferencesTable(PDO $pdo) {
+	ensureUserWidgetPreferencesSchema($pdo);
+	$defaultWidgets = [
+		'total_entries' => true,
+		'total_edits' => true,
+		'adds_today' => true,
+		'deletes_today' => true,
+		'local_time' => true,
+	];
+	$defaultJson = json_encode($defaultWidgets);
+	if (!is_string($defaultJson) || $defaultJson === '') {
+		$defaultJson = '{}';
+	}
+
+	$seededCount = 0;
+	$now = getDashboardSqlTimestamp();
+
+	$pdo->beginTransaction();
+	try {
+		$pdo->exec('TRUNCATE TABLE user_widget_preferences');
+
+		$userIdsStmt = $pdo->query('SELECT id FROM users WHERE deleted_at IS NULL ORDER BY id ASC');
+		$userRows = $userIdsStmt ? $userIdsStmt->fetchAll() : [];
+
+		if (is_array($userRows) && !empty($userRows)) {
+			$insertStmt = $pdo->prepare(
+				'INSERT INTO user_widget_preferences (user_id, widgets_json, created_at, updated_at)
+				 VALUES (:user_id, :widgets_json, :created_at, :updated_at)'
+			);
+
+			foreach ($userRows as $row) {
+				$userId = (int)($row['id'] ?? 0);
+				if ($userId < 1) {
+					continue;
+				}
+				$insertStmt->execute([
+					':user_id' => $userId,
+					':widgets_json' => $defaultJson,
+					':created_at' => $now,
+					':updated_at' => $now,
+				]);
+				$seededCount += 1;
+			}
+		}
+
+		$pdo->commit();
+	} catch (Throwable $e) {
+		if ($pdo->inTransaction()) {
+			$pdo->rollBack();
+		}
+		throw $e;
+	}
+
+	return $seededCount;
+}
+
 function resetRecordsTableToSample(PDO $pdo) {
 	$sampleItems = [
 		['title' => 'Sample Entry 1', 'description' => 'This is a test entry to demonstrate the system.'],
