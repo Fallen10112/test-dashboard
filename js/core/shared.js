@@ -1628,10 +1628,11 @@ function setupDevToolsCategorySelector() {
 	};
 
 	const applyCategory = function(category) {
+		const normalizedCategory = String(category || '').toLowerCase();
 		$modules.each(function() {
 			const $module = $(this);
-			const moduleCategory = String($module.data('devToolCategory') || '').toLowerCase();
-			const shouldShow = moduleCategory === String(category || '').toLowerCase();
+			const moduleCategory = String($module.attr('data-dev-tool-category') || '').toLowerCase();
+			const shouldShow = moduleCategory === normalizedCategory;
 
 			if (shouldShow) {
 				$module.removeAttr('hidden').removeClass('hidden');
@@ -1650,9 +1651,13 @@ function setupDevToolsCategorySelector() {
 	});
 
 	const storedCategory = normalizeCategory(localStorage.getItem(devToolsCategoryStorageKey));
-	const initialCategory = storedCategory !== '' ? storedCategory : normalizeCategory($selector.val());
+	const selectedCategory = normalizeCategory($selector.val());
+	const initialCategory = storedCategory !== ''
+		? storedCategory
+		: (selectedCategory !== '' ? selectedCategory : 'system');
 	if (initialCategory !== '') {
 		$selector.val(initialCategory);
+		localStorage.setItem(devToolsCategoryStorageKey, initialCategory);
 		applyCategory(initialCategory);
 	}
 }

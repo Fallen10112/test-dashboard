@@ -146,7 +146,7 @@ try {
 				<h3>Tool Category</h3>
 				<p>Select a system category to load its available tools below.</p>
 				<div class="form-group">
-					<label for="dev-tools-system-selector">System</label>
+					<label for="dev-tools-system-selector">Category</label>
 					<select id="dev-tools-system-selector" name="dev_tools_system">
 						<option value="notifications">Notifications</option>
 						<option value="system" selected>System</option>
@@ -192,7 +192,9 @@ try {
 
 					<div class="form-group">
 						<label for="notification-title">Notification Title</label>
-					<input type="text" id="notification-title" name="title" maxlength="64" placeholder="Enter title">
+						<input type="text" id="notification-title" name="title" maxlength="64" placeholder="Enter title">
+					</div>
+
 					<div class="form-group">
 						<label for="notification-message">Notification Message</label>
 						<textarea id="notification-message" name="message" maxlength="1000" required placeholder="Enter notification message"></textarea>
