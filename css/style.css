@@ -92,6 +92,10 @@ body {
     gap: 10px;
 }
 
+.header-metrics[hidden] {
+    display: none !important;
+}
+
 .metric-pill {
     display: flex;
     align-items: center;
@@ -101,6 +105,10 @@ body {
     border-radius: 999px;
     padding: 6px 12px;
     min-width: 96px;
+}
+
+.metric-pill[hidden] {
+    display: none !important;
 }
 
 .metric-label {
@@ -2465,6 +2473,66 @@ body.dark-mode .user-dropdown-signout:hover {
 
 .account-form .form-group {
     margin-bottom: 14px;
+}
+
+.widget-settings-card {
+    max-width: 680px;
+}
+
+.widget-options-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.widget-option-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid #dbe3ef;
+    border-radius: 8px;
+    background: #f9fbff;
+    padding: 12px;
+    cursor: pointer;
+    transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.widget-option-item:hover {
+    border-color: #b8c8e3;
+    background: #f2f7ff;
+}
+
+.widget-option-item input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: #667eea;
+    cursor: pointer;
+}
+
+.widget-option-label {
+    color: #2c3e50;
+    font-weight: 600;
+    font-size: 0.95em;
+}
+
+body.dark-mode .widget-option-item {
+    border-color: #3e4b66;
+    background: #242c3a;
+}
+
+body.dark-mode .widget-option-item:hover {
+    border-color: #5a6f98;
+    background: #293346;
+}
+
+body.dark-mode .widget-option-label {
+    color: #e5e7eb;
+}
+
+@media (max-width: 768px) {
+    .widget-options-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 .dev-tools-card {

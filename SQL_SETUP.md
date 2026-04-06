@@ -30,6 +30,7 @@ Recommended defaults:
 - audit_log: Immutable change tracking table.
 - activity_log: Readable operational events table.
 - notifications: Per-user notification inbox with read state.
+- user_widget_preferences: Per-user header widget visibility preferences.
 - user_sessions: Login session tracking.
 - password_reset_tokens: Password reset flow support.
 
@@ -290,6 +291,27 @@ Recommended indexes:
 - INDEX idx_notifications_user_created (user_id, created_at)
 - INDEX idx_notifications_user_read (user_id, is_read)
 - INDEX idx_notifications_sent_by (sent_by_user_id)
+
+---
+
+## 14) user_widget_preferences
+
+Purpose:
+
+Stores per-user visibility toggles for header analytics widgets.
+
+Columns:
+
+- id (BIGINT UNSIGNED, PK, AUTO_INCREMENT): Preference row ID.
+- user_id (BIGINT UNSIGNED, NOT NULL, FK -> users.id): Preference owner (one row per user).
+- widgets_json (LONGTEXT, NOT NULL): JSON object containing all widget visibility values.
+- created_at (DATETIME, NOT NULL): Preference row creation time.
+- updated_at (DATETIME, NOT NULL): Last update timestamp.
+
+Recommended indexes:
+
+- UNIQUE INDEX uniq_widget_pref_user (user_id)
+- INDEX idx_widget_pref_user (user_id)
 
 ---
 

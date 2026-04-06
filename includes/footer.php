@@ -21,6 +21,9 @@
 	<?php if ($currentPage === 'audit.php'): ?>
 	<script src="../js/features/audit-page.js"></script>
 	<?php endif; ?>
+	<?php if ($currentPage === 'widget-settings.php'): ?>
+	<script src="../js/features/widgets-page.js"></script>
+	<?php endif; ?>
 	<script src="../js/pages/app-init.js"></script>
 </body>
 </html>

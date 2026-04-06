@@ -173,6 +173,7 @@ function getActionBadgeInfo(action) {
 		'delete':                     { label: 'Delete',               color: 'red' },
 		'bulk_delete':                { label: 'Bulk Delete',          color: 'red' },
 		'reset':                      { label: 'Reset',                color: 'orange' },
+		'widget visibility':          { label: 'Widget Visibility',    color: 'blue' },
 		'login':                      { label: 'Login',                color: 'green' },
 		'logout':                     { label: 'Logout',               color: 'red' },
 		'password_change':            { label: 'Change',               color: 'blue' },

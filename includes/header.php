@@ -32,21 +32,25 @@ $pageTitle = "Dashboard Showcase";
 		<h1><?php echo $pageTitle; ?></h1>
 		<div class="title-bar-right">
 			<div class="header-metrics" aria-label="Dashboard analytics">
-				<div class="metric-pill" id="metric-total-entries">
+				<div class="metric-pill" id="metric-total-entries" data-widget-key="total_entries">
 					<span class="metric-label">Entries</span>
 					<span class="metric-value">--</span>
 				</div>
-				<div class="metric-pill" id="metric-total-edits">
+				<div class="metric-pill" id="metric-total-edits" data-widget-key="total_edits">
 					<span class="metric-label">Edits</span>
 					<span class="metric-value">--</span>
 				</div>
-				<div class="metric-pill" id="metric-adds-today">
+				<div class="metric-pill" id="metric-adds-today" data-widget-key="adds_today">
 					<span class="metric-label">Adds Today</span>
 					<span class="metric-value">--</span>
 				</div>
-				<div class="metric-pill" id="metric-deletes-today">
+				<div class="metric-pill" id="metric-deletes-today" data-widget-key="deletes_today">
 					<span class="metric-label">Deletes Today</span>
 					<span class="metric-value">--</span>
+				</div>
+				<div class="metric-pill" id="metric-local-time" data-widget-key="local_time">
+					<span class="metric-label">Local Time</span>
+					<span class="metric-value">--:--</span>
 				</div>
 			</div>
 
@@ -94,6 +98,7 @@ $pageTitle = "Dashboard Showcase";
 					</div>
 					<div class="user-dropdown-divider"></div>
 					<a href="user.php" class="user-dropdown-item">Account Settings</a>
+					<a href="widget-settings.php" class="user-dropdown-item">Widget Settings</a>
 					<a href="dev-tools.php" class="user-dropdown-item">Dev Tools</a>
 					<form method="POST" action="login.php">
 						<input type="hidden" name="action" value="logout">

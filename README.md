@@ -12,6 +12,7 @@ test-dashboard/
 │   ├── data.php           # Data management page (CRUD operations)
 │   ├── reports.php        # Reports & analytics with PDF/CSV export
 │   ├── audit.php          # Audit trail history viewer
+│   ├── widget-settings.php# Per-user header widget visibility controls
 │   └── dev-tools.php      # Modular dev tools with category-based utilities
 ├── includes/
 │   ├── header.php         # HTML head and fixed-height title bar
@@ -98,7 +99,14 @@ test-dashboard/
 - **Total Edits**: Total number of EDIT events in audit history
 - **Adds Today**: Number of records added today
 - **Deletes Today**: Number of records deleted today
+- **Local Time**: Current browser local time in `HH:MM` format
 - **Always Visible**: Displayed in the top-right of the fixed header for quick status checks
+
+### 🧩 Widget Customization (Per User)
+- **Dedicated Page**: `Widget Settings` page allows each user to choose which header widgets are visible
+- **Current Options**: `Entries`, `Edits`, `Adds Today`, `Deletes Today`, `Local Time`
+- **Server-Side Storage**: Preferences are persisted in SQL and loaded on every page request
+- **Cross-Device Sync**: The same account sees the same widget visibility choices on different devices
 
 ### 🎨 Dark Mode Theme
 - **Theme Toggle**: Toggle switch in the bottom-left area of navigation
@@ -211,6 +219,7 @@ test-dashboard/
 - **pages/data.php**: Data management interface with CRUD operations and bulk delete selection
 - **pages/reports.php**: Report generation with multiple export options
 - **pages/audit.php**: Audit trail viewer with search, plus table/timeline display toggle
+- **pages/widget-settings.php**: Per-user header widget visibility controls (4 current widget options)
 - **pages/dev-tools.php**: Category-driven maintenance and QA utilities (`System` default, `Notifications` optional)
 
 #### Include Files (Reusable Components)
@@ -246,6 +255,7 @@ Authentication (required):
 | `GET api.php?action=audit_trail` | Full audit history | none |
 | `GET api.php?action=logs` | Full activity logs | none |
 | `GET api.php?action=notifications` | User notification inbox + unread count | `limit` (optional, max 100) |
+| `GET api.php?action=widget_preferences` | Current user's header widget visibility preferences | none |
 | `GET api.php` | Full raw data payload | none |
 
 Auth usage pattern for every GET endpoint:
@@ -267,6 +277,7 @@ All POST endpoints require `Content-Type: application/json` and JSON body contai
 | `notification_create` | Create one in-app notification for current user | `title` or `message`, optional `type` |
 | `notification_mark_read` | Mark one notification as read | `id` |
 | `notifications_mark_all_read` | Mark all notifications as read for current user | `action` |
+| `widget_preferences_update` | Save current user's header widget visibility settings | `widgets` (object with `total_entries`, `total_edits`, `adds_today`, `deletes_today`, `local_time`) |
 | `reset_data` | Reset data/logs/audit to sample state | `action` |
 
 Auth usage pattern for every POST endpoint:
@@ -309,6 +320,7 @@ Auth usage pattern for every POST endpoint:
 - **activity_log** (SQL table): Administrative activity logs
 - **audit_log** (SQL table): Complete change history
 - **notifications** (SQL table): Per-user in-app notifications with unread/read tracking
+- **user_widget_preferences** (SQL table): One row per user with JSON widget visibility settings
 
 ## Usage Examples
 
@@ -342,7 +354,7 @@ Auth usage pattern for every POST endpoint:
 ### Header Analytics
 1. Look at the top-right of the header bar
 2. Review total entries and total edits
-3. Review adds today and deletes today for quick daily activity insight
+3. Review adds today, deletes today, and local time for quick daily context
 
 ### Generate and Export Reports
 1. Go to Reports page
@@ -467,6 +479,7 @@ Auth usage pattern for every POST endpoint:
 - ✅ **Modular Dev Tools Page** with category-based utility rendering and `System` as default selection
 - ✅ **Mobile Responsive Shell** with phone-first layout overrides for header, navigation, controls, and content flow
 - ✅ **Small-Screen Table Handling** with touch scrolling support and safer table sizing
+- ✅ **Server-Side Widget Preferences** with per-user header widget sync
 
 ## Important Notes
 

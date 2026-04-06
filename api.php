@@ -389,6 +389,132 @@ function createNotification(PDO $pdo, $userId, $title, $message, $type = 'info',
 }
 
 
+function getSupportedHeaderWidgetKeys() {
+	return ['total_entries', 'total_edits', 'adds_today', 'deletes_today', 'local_time'];
+}
+
+
+function getDefaultHeaderWidgetPreferences() {
+	$defaults = [];
+	foreach (getSupportedHeaderWidgetKeys() as $key) {
+		$defaults[$key] = true;
+	}
+	return $defaults;
+}
+
+
+function getHeaderWidgetPreferencesTableName() {
+	return 'user_widget_preferences';
+}
+
+
+function encodeHeaderWidgetPreferencesJson(array $preferences) {
+	$json = json_encode($preferences);
+	return $json === false ? '{}' : $json;
+}
+
+
+function decodeHeaderWidgetPreferencesJson($json) {
+	if (!is_string($json) || trim($json) === '') {
+		return getDefaultHeaderWidgetPreferences();
+	}
+
+	$decoded = json_decode($json, true);
+	if (!is_array($decoded)) {
+		return getDefaultHeaderWidgetPreferences();
+	}
+
+	return normalizeHeaderWidgetPreferencesInput($decoded);
+}
+
+
+function ensureDefaultHeaderWidgetPreferencesForUser(PDO $pdo, $userId) {
+	ensureUserWidgetPreferencesSchema($pdo);
+	$tableName = getHeaderWidgetPreferencesTableName();
+
+	$existsStmt = $pdo->prepare('SELECT id FROM ' . $tableName . ' WHERE user_id = :user_id LIMIT 1');
+	$existsStmt->execute([':user_id' => (int)$userId]);
+	if ($existsStmt->fetch()) {
+		return;
+	}
+
+	$preferences = getDefaultHeaderWidgetPreferences();
+
+	$now = getDashboardSqlTimestamp();
+	$insertStmt = $pdo->prepare(
+		'INSERT INTO ' . $tableName . ' (user_id, widgets_json, created_at, updated_at)
+		 VALUES (:user_id, :widgets_json, :created_at, :updated_at)
+		 ON DUPLICATE KEY UPDATE widgets_json = VALUES(widgets_json), updated_at = VALUES(updated_at)'
+	);
+	$insertStmt->execute([
+		':user_id' => (int)$userId,
+		':widgets_json' => encodeHeaderWidgetPreferencesJson($preferences),
+		':created_at' => $now,
+		':updated_at' => $now,
+	]);
+}
+
+
+function getHeaderWidgetPreferencesPayload(PDO $pdo, $userId) {
+	ensureDefaultHeaderWidgetPreferencesForUser($pdo, $userId);
+	$tableName = getHeaderWidgetPreferencesTableName();
+
+	$stmt = $pdo->prepare(
+		'SELECT widgets_json
+		 FROM ' . $tableName . '
+		 WHERE user_id = :user_id'
+	);
+	$stmt->execute([':user_id' => (int)$userId]);
+	$row = $stmt->fetch();
+	$preferences = decodeHeaderWidgetPreferencesJson((string)($row['widgets_json'] ?? ''));
+
+	return [
+		'success' => true,
+		'widgets' => $preferences,
+	];
+}
+
+
+function normalizeHeaderWidgetPreferencesInput($rawInput) {
+	$defaults = getDefaultHeaderWidgetPreferences();
+	if (!is_array($rawInput)) {
+		return $defaults;
+	}
+
+	$normalized = $defaults;
+	foreach ($defaults as $key => $defaultValue) {
+		$normalized[$key] = !empty($rawInput[$key]);
+	}
+
+	return $normalized;
+}
+
+
+function updateHeaderWidgetPreferences(PDO $pdo, $userId, $rawInput) {
+	$preferences = normalizeHeaderWidgetPreferencesInput($rawInput);
+	ensureUserWidgetPreferencesSchema($pdo);
+	$tableName = getHeaderWidgetPreferencesTableName();
+
+	$stmt = $pdo->prepare(
+		'INSERT INTO ' . $tableName . ' (user_id, widgets_json, created_at, updated_at)
+		 VALUES (:user_id, :widgets_json, :created_at, :updated_at)
+		 ON DUPLICATE KEY UPDATE widgets_json = VALUES(widgets_json), updated_at = VALUES(updated_at)'
+	);
+	$now = getDashboardSqlTimestamp();
+	$stmt->execute([
+		':user_id' => (int)$userId,
+		':widgets_json' => encodeHeaderWidgetPreferencesJson($preferences),
+		':created_at' => $now,
+		':updated_at' => $now,
+	]);
+
+	return [
+		'success' => true,
+		'widgets' => $preferences,
+	];
+}
+
+
 function notifyOriginalSenderOfRecipientAction(PDO $pdo, $recipientUserId, $originalSenderUserId, $recipientDisplayName, $verbPastTense, $originalNotificationTitle = '', $originalNotificationSentAt = '') {
 	$senderId = (int)$originalSenderUserId;
 	$recipientId = (int)$recipientUserId;
@@ -660,6 +786,7 @@ try {
 	$pdo = getDashboardPdo();
 	ensureActivityLogSchema($pdo);
 	ensureAuditLogSchema($pdo);
+	ensureUserWidgetPreferencesSchema($pdo);
 } catch (Throwable $e) {
 	respondJson(500, ['success' => false, 'message' => 'Database connection failed']);
 }
@@ -957,6 +1084,26 @@ if ($method === 'POST') {
 		]);
 	}
 
+	if ($postAction === 'widget_preferences_update') {
+		$userId = getApiAuthUserId();
+		enforceApiRateLimit('widget_preferences_update_' . $userId, 40, 60);
+		$updated = updateHeaderWidgetPreferences($pdo, $userId, $data['widgets'] ?? []);
+
+		writeAuditEvent($pdo, [
+			'record_type' => 'users',
+			'record_id' => null,
+			'action' => 'Widget Visibility',
+			'details' => 'Header widget visibility preferences updated',
+			'source_user_id' => $userId,
+		]);
+
+		respondJson(200, [
+			'success' => true,
+			'message' => 'Widget preferences updated',
+			'widgets' => $updated['widgets'],
+		]);
+	}
+
 	if ($postAction === 'data_create') {
 		$actorUserId = getApiAuthUserId();
 		$title = normalizeRecordText($data['title'] ?? '');
@@ -1206,6 +1353,12 @@ if ($method === 'GET') {
 		$userId = getApiAuthUserId();
 		$limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 25;
 		echo json_encode(getNotificationsPayload($pdo, $userId, $limit));
+		exit;
+	}
+
+	if ($action === 'widget_preferences') {
+		$userId = getApiAuthUserId();
+		echo json_encode(getHeaderWidgetPreferencesPayload($pdo, $userId));
 		exit;
 	}
 

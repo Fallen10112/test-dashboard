@@ -15,6 +15,133 @@ let headerNotifications = [];
 let headerUnreadNotificationCount = 0;
 let hasNotificationBaselineLoaded = false;
 let knownNotificationIds = new Set();
+let localTimeWidgetTimerId = null;
+const SUPPORTED_HEADER_WIDGET_KEYS = ['total_entries', 'total_edits', 'adds_today', 'deletes_today', 'local_time'];
+
+
+function getDefaultHeaderWidgetPreferences() {
+	return {
+		total_entries: true,
+		total_edits: true,
+		adds_today: true,
+		deletes_today: true,
+		local_time: true
+	};
+}
+
+
+function formatLocalTimeHHMM(dateObj) {
+	const d = dateObj instanceof Date ? dateObj : new Date();
+	const hours = String(d.getHours()).padStart(2, '0');
+	const minutes = String(d.getMinutes()).padStart(2, '0');
+	return hours + ':' + minutes;
+}
+
+
+function updateLocalTimeWidgetValue() {
+	setMetricValue('#metric-local-time', formatLocalTimeHHMM(new Date()));
+}
+
+
+function setupLocalTimeWidgetClock() {
+	if (localTimeWidgetTimerId !== null) {
+		clearInterval(localTimeWidgetTimerId);
+		localTimeWidgetTimerId = null;
+	}
+
+	updateLocalTimeWidgetValue();
+	localTimeWidgetTimerId = setInterval(updateLocalTimeWidgetValue, 1000);
+}
+
+
+function normalizeHeaderWidgetPreferences(rawPreferences) {
+	const defaults = getDefaultHeaderWidgetPreferences();
+	const source = (rawPreferences && typeof rawPreferences === 'object') ? rawPreferences : {};
+	const normalized = {};
+
+	function normalizePreferenceFlag(value, fallbackValue) {
+		if (typeof value === 'boolean') {
+			return value;
+		}
+		if (typeof value === 'number') {
+			return value !== 0;
+		}
+		if (typeof value === 'string') {
+			const lowered = value.trim().toLowerCase();
+			if (lowered === '1' || lowered === 'true' || lowered === 'yes' || lowered === 'on') {
+				return true;
+			}
+			if (lowered === '0' || lowered === 'false' || lowered === 'no' || lowered === 'off' || lowered === '') {
+				return false;
+			}
+		}
+		return Boolean(fallbackValue);
+	}
+
+	SUPPORTED_HEADER_WIDGET_KEYS.forEach(function(widgetKey) {
+		normalized[widgetKey] = source[widgetKey] !== undefined
+			? normalizePreferenceFlag(source[widgetKey], defaults[widgetKey])
+			: defaults[widgetKey];
+	});
+
+	return normalized;
+}
+
+
+function applyHeaderWidgetPreferences(preferences) {
+	const normalized = normalizeHeaderWidgetPreferences(preferences);
+	const container = document.querySelector('.header-metrics');
+	if (!container) {
+		return normalized;
+	}
+
+	let visibleCount = 0;
+	SUPPORTED_HEADER_WIDGET_KEYS.forEach(function(widgetKey) {
+		const el = container.querySelector('[data-widget-key="' + widgetKey + '"]');
+		if (!el) {
+			return;
+		}
+
+		const isVisible = normalized[widgetKey] === true;
+		el.hidden = !isVisible;
+		if (isVisible) {
+			visibleCount += 1;
+		}
+	});
+
+	container.hidden = visibleCount === 0;
+	return normalized;
+}
+
+
+function loadHeaderWidgetPreferences() {
+	if (document.querySelector('.header-metrics') === null) {
+		return $.Deferred().resolve(getDefaultHeaderWidgetPreferences()).promise();
+	}
+
+	return $.ajax({
+		url: '../api.php?action=widget_preferences',
+		type: 'GET',
+		dataType: 'json'
+	}).done(function(response) {
+		const preferences = response && typeof response === 'object' ? response.widgets : null;
+		applyHeaderWidgetPreferences(preferences);
+	}).fail(function() {
+		applyHeaderWidgetPreferences(getDefaultHeaderWidgetPreferences());
+	});
+}
+
+
+window.DashboardHeaderWidgets = {
+	getDefaults: getDefaultHeaderWidgetPreferences,
+	normalize: normalizeHeaderWidgetPreferences,
+	apply: applyHeaderWidgetPreferences,
+	load: loadHeaderWidgetPreferences,
+	keys: SUPPORTED_HEADER_WIDGET_KEYS.slice(),
+	setupLocalTimeClock: setupLocalTimeWidgetClock
+};
+
+
 function setupUserAvatarDropdown() {
 	const btn = document.getElementById('user-avatar-btn');
 	const dropdown = document.getElementById('user-dropdown');

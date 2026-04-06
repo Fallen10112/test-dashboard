@@ -7,7 +7,16 @@ $(document).ready(function() {
 	setupUserAvatarDropdown();
 	setupGlobalAjaxSessionGuard();
 	setupSessionEnforcementPoller();
-	loadHeaderMetrics();
+	if (window.DashboardHeaderWidgets && typeof window.DashboardHeaderWidgets.setupLocalTimeClock === 'function') {
+		window.DashboardHeaderWidgets.setupLocalTimeClock();
+	}
+	const loadWidgetsPromise = (typeof loadHeaderWidgetPreferences === 'function')
+		? loadHeaderWidgetPreferences()
+		: $.Deferred().resolve().promise();
+
+	$.when(loadWidgetsPromise).always(function() {
+		loadHeaderMetrics();
+	});
 
 	if ($('#data-container').length > 0) {
 		if (typeof initializeDataPagePreferences === 'function') {
@@ -34,6 +43,10 @@ $(document).ready(function() {
 		if (typeof setupAuditTrailPageHandlers === 'function') {
 			setupAuditTrailPageHandlers();
 		}
+	}
+
+	if ($('#widget-settings-container').length > 0 && typeof setupWidgetSettingsPageHandlers === 'function') {
+		setupWidgetSettingsPageHandlers();
 	}
 });
 

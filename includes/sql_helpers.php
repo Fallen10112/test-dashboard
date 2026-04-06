@@ -174,6 +174,34 @@ function ensureAuditLogSchema(PDO $pdo) {
 	}
 }
 
+function ensureUserWidgetPreferencesSchema(PDO $pdo) {
+	$tableName = 'user_widget_preferences';
+	$pdo->exec('DROP TABLE IF EXISTS user_widget_preferences_compact');
+	$pdo->exec(
+		'CREATE TABLE IF NOT EXISTS ' . $tableName . ' (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			user_id BIGINT UNSIGNED NOT NULL,
+			widgets_json LONGTEXT NOT NULL,
+			created_at DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL,
+			PRIMARY KEY (id),
+			UNIQUE KEY uniq_widget_pref_user (user_id),
+			KEY idx_widget_pref_user (user_id),
+			CONSTRAINT fk_widget_pref_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+	);
+
+	if (!doesTableColumnExist($pdo, $tableName, 'updated_at')) {
+		$pdo->exec('ALTER TABLE ' . $tableName . ' ADD COLUMN updated_at DATETIME NOT NULL AFTER created_at');
+	}
+	if (!doesTableIndexExist($pdo, $tableName, 'uniq_widget_pref_user')) {
+		$pdo->exec('ALTER TABLE ' . $tableName . ' ADD UNIQUE INDEX uniq_widget_pref_user (user_id)');
+	}
+	if (!doesTableIndexExist($pdo, $tableName, 'idx_widget_pref_user')) {
+		$pdo->exec('ALTER TABLE ' . $tableName . ' ADD INDEX idx_widget_pref_user (user_id)');
+	}
+}
+
 function resetAuditLogTable(PDO $pdo) {
 	$pdo->exec('DROP TABLE IF EXISTS audit_log');
 	ensureAuditLogSchema($pdo);
