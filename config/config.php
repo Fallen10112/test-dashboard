@@ -25,6 +25,12 @@ define('DB_DATABASE', getenv('DB_DATABASE') ?: 'test_dashboard');
 define('DB_USERNAME', getenv('DB_USERNAME') ?: 'root');
 define('DB_PASSWORD', getenv('DB_PASSWORD') ?: '');
 define('DB_CHARSET', getenv('DB_CHARSET') ?: 'utf8mb4');
+define('APP_TIMEZONE', getenv('APP_TIMEZONE') ?: 'Europe/London');
+
+// Use a single explicit app timezone so DST is handled by PHP's timezone database.
+if (!@date_default_timezone_set(APP_TIMEZONE)) {
+	date_default_timezone_set('UTC');
+}
 
 function envToBool($value, $default = false) {
 	if ($value === false || $value === null || $value === '') {

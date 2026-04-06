@@ -7,22 +7,28 @@ requireAuth();
 
 $authUser = $GLOBALS['auth_user'] ?? null;
 $currentUserId = (int)($authUser['id'] ?? 0);
+$csrfToken = getCsrfToken();
 
 $error = '';
 $success = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+	$postedCsrfToken = (string)($_POST['csrf_token'] ?? '');
+	if (!isValidCsrfToken($postedCsrfToken)) {
+		$error = 'Invalid security token. Please refresh and try again.';
+	}
+
 	$currentPassword = (string)($_POST['current_password'] ?? '');
 	$newPassword = (string)($_POST['new_password'] ?? '');
 	$confirmPassword = (string)($_POST['confirm_password'] ?? '');
 
-	if ($currentPassword === '' || $newPassword === '' || $confirmPassword === '') {
+	if ($error === '' && ($currentPassword === '' || $newPassword === '' || $confirmPassword === '')) {
 		$error = 'All password fields are required.';
-	} elseif (strlen($newPassword) < 8) {
+	} elseif ($error === '' && strlen($newPassword) < 8) {
 		$error = 'New password must be at least 8 characters long.';
-	} elseif (!hash_equals($newPassword, $confirmPassword)) {
+	} elseif ($error === '' && !hash_equals($newPassword, $confirmPassword)) {
 		$error = 'New password and confirmation do not match.';
-	} else {
+	} elseif ($error === '') {
 		try {
 			$pdo = getDashboardPdo();
 			$stmt = $pdo->prepare(
@@ -44,6 +50,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 				$newHash = password_hash($newPassword, PASSWORD_BCRYPT, ['cost' => 12]);
 				$update = $pdo->prepare('UPDATE users SET password_hash = :hash, updated_at = NOW() WHERE id = :id');
 				$update->execute([':hash' => $newHash, ':id' => $currentUserId]);
+				writeAuditEvent($pdo, [
+					'record_type' => 'user',
+					'record_id' => $currentUserId,
+					'action' => 'password_change',
+					'details' => '[REDACTED] -> [REDACTED]',
+					'actor_user_id' => $currentUserId,
+				]);
 				$success = 'Password updated successfully.';
 			}
 		} catch (Throwable $e) {
@@ -71,6 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 				<?php endif; ?>
 
 				<form method="POST" action="user.php" class="account-form" autocomplete="off">
+					<input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>">
 					<div class="form-group">
 						<label for="current-password">Current Password</label>
 						<input type="password" id="current-password" name="current_password" required>

@@ -1,5 +1,15 @@
 let currentFilteredItemCount = 0;
 let currentTotalDataCount = 0;
+let currentSortColumn = null;
+let currentSortOrder = 'asc';
+let selectedRecordIds = new Set();
+let currentFilteredDataItems = [];
+let currentPage = 1;
+let pageSize = 25;
+let currentPagedItems = [];
+const virtualRowHeightPx = 52;
+const virtualOverscanRows = 6;
+const dataPageSizeStorageKey = 'data-page-size';
 
 
 function setupDataPageHandlers() {

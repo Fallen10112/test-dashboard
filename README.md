@@ -390,11 +390,14 @@ Auth usage pattern for every POST endpoint:
       "id": 1,
       "date": "2026-03-31",
       "time": "15:57",
+      "record_type": "record",
+      "action": "update",
       "change_type": "ADD",
+      "actor_display_name": "System",
+      "target_display_name": "",
+      "ip_address": "127.0.0.1",
       "record_id": 1,
-      "field_name": "title",
-      "old_value": "",
-      "new_value": "Project Name"
+      "details": "Old title -> Project Name"
     }
   ]
 }

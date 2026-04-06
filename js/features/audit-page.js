@@ -1,7 +1,15 @@
+let currentAuditView = 'table';
+
 function setupAuditTrailPageHandlers() {
 	const debouncedAuditFilter = debounce(filterAuditTrail, 180);
 	$('#search-input').on('keyup', function() {
 		debouncedAuditFilter();
+	});
+	$('#audit-record-type-filter').on('change', function() {
+		filterAuditTrail();
+	});
+	$('#audit-action-filter').on('change', function() {
+		filterAuditTrail();
 	});
 	$('#audit-view-table').on('click', function() {
 		setAuditView('table');
@@ -55,12 +63,10 @@ function renderAuditTrail(entries, emptyMessage) {
 
 function renderAuditTable(entries) {
 	const container = $('#audit-container');
-	let tableHTML = '<table class="data-table"><thead><tr><th>ID</th><th>Date</th><th>Time</th><th>Record ID</th><th>Change Type</th><th>Field Name</th><th>Old Value</th><th>New Value</th></tr></thead><tbody>';
+	let tableHTML = '<table class="data-table"><thead><tr><th>ID</th><th>Date</th><th>Time</th><th>Type</th><th>Action</th><th>Actor</th><th>IP</th><th>Record ID</th><th>Details</th></tr></thead><tbody>';
 	entries.forEach(function(entry) {
-		const oldValue = String(entry.old_value || '');
-		const newValue = String(entry.new_value || '');
-		const valueDiff = buildInlineDiffMarkup(oldValue, newValue);
-		tableHTML += '<tr><td>' + entry.id + '</td><td>' + entry.date + '</td><td>' + entry.time + '</td><td>' + entry.record_id + '</td><td><span class="badge badge-' + entry.change_type.toLowerCase() + '">' + entry.change_type + '</span></td><td>' + entry.field_name + '</td><td>' + valueDiff.oldMarkup + '</td><td>' + valueDiff.newMarkup + '</td></tr>';
+		const detailsMarkup = buildDetailsMarkup(entry);
+		tableHTML += '<tr><td>' + entry.id + '</td><td>' + entry.date + '</td><td>' + entry.time + '</td><td>' + (entry.record_type || '') + '</td><td><span class="badge badge-' + entry.change_type.toLowerCase() + '">' + (entry.action || entry.change_type) + '</span></td><td>' + (entry.actor_display_name || 'System') + '</td><td>' + (entry.ip_address || '') + '</td><td>' + entry.record_id + '</td><td>' + detailsMarkup + '</td></tr>';
 	});
 	tableHTML += '</tbody></table>';
 	container.html(tableHTML);
@@ -86,8 +92,8 @@ function renderAuditTimeline(entries) {
 		}
 
 		const typeClass = String(entry.change_type || '').toLowerCase();
-		const valueDiff = buildInlineDiffMarkup(String(entry.old_value || ''), String(entry.new_value || ''));
-		timelineHTML += '<div class="timeline-item"><div class="timeline-dot timeline-dot-' + typeClass + '"></div><div class="timeline-card"><div class="timeline-card-header"><span class="badge badge-' + typeClass + '">' + entry.change_type + '</span><span class="timeline-time">' + entry.time + '</span><span class="timeline-id">#' + entry.id + '</span></div><p class="timeline-line"><strong>Record:</strong> ' + entry.record_id + ' | <strong>Field:</strong> ' + entry.field_name + '</p><p class="timeline-line"><strong>Old:</strong> ' + valueDiff.oldMarkup + '</p><p class="timeline-line"><strong>New:</strong> ' + valueDiff.newMarkup + '</p></div></div>';
+		const detailsMarkup = buildDetailsMarkup(entry);
+		timelineHTML += '<div class="timeline-item"><div class="timeline-dot timeline-dot-' + typeClass + '"></div><div class="timeline-card"><div class="timeline-card-header"><span class="badge badge-' + typeClass + '">' + (entry.action || entry.change_type) + '</span><span class="timeline-time">' + entry.time + '</span><span class="timeline-id">#' + entry.id + '</span></div><p class="timeline-line"><strong>Type:</strong> ' + (entry.record_type || '') + ' | <strong>Actor:</strong> ' + (entry.actor_display_name || 'System') + '</p><p class="timeline-line"><strong>Record:</strong> ' + entry.record_id + '</p><p class="timeline-line"><strong>Details:</strong> ' + detailsMarkup + '</p></div></div>';
 	});
 
 	if (currentDate !== '') {
@@ -146,6 +152,48 @@ function buildInlineDiffMarkup(oldValue, newValue) {
 }
 
 
+function buildDetailsMarkup(entry) {
+	const details = String(entry.details || '');
+	const recordType = String(entry.record_type || '').toLowerCase();
+	const action = String(entry.action || '').toLowerCase();
+	const allowDiff = recordType === 'record' && (action === 'create' || action === 'update' || action === 'delete');
+
+	if (!allowDiff) {
+		return escapeHtml(details || '(empty)');
+	}
+
+	const labeledSegments = [];
+	const labeledPattern = /(?:^|,\s*)(Title|Description):\s*(.*?)(?=,\s*(?:Title|Description):\s*|$)/g;
+	let labeledMatch = labeledPattern.exec(details);
+	while (labeledMatch !== null) {
+		const label = labeledMatch[1];
+		const valueChunk = String(labeledMatch[2] || '');
+		const arrowAt = valueChunk.indexOf(' -> ');
+		if (arrowAt !== -1) {
+			const oldValue = valueChunk.slice(0, arrowAt);
+			const newValue = valueChunk.slice(arrowAt + 4);
+			const diff = buildInlineDiffMarkup(oldValue, newValue);
+			labeledSegments.push('<span class="audit-details-part"><strong>' + escapeHtml(label) + ':</strong> ' + diff.oldMarkup + ' <span class="audit-details-arrow">-&gt;</span> ' + diff.newMarkup + '</span>');
+		}
+		labeledMatch = labeledPattern.exec(details);
+	}
+
+	if (labeledSegments.length > 0) {
+		return '<span class="audit-details-diff">' + labeledSegments.join(', ') + '</span>';
+	}
+
+	const arrowIndex = details.indexOf(' -> ');
+	if (arrowIndex === -1) {
+		return escapeHtml(details || '(empty)');
+	}
+
+	const oldValue = details.slice(0, arrowIndex);
+	const newValue = details.slice(arrowIndex + 4);
+	const diff = buildInlineDiffMarkup(oldValue, newValue);
+	return '<span class="audit-details-diff">' + diff.oldMarkup + ' <span class="audit-details-arrow">-&gt;</span> ' + diff.newMarkup + '</span>';
+}
+
+
 function displayAuditTrail(data) {
 	renderAuditTrail(data.entries || [], 'No audit trail entries yet.');
 }
@@ -156,14 +204,31 @@ function filterAuditTrail() {
 		return;
 	}
 	const searchValue = $('#search-input').val().toLowerCase();
+	const recordTypeFilter = String($('#audit-record-type-filter').val() || '').toLowerCase();
+	const actionFilter = String($('#audit-action-filter').val() || '').toLowerCase();
 	const filteredEntries = allAuditTrail.entries.filter(function(entry) {
-		const oldValue = String(entry.old_value || '').toLowerCase();
-		const newValue = String(entry.new_value || '').toLowerCase();
+		const details = String(entry.details || '').toLowerCase();
+		const recordType = String(entry.record_type || '').toLowerCase();
+		const action = String(entry.action || '').toLowerCase();
+		const actor = String(entry.actor_display_name || '').toLowerCase();
+		const target = String(entry.target_display_name || '').toLowerCase();
+		const ipAddress = String(entry.ip_address || '').toLowerCase();
+
+		if (recordTypeFilter !== '' && recordType !== recordTypeFilter) {
+			return false;
+		}
+		if (actionFilter !== '' && action !== actionFilter) {
+			return false;
+		}
+
 		return entry.record_id.toString().includes(searchValue) ||
+			recordType.includes(searchValue) ||
+			action.includes(searchValue) ||
+			actor.includes(searchValue) ||
+			target.includes(searchValue) ||
+			ipAddress.includes(searchValue) ||
 			entry.change_type.toLowerCase().includes(searchValue) ||
-			entry.field_name.toLowerCase().includes(searchValue) ||
-			oldValue.includes(searchValue) ||
-			newValue.includes(searchValue) ||
+			details.includes(searchValue) ||
 			entry.date.includes(searchValue) ||
 			entry.time.includes(searchValue);
 	});

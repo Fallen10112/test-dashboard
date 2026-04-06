@@ -197,14 +197,17 @@ Columns:
 - id (BIGINT UNSIGNED, PK, AUTO_INCREMENT): Audit row ID.
 - record_type (VARCHAR(50), NOT NULL): Entity kind, e.g., record, user, permission.
 - record_id (BIGINT UNSIGNED, NULL): Entity ID when available.
-- action (ENUM('create','update','delete','bulk_delete','login','logout','reset','permission_change'), NOT NULL): Event type.
-- field_name (VARCHAR(100), NULL): Changed field when action is update.
-- old_value (TEXT, NULL): Previous value.
-- new_value (TEXT, NULL): New value.
+- action (VARCHAR(50), NOT NULL): Event type (examples: create, update, delete, bulk_delete, login, logout, password_change, notification_sent, notification_read, notification_deleted, reset).
+- details (TEXT, NULL): Event details payload. For updates, stores `old_value -> new_value` text.
 - actor_user_id (BIGINT UNSIGNED, NULL, FK -> users.id): Who performed action.
+- target_user_id (BIGINT UNSIGNED, NULL, FK -> users.id): Optional target user for user-to-user events.
 - ip_address (VARCHAR(45), NULL): Source IP (IPv4/IPv6).
 - user_agent (VARCHAR(255), NULL): Client user agent string.
 - created_at (DATETIME, NOT NULL): Event timestamp.
+
+Notes:
+
+- If `actor_user_id` is NULL, the UI displays actor as `System`.
 
 ---
 

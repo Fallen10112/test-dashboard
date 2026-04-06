@@ -1,18 +1,7 @@
 let allData = null;
 let allLogs = null;
 let allAuditTrail = null;
-let currentSortColumn = null;
-let currentSortOrder = 'asc';
-let selectedRecordIds = new Set();
-let currentAuditView = 'table';
-let currentFilteredDataItems = [];
 let nextRecordId = 1;
-let currentPage = 1;
-let pageSize = 25;
-let currentPagedItems = [];
-const virtualRowHeightPx = 52;
-const virtualOverscanRows = 6;
-const dataPageSizeStorageKey = 'data-page-size';
 let isHandlingForcedLogout = false;
 let sessionPollTimerId = null;
 let sessionPollFnRef = null;
@@ -849,20 +838,10 @@ function countUniqueAuditRecordsForToday(entries, changeType) {
 			return;
 		}
 
-		const fieldName = String(entry.field_name || '').toLowerCase();
 		const recordId = String(entry.record_id || '');
 
-		if (normalizedType === 'ADD' && fieldName !== 'title') {
+		if (normalizedType === 'DELETE' && recordId.toUpperCase() === 'BULK') {
 			return;
-		}
-
-		if (normalizedType === 'DELETE') {
-			if (fieldName !== 'title' && fieldName !== 'record') {
-				return;
-			}
-			if (recordId.toUpperCase() === 'BULK') {
-				return;
-			}
 		}
 
 		if (recordId !== '') {
@@ -1030,6 +1009,7 @@ function loadData(callback) {
 		url: '../api.php',
 		type: 'GET',
 		dataType: 'json',
+		data: { action: 'data' },
 		success: function(data) {
 			allData = data;
 			refreshNextRecordId();

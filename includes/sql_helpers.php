@@ -28,7 +28,171 @@ function getDashboardPdo() {
 }
 
 function getDashboardSqlTimestamp() {
-	return date('Y-m-d H:i:s', time());
+	return (new DateTimeImmutable('now', new DateTimeZone(date_default_timezone_get())))->format('Y-m-d H:i:s');
+}
+
+function getRequestIpAddress() {
+	$ip = isset($_SERVER['REMOTE_ADDR']) ? trim((string)$_SERVER['REMOTE_ADDR']) : '';
+	if ($ip === '') {
+		return null;
+	}
+	return substr($ip, 0, 45);
+}
+
+function getRequestUserAgent() {
+	$ua = isset($_SERVER['HTTP_USER_AGENT']) ? trim((string)$_SERVER['HTTP_USER_AGENT']) : '';
+	if ($ua === '') {
+		return null;
+	}
+	return substr($ua, 0, 255);
+}
+
+function doesTableColumnExist(PDO $pdo, $tableName, $columnName) {
+	$stmt = $pdo->prepare(
+		'SELECT 1
+		 FROM information_schema.COLUMNS
+		 WHERE TABLE_SCHEMA = DATABASE()
+		   AND TABLE_NAME = :table_name
+		   AND COLUMN_NAME = :column_name
+		 LIMIT 1'
+	);
+	$stmt->execute([
+		':table_name' => (string)$tableName,
+		':column_name' => (string)$columnName,
+	]);
+	return (bool)$stmt->fetchColumn();
+}
+
+function doesTableIndexExist(PDO $pdo, $tableName, $indexName) {
+	$stmt = $pdo->prepare(
+		'SELECT 1
+		 FROM information_schema.STATISTICS
+		 WHERE TABLE_SCHEMA = DATABASE()
+		   AND TABLE_NAME = :table_name
+		   AND INDEX_NAME = :index_name
+		 LIMIT 1'
+	);
+	$stmt->execute([
+		':table_name' => (string)$tableName,
+		':index_name' => (string)$indexName,
+	]);
+	return (bool)$stmt->fetchColumn();
+}
+
+function ensureAuditLogSchema(PDO $pdo) {
+	$pdo->exec(
+		'CREATE TABLE IF NOT EXISTS audit_log (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			record_type VARCHAR(50) NOT NULL DEFAULT "system",
+			record_id BIGINT UNSIGNED NULL,
+			action VARCHAR(50) NOT NULL DEFAULT "update",
+			details TEXT NULL,
+			actor_user_id BIGINT UNSIGNED NULL,
+			target_user_id BIGINT UNSIGNED NULL,
+			ip_address VARCHAR(45) NULL,
+			user_agent VARCHAR(255) NULL,
+			created_at DATETIME NOT NULL,
+			PRIMARY KEY (id)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+	);
+
+	if (!doesTableColumnExist($pdo, 'audit_log', 'details')) {
+		$pdo->exec('ALTER TABLE audit_log ADD COLUMN details TEXT NULL AFTER action');
+	}
+
+	if (doesTableColumnExist($pdo, 'audit_log', 'field_name')) {
+		$pdo->exec('ALTER TABLE audit_log DROP COLUMN field_name');
+	}
+
+	if (!doesTableColumnExist($pdo, 'audit_log', 'actor_user_id')) {
+		$pdo->exec('ALTER TABLE audit_log ADD COLUMN actor_user_id BIGINT UNSIGNED NULL AFTER details');
+	}
+	if (!doesTableColumnExist($pdo, 'audit_log', 'target_user_id')) {
+		$pdo->exec('ALTER TABLE audit_log ADD COLUMN target_user_id BIGINT UNSIGNED NULL AFTER actor_user_id');
+	}
+	if (!doesTableColumnExist($pdo, 'audit_log', 'ip_address')) {
+		$pdo->exec('ALTER TABLE audit_log ADD COLUMN ip_address VARCHAR(45) NULL AFTER target_user_id');
+	}
+	if (!doesTableColumnExist($pdo, 'audit_log', 'user_agent')) {
+		$pdo->exec('ALTER TABLE audit_log ADD COLUMN user_agent VARCHAR(255) NULL AFTER ip_address');
+	}
+
+	$actionTypeStmt = $pdo->query(
+		'SELECT DATA_TYPE
+		 FROM information_schema.COLUMNS
+		 WHERE TABLE_SCHEMA = DATABASE()
+		   AND TABLE_NAME = "audit_log"
+		   AND COLUMN_NAME = "action"
+		 LIMIT 1'
+	);
+	$actionDataType = strtolower((string)$actionTypeStmt->fetchColumn());
+	if ($actionDataType === 'enum') {
+		$pdo->exec('ALTER TABLE audit_log MODIFY COLUMN action VARCHAR(50) NOT NULL');
+	}
+
+	if (!doesTableIndexExist($pdo, 'audit_log', 'idx_audit_created_at')) {
+		$pdo->exec('ALTER TABLE audit_log ADD INDEX idx_audit_created_at (created_at)');
+	}
+	if (!doesTableIndexExist($pdo, 'audit_log', 'idx_audit_actor')) {
+		$pdo->exec('ALTER TABLE audit_log ADD INDEX idx_audit_actor (actor_user_id)');
+	}
+	if (!doesTableIndexExist($pdo, 'audit_log', 'idx_audit_target')) {
+		$pdo->exec('ALTER TABLE audit_log ADD INDEX idx_audit_target (target_user_id)');
+	}
+	if (!doesTableIndexExist($pdo, 'audit_log', 'idx_audit_record')) {
+		$pdo->exec('ALTER TABLE audit_log ADD INDEX idx_audit_record (record_type, record_id)');
+	}
+}
+
+function resetAuditLogTable(PDO $pdo) {
+	$pdo->exec('DROP TABLE IF EXISTS audit_log');
+	ensureAuditLogSchema($pdo);
+}
+
+function writeAuditEvent(PDO $pdo, array $entry) {
+	ensureAuditLogSchema($pdo);
+
+	$recordType = trim((string)($entry['record_type'] ?? 'system'));
+	$action = trim((string)($entry['action'] ?? 'event'));
+	$recordIdRaw = $entry['record_id'] ?? null;
+	$recordId = is_numeric($recordIdRaw) ? (int)$recordIdRaw : null;
+	$actorUserIdRaw = $entry['actor_user_id'] ?? null;
+	$actorUserId = is_numeric($actorUserIdRaw) ? (int)$actorUserIdRaw : null;
+	$targetUserIdRaw = $entry['target_user_id'] ?? null;
+	$targetUserId = is_numeric($targetUserIdRaw) ? (int)$targetUserIdRaw : null;
+	$details = isset($entry['details']) ? (string)$entry['details'] : '';
+
+	$stmt = $pdo->prepare(
+		'INSERT INTO audit_log (record_type, record_id, action, details, actor_user_id, target_user_id, ip_address, user_agent, created_at)
+		 VALUES (:record_type, :record_id, :action, :details, :actor_user_id, :target_user_id, :ip_address, :user_agent, :created_at)'
+	);
+
+	return $stmt->execute([
+		':record_type' => $recordType !== '' ? substr($recordType, 0, 50) : 'system',
+		':record_id' => $recordId,
+		':action' => $action !== '' ? substr($action, 0, 50) : 'event',
+		':details' => $details !== '' ? $details : null,
+		':actor_user_id' => $actorUserId,
+		':target_user_id' => $targetUserId,
+		':ip_address' => isset($entry['ip_address']) ? (string)$entry['ip_address'] : getRequestIpAddress(),
+		':user_agent' => isset($entry['user_agent']) ? (string)$entry['user_agent'] : getRequestUserAgent(),
+		':created_at' => isset($entry['created_at']) ? (string)$entry['created_at'] : getDashboardSqlTimestamp(),
+	]);
+}
+
+function writeAuditEvents(PDO $pdo, array $entries) {
+	if (empty($entries)) {
+		return false;
+	}
+
+	$allOk = true;
+	foreach ($entries as $entry) {
+		if (!is_array($entry) || !writeAuditEvent($pdo, $entry)) {
+			$allOk = false;
+		}
+	}
+
+	return $allOk;
 }
 
 function resetDashboardSqlData(PDO $pdo) {
@@ -50,7 +214,7 @@ function resetDashboardSqlData(PDO $pdo) {
 		$pdo->exec('ALTER TABLE activity_log AUTO_INCREMENT = 1');
 		$pdo->exec('ALTER TABLE audit_log AUTO_INCREMENT = 1');
 
-		$insertRecord = $pdo->prepare('INSERT INTO records (id, title, description, created_at, updated_at) VALUES (:id, :title, :description, :created_at, :updated_at)');
+		$insertRecord = $pdo->prepare('INSERT INTO records (id, title, description, created_by_user_id, updated_by_user_id, created_at, updated_at) VALUES (:id, :title, :description, :created_by_user_id, :updated_by_user_id, :created_at, :updated_at)');
 		$now = getDashboardSqlTimestamp();
 		$seedId = 1;
 		foreach ($sampleItems as $item) {
@@ -58,6 +222,8 @@ function resetDashboardSqlData(PDO $pdo) {
 				':id' => $seedId,
 				':title' => $item['title'],
 				':description' => $item['description'],
+				':created_by_user_id' => null,
+				':updated_by_user_id' => null,
 				':created_at' => $now,
 				':updated_at' => $now,
 			]);

@@ -299,48 +299,53 @@ body {
 
 .audit-container .data-table tbody tr td:nth-child(1),
 .audit-container .data-table thead tr th:nth-child(1) {
-    width: auto;
-    min-width: 30px;
+    width: 48px;
 }
 
 .audit-container .data-table tbody tr td:nth-child(2),
 .audit-container .data-table thead tr th:nth-child(2) {
-    width: auto;
-    min-width: 125px;
+    width: 110px;
 }
 
 .audit-container .data-table tbody tr td:nth-child(3),
 .audit-container .data-table thead tr th:nth-child(3) {
-    width: auto;
-    min-width: 125px;
+    width: 96px;
 }
 
 .audit-container .data-table tbody tr td:nth-child(4),
 .audit-container .data-table thead tr th:nth-child(4) {
-    width: auto;
-    min-width: 40px;
+    width: 120px;
 }
 
 .audit-container .data-table tbody tr td:nth-child(5),
 .audit-container .data-table thead tr th:nth-child(5) {
-    width: auto;
-    min-width: 70px;
+    width: 150px;
 }
 
 .audit-container .data-table tbody tr td:nth-child(6),
 .audit-container .data-table thead tr th:nth-child(6) {
-    width: auto;
-    min-width: 75px;
+    width: 140px;
 }
 
 .audit-container .data-table tbody tr td:nth-child(7),
 .audit-container .data-table thead tr th:nth-child(7) {
-    width: 50%;
+    width: 120px;
 }
 
 .audit-container .data-table tbody tr td:nth-child(8),
 .audit-container .data-table thead tr th:nth-child(8) {
-    width: 50%;
+    width: 90px;
+}
+
+.audit-container .data-table tbody tr td:nth-child(9),
+.audit-container .data-table thead tr th:nth-child(9) {
+    width: 120px;
+}
+
+.audit-container .data-table tbody tr td:nth-child(9),
+.audit-container .data-table thead tr th:nth-child(9) {
+    width: auto;
+    min-width: 280px;
 }
 
 
@@ -446,6 +451,39 @@ body {
 .audit-view-toggle {
     display: flex;
     gap: 8px;
+}
+
+.audit-controls-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: nowrap;
+}
+
+.audit-controls-row .search-container {
+    flex: 1 1 auto;
+    max-width: none;
+}
+
+.audit-filter-group {
+    min-width: 180px;
+    margin: 0;
+}
+
+.audit-filter-group .dataset-selector {
+    width: 100%;
+}
+
+.audit-details-diff {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.audit-details-arrow {
+    color: #64748b;
+    font-weight: 700;
 }
 
 .audit-view-toggle .btn.active {

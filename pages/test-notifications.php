@@ -18,6 +18,8 @@ if ($currentDisplayName === '') {
 	$currentDisplayName = 'Current User';
 }
 
+$csrfToken = getCsrfToken();
+
 $error = '';
 $success = '';
 $users = [];
@@ -47,15 +49,13 @@ try {
 		$action = trim((string)($_POST['action'] ?? 'create'));
 		$postError = '';
 		$postSuccess = '';
+		$postedCsrfToken = (string)($_POST['csrf_token'] ?? '');
 
-		if ($action === 'reset_table') {
-			try {
-				$pdo->exec('TRUNCATE TABLE notifications');
-				$postSuccess = 'Notification table has been reset to fresh start (ID 1).';
-			} catch (Throwable $e) {
-				$postError = 'Failed to reset notification table.';
-			}
-		} else {
+		if (!isValidCsrfToken($postedCsrfToken)) {
+			$postError = 'Invalid security token. Please refresh and try again.';
+		}
+
+		if ($action === 'create' && $postError === '') {
 			$recipientUserId = (int)($_POST['recipient_user_id'] ?? 0);
 			$title = trim((string)($_POST['title'] ?? ''));
 			$message = trim((string)($_POST['message'] ?? ''));
@@ -98,6 +98,16 @@ try {
 				]);
 
 				if ($ok) {
+					$recipientLabel = 'user #' . $recipientUserId;
+					$senderLabel = $sentByUserId === null ? 'System' : ('user #' . (int)$sentByUserId);
+					writeAuditEvent($pdo, [
+						'record_type' => 'notification',
+						'record_id' => (int)$pdo->lastInsertId(),
+						'action' => 'notification_sent',
+						'details' => 'Queued -> Sent | From ' . $senderLabel . ' to ' . $recipientLabel . ': ' . substr($title !== '' ? $title : 'Notification', 0, 160),
+						'actor_user_id' => $currentUserId > 0 ? $currentUserId : null,
+						'target_user_id' => $recipientUserId,
+					]);
 					$postSuccess = 'Test notification sent successfully.';
 				} else {
 					$postError = 'Failed to send test notification.';
@@ -140,6 +150,7 @@ try {
 
 				<form method="POST" action="test-notifications.php" class="account-form" autocomplete="off">
 					<input type="hidden" name="action" value="create">
+					<input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>">
 					<div class="form-group">
 						<label for="recipient-user-id">Recipient User</label>
 						<select id="recipient-user-id" name="recipient_user_id" required>
@@ -196,9 +207,9 @@ try {
 				<div class="account-card" style="margin-top: 30px;">
 					<h3>Maintenance Tools</h3>
 					<p>Reset the notifications table for a fresh start.</p>
-				<div style="max-width: 200px;">
-					<button id="reset-notif-table-btn" class="btn btn-reset">Reset Notification Table</button>
-				</div>
+					<div style="max-width: 200px;">
+						<button id="reset-notif-table-btn" class="btn btn-reset">Reset Notification Table</button>
+					</div>
 				</div>
 			</section>
 		</main>

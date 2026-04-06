@@ -135,6 +135,28 @@ function clearAuthSessionState(): void {
 	session_regenerate_id(true);
 }
 
+function getCsrfToken(): string {
+	startAuthSession();
+	if (empty($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token'])) {
+		$_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+	}
+	return (string)$_SESSION['csrf_token'];
+}
+
+function isValidCsrfToken($token): bool {
+	startAuthSession();
+	if (!is_string($token) || $token === '') {
+		return false;
+	}
+	$sessionToken = isset($_SESSION['csrf_token']) && is_string($_SESSION['csrf_token'])
+		? $_SESSION['csrf_token']
+		: '';
+	if ($sessionToken === '') {
+		return false;
+	}
+	return hash_equals($sessionToken, $token);
+}
+
 function loginUser(string $identifier, string $password): bool {
 	try {
 		$pdo = getDashboardPdo();
@@ -197,6 +219,14 @@ function loginUser(string $identifier, string $password): bool {
 		$pdo->prepare('UPDATE users SET last_login_at = NOW(), updated_at = NOW() WHERE id = :id')
 		    ->execute([':id' => $user['id']]);
 
+		writeAuditEvent($pdo, [
+			'record_type' => 'auth',
+			'record_id' => null,
+			'action' => 'login',
+			'details' => 'Signed out -> Signed in successfully',
+			'actor_user_id' => (int)$user['id'],
+		]);
+
 		startAuthSession();
 		session_regenerate_id(true);
 		$_SESSION['auth_token']   = $token;
@@ -210,12 +240,22 @@ function loginUser(string $identifier, string $password): bool {
 
 function logoutUser(): void {
 	startAuthSession();
+	$authUserId = isset($_SESSION['auth_user_id']) ? (int)$_SESSION['auth_user_id'] : 0;
 	if (isset($_SESSION['auth_token'])) {
 		$tokenHash = hash('sha256', $_SESSION['auth_token']);
 		try {
 			$pdo = getDashboardPdo();
 			$pdo->prepare('UPDATE user_sessions SET revoked_at = NOW() WHERE session_token_hash = :hash')
 			    ->execute([':hash' => $tokenHash]);
+			if ($authUserId > 0) {
+				writeAuditEvent($pdo, [
+					'record_type' => 'auth',
+					'record_id' => null,
+					'action' => 'logout',
+					'details' => 'Signed in -> Signed out',
+					'actor_user_id' => $authUserId,
+				]);
+			}
 		} catch (Throwable $e) {
 			// non-critical
 		}

@@ -7,7 +7,7 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/includes/sql_helpers.php';
 require_once __DIR__ . '/includes/auth.php';
 
-$action = $_GET['action'] ?? null;
+$action = isset($_GET['action']) ? trim((string)$_GET['action']) : '';
 
 
 function respondJson($statusCode, $payload) {
@@ -187,14 +187,13 @@ function mapAuditActionToChangeType($action, $fieldName = '') {
 	if ($action === 'reset') {
 		return 'RESET';
 	}
+	if ($action === 'login' || $action === 'logout' || $action === 'password_change') {
+		return 'AUTH';
+	}
+	if (strpos($action, 'notification_') === 0) {
+		return 'NOTIFY';
+	}
 	return strtoupper((string)$action);
-}
-
-
-function getDataPayload(PDO $pdo) {
-	$stmt = $pdo->query('SELECT id, title, description FROM records WHERE deleted_at IS NULL ORDER BY id ASC');
-	$items = $stmt->fetchAll();
-	return ['items' => is_array($items) ? $items : []];
 }
 
 
@@ -234,6 +233,36 @@ function getApiAuthUserDisplayName() {
 	}
 
 	return 'A user';
+}
+
+
+function enforceApiRateLimit(string $bucketKey, int $limit, int $windowSeconds) {
+	startAuthSession();
+	$now = time();
+	if (!isset($_SESSION['api_rate_limits']) || !is_array($_SESSION['api_rate_limits'])) {
+		$_SESSION['api_rate_limits'] = [];
+	}
+
+	$bucket = $_SESSION['api_rate_limits'][$bucketKey] ?? null;
+	if (!is_array($bucket) || !isset($bucket['count'], $bucket['window_start'])) {
+		$bucket = ['count' => 0, 'window_start' => $now];
+	}
+
+	if (($now - (int)$bucket['window_start']) >= $windowSeconds) {
+		$bucket['count'] = 0;
+		$bucket['window_start'] = $now;
+	}
+
+	$bucket['count'] = (int)$bucket['count'] + 1;
+	$_SESSION['api_rate_limits'][$bucketKey] = $bucket;
+
+	if ((int)$bucket['count'] > $limit) {
+		respondJson(429, [
+			'success' => false,
+			'message' => 'Too many requests. Please slow down and try again.',
+			'reason' => 'rate_limited',
+		]);
+	}
 }
 
 
@@ -406,14 +435,29 @@ function getLogsPayload(PDO $pdo) {
 
 
 function getAuditPayload(PDO $pdo) {
-	$stmt = $pdo->query('SELECT id, DATE_FORMAT(created_at, "%Y-%m-%d") AS `date`, DATE_FORMAT(created_at, "%H:%i:%s") AS `time`, action, record_id, field_name, old_value, new_value FROM audit_log ORDER BY id ASC');
+	ensureAuditLogSchema($pdo);
+	$stmt = $pdo->query(
+		'SELECT a.id,
+		        DATE_FORMAT(a.created_at, "%Y-%m-%d") AS `date`,
+		        DATE_FORMAT(a.created_at, "%H:%i:%s") AS `time`,
+		        a.record_type,
+		        a.action,
+		        a.record_id,
+		        a.details,
+		        a.ip_address,
+		        COALESCE(NULLIF(u.display_name, ""), NULLIF(u.username, ""), u.email, "System") AS actor_display_name,
+		        COALESCE(NULLIF(tu.display_name, ""), NULLIF(tu.username, ""), tu.email) AS target_display_name
+		 FROM audit_log a
+		 LEFT JOIN users u ON u.id = a.actor_user_id
+		 LEFT JOIN users tu ON tu.id = a.target_user_id
+		 ORDER BY a.id ASC'
+	);
 	$rows = $stmt->fetchAll();
 	$entries = [];
 
 	foreach ($rows as $row) {
-		$fieldName = (string)($row['field_name'] ?? '');
 		$recordId = $row['record_id'];
-		if ($recordId === null && $fieldName === 'bulk_action') {
+		if ($recordId === null && strtolower((string)($row['action'] ?? '')) === 'bulk_delete') {
 			$recordId = 'BULK';
 		}
 		if ($recordId === null) {
@@ -424,11 +468,14 @@ function getAuditPayload(PDO $pdo) {
 			'id' => (int)$row['id'],
 			'date' => (string)$row['date'],
 			'time' => (string)$row['time'],
-			'change_type' => mapAuditActionToChangeType($row['action'] ?? '', $fieldName),
+			'record_type' => (string)($row['record_type'] ?? ''),
+			'action' => (string)($row['action'] ?? ''),
+			'actor_display_name' => (string)($row['actor_display_name'] ?? ''),
+			'target_display_name' => (string)($row['target_display_name'] ?? ''),
+			'ip_address' => (string)($row['ip_address'] ?? ''),
+			'change_type' => mapAuditActionToChangeType($row['action'] ?? '', ''),
 			'record_id' => $recordId,
-			'field_name' => $fieldName,
-			'old_value' => (string)($row['old_value'] ?? ''),
-			'new_value' => (string)($row['new_value'] ?? ''),
+			'details' => (string)($row['details'] ?? ''),
 		];
 	}
 
@@ -459,23 +506,42 @@ function addAuditEntries(PDO $pdo, $entries) {
 		return false;
 	}
 
-	$timestamp = getDashboardSqlTimestamp();
-	$stmt = $pdo->prepare('INSERT INTO audit_log (record_type, record_id, action, field_name, old_value, new_value, created_at) VALUES (:record_type, :record_id, :action, :field_name, :old_value, :new_value, :created_at)');
+	$actorUserId = null;
+	$authUser = $GLOBALS['auth_user'] ?? null;
+	if (is_array($authUser) && isset($authUser['id'])) {
+		$candidate = (int)$authUser['id'];
+		if ($candidate > 0) {
+			$actorUserId = $candidate;
+		}
+	}
 
 	foreach ($entries as $entry) {
 		$recordIdRaw = $entry['recordId'] ?? null;
 		$recordId = is_numeric($recordIdRaw) ? (int)$recordIdRaw : null;
-		$fieldName = (string)($entry['fieldName'] ?? '');
 		$action = mapChangeTypeToAuditAction($entry['changeType'] ?? '');
+		$details = '';
+		if (isset($entry['details'])) {
+			$details = trim((string)$entry['details']);
+		} elseif (isset($entry['oldValue']) || isset($entry['newValue'])) {
+			$fieldName = strtolower(trim((string)($entry['fieldName'] ?? '')));
+			$fieldLabel = '';
+			if ($fieldName === 'title') {
+				$fieldLabel = 'Title';
+			} elseif ($fieldName === 'description') {
+				$fieldLabel = 'Description';
+			}
 
-		$ok = $stmt->execute([
-			':record_type' => 'record',
-			':record_id' => $recordId,
-			':action' => $action,
-			':field_name' => $fieldName !== '' ? $fieldName : null,
-			':old_value' => isset($entry['oldValue']) ? (string)$entry['oldValue'] : null,
-			':new_value' => isset($entry['newValue']) ? (string)$entry['newValue'] : null,
-			':created_at' => $timestamp,
+			$oldValue = (string)($entry['oldValue'] ?? '');
+			$newValue = (string)($entry['newValue'] ?? '');
+			$details = ($fieldLabel !== '' ? ($fieldLabel . ': ') : '') . $oldValue . ' -> ' . $newValue;
+		}
+
+		$ok = writeAuditEvent($pdo, [
+			'record_type' => 'record',
+			'record_id' => $recordId,
+			'action' => $action,
+			'details' => $details,
+			'actor_user_id' => $actorUserId,
 		]);
 
 		if (!$ok) {
@@ -515,10 +581,12 @@ function buildDataPagePayload(PDO $pdo, $includeAllFilteredItems = false) {
 
 	$totalCountStmt = $pdo->query('SELECT COUNT(*) FROM records WHERE deleted_at IS NULL');
 	$totalCount = (int)$totalCountStmt->fetchColumn();
-
-	$filteredCountStmt = $pdo->prepare('SELECT COUNT(*) FROM records ' . $where);
-	$filteredCountStmt->execute($bindings);
-	$filteredCount = (int)$filteredCountStmt->fetchColumn();
+	$filteredCount = $totalCount;
+	if ($search !== '') {
+		$filteredCountStmt = $pdo->prepare('SELECT COUNT(*) FROM records ' . $where);
+		$filteredCountStmt->execute($bindings);
+		$filteredCount = (int)$filteredCountStmt->fetchColumn();
+	}
 
 	$totalPages = max(1, (int)ceil($filteredCount / $pageSize));
 	$page = min($page, $totalPages);
@@ -557,6 +625,13 @@ function buildDataPagePayload(PDO $pdo, $includeAllFilteredItems = false) {
 }
 
 
+function getDataPayload(PDO $pdo) {
+	$stmt = $pdo->query('SELECT id, title, description FROM records WHERE deleted_at IS NULL ORDER BY id ASC');
+	$items = $stmt->fetchAll();
+	return ['items' => is_array($items) ? $items : []];
+}
+
+
 $method = $_SERVER['REQUEST_METHOD'];
 
 if ($method === 'OPTIONS') {
@@ -569,6 +644,7 @@ requireApiSessionAuthentication();
 
 try {
 	$pdo = getDashboardPdo();
+	ensureAuditLogSchema($pdo);
 } catch (Throwable $e) {
 	respondJson(500, ['success' => false, 'message' => 'Database connection failed']);
 }
@@ -591,6 +667,13 @@ if ($method === 'POST') {
 		}
 
 		if (resetDashboardSqlData($pdo)) {
+			writeAuditEvent($pdo, [
+				'record_type' => 'system',
+				'record_id' => null,
+				'action' => 'reset',
+				'details' => 'Dashboard data reset to seed state',
+				'actor_user_id' => getApiAuthUserId(),
+			]);
 			respondJson(200, ['success' => true, 'message' => 'Data reset successfully']);
 		}
 
@@ -598,8 +681,16 @@ if ($method === 'POST') {
 	}
 
 	if ($postAction === 'reset_notifications_table') {
+		$userId = getApiAuthUserId();
 		try {
 			$pdo->exec('TRUNCATE TABLE notifications');
+			writeAuditEvent($pdo, [
+				'record_type' => 'notification',
+				'record_id' => null,
+				'action' => 'reset',
+				'details' => 'Notifications table truncated',
+				'actor_user_id' => $userId,
+			]);
 			respondJson(200, ['success' => true, 'message' => 'Notifications table reset successfully']);
 		} catch (Throwable $e) {
 			respondJson(500, ['success' => false, 'message' => 'Failed to reset notifications table']);
@@ -624,6 +715,7 @@ if ($method === 'POST') {
 
 	if ($postAction === 'notification_create') {
 		$userId = getApiAuthUserId();
+		enforceApiRateLimit('notification_create_' . $userId, 30, 60);
 		$created = createNotification(
 			$pdo,
 			$userId,
@@ -637,6 +729,15 @@ if ($method === 'POST') {
 			respondJson(400, ['success' => false, 'message' => $created['message'] ?? 'Failed to save notification']);
 		}
 
+		writeAuditEvent($pdo, [
+			'record_type' => 'notification',
+			'record_id' => (int)$created['id'],
+			'action' => 'notification_sent',
+			'details' => 'Notification sent by user #' . $userId . ' to user #' . $userId . ': ' . substr((string)($data['title'] ?? 'Notification'), 0, 160),
+			'actor_user_id' => $userId,
+			'target_user_id' => $userId,
+		]);
+
 		$payload = getNotificationsPayload($pdo, $userId, 25);
 		respondJson(200, [
 			'success' => true,
@@ -649,6 +750,7 @@ if ($method === 'POST') {
 
 	if ($postAction === 'notification_mark_read') {
 		$userId = getApiAuthUserId();
+		enforceApiRateLimit('notification_mark_read_' . $userId, 120, 60);
 		ensureNotificationsTable($pdo);
 		$notificationId = isset($data['id']) ? (int)$data['id'] : 0;
 		if ($notificationId < 1) {
@@ -673,6 +775,14 @@ if ($method === 'POST') {
 		]);
 
 		if ((int)($notification['is_read'] ?? 0) === 0) {
+			writeAuditEvent($pdo, [
+				'record_type' => 'notification',
+				'record_id' => $notificationId,
+				'action' => 'notification_read',
+				'details' => 'Unread -> Read',
+				'actor_user_id' => $userId,
+			]);
+
 			notifyOriginalSenderOfRecipientAction(
 				$pdo,
 				$userId,
@@ -695,6 +805,7 @@ if ($method === 'POST') {
 
 	if ($postAction === 'notifications_mark_all_read') {
 		$userId = getApiAuthUserId();
+		enforceApiRateLimit('notifications_mark_all_read_' . $userId, 20, 60);
 		ensureNotificationsTable($pdo);
 
 		$pendingSenderStmt = $pdo->prepare('SELECT sent_by_user_id, title, DATE_FORMAT(created_at, "%Y-%m-%d %H:%i:%s") AS sent_at_label FROM notifications WHERE user_id = :user_id AND is_read = 0 AND sent_by_user_id IS NOT NULL');
@@ -706,6 +817,16 @@ if ($method === 'POST') {
 			':read_at' => getDashboardSqlTimestamp(),
 			':user_id' => $userId,
 		]);
+
+		if (!empty($pendingSenderRows)) {
+			writeAuditEvent($pdo, [
+				'record_type' => 'notification',
+				'record_id' => null,
+				'action' => 'notification_mark_all_read',
+				'details' => 'Unread notifications present -> All notifications marked read',
+				'actor_user_id' => $userId,
+			]);
+		}
 
 		$recipientDisplayName = getApiAuthUserDisplayName();
 		foreach ($pendingSenderRows as $row) {
@@ -731,6 +852,7 @@ if ($method === 'POST') {
 
 	if ($postAction === 'notification_delete') {
 		$userId = getApiAuthUserId();
+		enforceApiRateLimit('notification_delete_' . $userId, 120, 60);
 		ensureNotificationsTable($pdo);
 		$notificationId = isset($data['id']) ? (int)$data['id'] : 0;
 		if ($notificationId < 1) {
@@ -751,6 +873,14 @@ if ($method === 'POST') {
 		$deleteStmt->execute([
 			':id' => $notificationId,
 			':user_id' => $userId,
+		]);
+
+		writeAuditEvent($pdo, [
+			'record_type' => 'notification',
+			'record_id' => $notificationId,
+			'action' => 'notification_deleted',
+			'details' => 'Notification existed -> Notification deleted',
+			'actor_user_id' => $userId,
 		]);
 
 		notifyOriginalSenderOfRecipientAction(
@@ -774,6 +904,7 @@ if ($method === 'POST') {
 
 	if ($postAction === 'notifications_delete_all') {
 		$userId = getApiAuthUserId();
+		enforceApiRateLimit('notifications_delete_all_' . $userId, 20, 60);
 		ensureNotificationsTable($pdo);
 
 		$senderStmt = $pdo->prepare('SELECT sent_by_user_id, title, DATE_FORMAT(created_at, "%Y-%m-%d %H:%i:%s") AS sent_at_label FROM notifications WHERE user_id = :user_id AND sent_by_user_id IS NOT NULL');
@@ -782,6 +913,16 @@ if ($method === 'POST') {
 
 		$deleteStmt = $pdo->prepare('DELETE FROM notifications WHERE user_id = :user_id');
 		$deleteStmt->execute([':user_id' => $userId]);
+
+		if (!empty($senderRows)) {
+			writeAuditEvent($pdo, [
+				'record_type' => 'notification',
+				'record_id' => null,
+				'action' => 'notification_delete_all',
+				'details' => 'Notifications existed -> All notifications deleted',
+				'actor_user_id' => $userId,
+			]);
+		}
 
 		$recipientDisplayName = getApiAuthUserDisplayName();
 		foreach ($senderRows as $row) {
@@ -806,6 +947,7 @@ if ($method === 'POST') {
 	}
 
 	if ($postAction === 'data_create') {
+		$actorUserId = getApiAuthUserId();
 		$title = normalizeRecordText($data['title'] ?? '');
 		$description = normalizeRecordText($data['description'] ?? '');
 
@@ -814,10 +956,12 @@ if ($method === 'POST') {
 		}
 
 		$timestamp = getDashboardSqlTimestamp();
-		$stmt = $pdo->prepare('INSERT INTO records (title, description, created_at, updated_at) VALUES (:title, :description, :created_at, :updated_at)');
+		$stmt = $pdo->prepare('INSERT INTO records (title, description, created_by_user_id, updated_by_user_id, created_at, updated_at) VALUES (:title, :description, :created_by_user_id, :updated_by_user_id, :created_at, :updated_at)');
 		$ok = $stmt->execute([
 			':title' => $title,
 			':description' => $description,
+			':created_by_user_id' => $actorUserId,
+			':updated_by_user_id' => $actorUserId,
 			':created_at' => $timestamp,
 			':updated_at' => $timestamp,
 		]);
@@ -828,10 +972,10 @@ if ($method === 'POST') {
 
 		$newId = (int)$pdo->lastInsertId();
 		$newItem = ['id' => $newId, 'title' => $title, 'description' => $description];
+		$createDetails = 'Title:  -> ' . $title . ', Description:  -> ' . $description;
 
 		addAuditEntries($pdo, [
-			['changeType' => 'ADD', 'recordId' => $newId, 'fieldName' => 'title', 'oldValue' => '', 'newValue' => $title],
-			['changeType' => 'ADD', 'recordId' => $newId, 'fieldName' => 'description', 'oldValue' => '', 'newValue' => $description]
+			['changeType' => 'ADD', 'recordId' => $newId, 'details' => $createDetails]
 		]);
 		addLog($pdo, 'A new entry has been added; ID ' . $newId . ' with title: "' . $title . '", and description: "' . $description . '"', 'record_created', 'record', $newId);
 
@@ -839,6 +983,7 @@ if ($method === 'POST') {
 	}
 
 	if ($postAction === 'data_update') {
+		$actorUserId = getApiAuthUserId();
 		$recordId = isset($data['id']) ? (int)$data['id'] : 0;
 		$title = normalizeRecordText($data['title'] ?? '');
 		$description = normalizeRecordText($data['description'] ?? '');
@@ -855,10 +1000,11 @@ if ($method === 'POST') {
 			respondJson(404, ['success' => false, 'message' => 'Record not found']);
 		}
 
-		$updateStmt = $pdo->prepare('UPDATE records SET title = :title, description = :description, updated_at = :updated_at WHERE id = :id');
+		$updateStmt = $pdo->prepare('UPDATE records SET title = :title, description = :description, updated_by_user_id = :updated_by_user_id, updated_at = :updated_at WHERE id = :id');
 		$ok = $updateStmt->execute([
 			':title' => $title,
 			':description' => $description,
+			':updated_by_user_id' => $actorUserId,
 			':updated_at' => getDashboardSqlTimestamp(),
 			':id' => $recordId,
 		]);
@@ -867,15 +1013,19 @@ if ($method === 'POST') {
 			respondJson(500, ['success' => false, 'message' => 'Failed to save data']);
 		}
 
-		$auditEntries = [];
+		$detailParts = [];
 		if ((string)$existingItem['title'] !== $title) {
-			$auditEntries[] = ['changeType' => 'EDIT', 'recordId' => $recordId, 'fieldName' => 'title', 'oldValue' => $existingItem['title'], 'newValue' => $title];
+			$detailParts[] = 'Title: ' . (string)$existingItem['title'] . ' -> ' . $title;
 		}
 		if ((string)$existingItem['description'] !== $description) {
-			$auditEntries[] = ['changeType' => 'EDIT', 'recordId' => $recordId, 'fieldName' => 'description', 'oldValue' => $existingItem['description'], 'newValue' => $description];
+			$detailParts[] = 'Description: ' . (string)$existingItem['description'] . ' -> ' . $description;
 		}
-		if (!empty($auditEntries)) {
-			addAuditEntries($pdo, $auditEntries);
+		if (!empty($detailParts)) {
+			addAuditEntries($pdo, [[
+				'changeType' => 'EDIT',
+				'recordId' => $recordId,
+				'details' => implode(', ', $detailParts)
+			]]);
 		}
 
 		addLog($pdo, 'An entry has been edited; ID ' . $recordId . ' with title: "' . $title . '", and description: "' . $description . '"', 'record_updated', 'record', $recordId);
@@ -903,7 +1053,11 @@ if ($method === 'POST') {
 			respondJson(500, ['success' => false, 'message' => 'Failed to save data']);
 		}
 
-		addAuditEntry($pdo, 'DELETE', $recordId, 'record', 'Title: "' . $deletedItem['title'] . '", Description: "' . $deletedItem['description'] . '"', '');
+		addAuditEntries($pdo, [[
+			'changeType' => 'DELETE',
+			'recordId' => $recordId,
+			'details' => 'Title: ' . (string)$deletedItem['title'] . ' -> (deleted), Description: ' . (string)$deletedItem['description'] . ' -> (deleted)'
+		]]);
 		addLog($pdo, 'An entry has been deleted; ID ' . $deletedItem['id'] . ' with title: "' . $deletedItem['title'] . '", and description: "' . $deletedItem['description'] . '"', 'record_deleted', 'record', (int)$deletedItem['id']);
 
 		respondJson(200, ['success' => true, 'message' => 'Record deleted successfully', 'item' => $deletedItem]);
@@ -945,9 +1099,7 @@ if ($method === 'POST') {
 			$auditEntries[] = [
 				'changeType' => 'DELETE',
 				'recordId' => (int)$item['id'],
-				'fieldName' => 'record',
-				'oldValue' => 'Title: "' . $item['title'] . '", Description: "' . $item['description'] . '"',
-				'newValue' => ''
+				'details' => 'Title: ' . (string)$item['title'] . ' -> (deleted), Description: ' . (string)$item['description'] . ' -> (deleted)'
 			];
 		}
 
@@ -972,6 +1124,7 @@ if ($method === 'POST') {
 	}
 
 	if ($action !== 'report_generated' && $action !== 'report_downloaded') {
+		$actorUserId = getApiAuthUserId();
 		$items = [];
 		$rawItems = is_array($data['data'] ?? null) && is_array(($data['data']['items'] ?? null)) ? $data['data']['items'] : [];
 		foreach ($rawItems as $item) {
@@ -986,7 +1139,7 @@ if ($method === 'POST') {
 		try {
 			$pdo->beginTransaction();
 			$pdo->exec('DELETE FROM records');
-			$insertStmt = $pdo->prepare('INSERT INTO records (id, title, description, created_at, updated_at) VALUES (:id, :title, :description, :created_at, :updated_at)');
+			$insertStmt = $pdo->prepare('INSERT INTO records (id, title, description, created_by_user_id, updated_by_user_id, created_at, updated_at) VALUES (:id, :title, :description, :created_by_user_id, :updated_by_user_id, :created_at, :updated_at)');
 			$ts = getDashboardSqlTimestamp();
 			$maxId = 0;
 			foreach ($items as $item) {
@@ -994,6 +1147,8 @@ if ($method === 'POST') {
 					':id' => $item['id'],
 					':title' => $item['title'],
 					':description' => $item['description'],
+					':created_by_user_id' => $actorUserId,
+					':updated_by_user_id' => $actorUserId,
 					':created_at' => $ts,
 					':updated_at' => $ts,
 				]);
@@ -1053,8 +1208,12 @@ if ($method === 'GET') {
 		exit;
 	}
 
-	echo json_encode(getDataPayload($pdo));
-	exit;
+	if ($action === '' || $action === 'data') {
+		echo json_encode(getDataPayload($pdo));
+		exit;
+	}
+
+	respondJson(400, ['success' => false, 'message' => 'Unknown GET action']);
 }
 
 
