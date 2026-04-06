@@ -262,6 +262,10 @@ function toggleTheme() {
 
 
 function setupResetButtonHandler() {
+	if ($('#reset-data-btn').length === 0) {
+		return;
+	}
+
 	$('#reset-data-btn').on('click', function() {
 		showToast({
 			type: 'warning',
@@ -296,10 +300,16 @@ function setupResetButtonHandler() {
 								});
 							},
 							error: function(xhr, status, error) {
+								const responseMessage = xhr && xhr.responseJSON && xhr.responseJSON.message
+									? xhr.responseJSON.message
+									: '';
+								const fallbackMessage = (xhr && xhr.status === 403)
+									? 'Reset is only available when APP_MODE is demo.'
+									: ('Error resetting data: ' + error);
 								showToast({
 									type: 'error',
 									title: 'Reset Failed',
-									message: 'Error resetting data: ' + error,
+									message: responseMessage || fallbackMessage,
 									showOkayButton: true,
 									autoCloseMs: 3000
 								});

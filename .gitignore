@@ -1,5 +1,1 @@
 config/.env
-data/.encrypted_init
-data/data.json
-data/logs.json
-data/audit_trail.json

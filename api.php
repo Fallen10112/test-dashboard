@@ -4,14 +4,9 @@ ini_set('display_errors', '0');
 
 header('Content-Type: application/json');
 
-require_once 'config/config.php';
+require_once __DIR__ . '/includes/sql_helpers.php';
 
-$dataFile = DATA_FILE;
-$logsFile = LOGS_FILE;
 $action = $_GET['action'] ?? null;
-
-$encryptionKey = ENCRYPTION_KEY;
-$encryptionCipher = ENCRYPTION_CIPHER;
 
 
 function respondJson($statusCode, $payload) {
@@ -75,144 +70,8 @@ function requireApiKeyAuthentication() {
 }
 
 
-function encryptData($data, $key, $cipher) {
-	$iv = openssl_random_pseudo_bytes(openssl_cipher_iv_length($cipher));
-	$encrypted = openssl_encrypt($data, $cipher, $key, 0, $iv);
-	return base64_encode($iv . $encrypted);
-}
-
-
-function decryptData($encryptedData, $key, $cipher) {
-	$data = base64_decode($encryptedData);
-	$ivLength = openssl_cipher_iv_length($cipher);
-	$iv = substr($data, 0, $ivLength);
-	$encrypted = substr($data, $ivLength);
-	return openssl_decrypt($encrypted, $cipher, $key, 0, $iv);
-}
-
-
-function writeFileWithLockRetry($filePath, $content, $maxRetries = 3, $retryDelayMicros = 120000) {
-	$attempt = 0;
-
-	while ($attempt <= $maxRetries) {
-		$dir = dirname($filePath);
-		if (!is_dir($dir)) {
-			mkdir($dir, 0755, true);
-		}
-
-		$fp = fopen($filePath, 'c+');
-		if ($fp !== false) {
-			if (flock($fp, LOCK_EX)) {
-				ftruncate($fp, 0);
-				rewind($fp);
-				$bytesWritten = fwrite($fp, $content);
-				fflush($fp);
-				flock($fp, LOCK_UN);
-				fclose($fp);
-
-				if ($bytesWritten !== false) {
-					return true;
-				}
-			} else {
-				fclose($fp);
-			}
-		}
-
-		$attempt++;
-		if ($attempt <= $maxRetries) {
-			usleep($retryDelayMicros);
-		}
-	}
-
-	return false;
-}
-
-
-function ensureDataDirectory() {
-	if (!is_dir(DATA_DIR)) {
-		mkdir(DATA_DIR, 0755, true);
-	}
-}
-
-
-function writeEncryptedJsonFile($filePath, $payload) {
-	global $encryptionKey, $encryptionCipher;
-
-	$jsonContent = json_encode($payload, JSON_UNESCAPED_SLASHES);
-	$encryptedContent = encryptData($jsonContent, $encryptionKey, $encryptionCipher);
-	return writeFileWithLockRetry($filePath, $encryptedContent);
-}
-
-
-function readEncryptedJsonFile($filePath, $defaultData) {
-	global $encryptionKey, $encryptionCipher;
-
-	ensureDataDirectory();
-
-	if (!file_exists($filePath) || filesize($filePath) === 0) {
-		writeEncryptedJsonFile($filePath, $defaultData);
-		return $defaultData;
-	}
-
-	$fileContent = file_get_contents($filePath);
-	$decryptedContent = decryptData($fileContent, $encryptionKey, $encryptionCipher);
-
-	if ($decryptedContent !== false && $decryptedContent !== '') {
-		$parsed = json_decode($decryptedContent, true);
-		if (is_array($parsed)) {
-			return $parsed;
-		}
-	}
-
-	$parsed = json_decode($fileContent, true);
-	if (is_array($parsed)) {
-		writeEncryptedJsonFile($filePath, $parsed);
-		return $parsed;
-	}
-
-	writeEncryptedJsonFile($filePath, $defaultData);
-	return $defaultData;
-}
-
-
-function getDataPayload() {
-	return readEncryptedJsonFile(DATA_FILE, ['items' => []]);
-}
-
-
-function getLogsPayload() {
-	return readEncryptedJsonFile(LOGS_FILE, ['logs' => []]);
-}
-
-
-function getAuditPayload() {
-	return readEncryptedJsonFile(DATA_DIR . '/audit_trail.json', ['entries' => []]);
-}
-
-
-function saveDataPayload($payload) {
-	return writeEncryptedJsonFile(DATA_FILE, $payload);
-}
-
-
-function sanitizeDataPayload($payload) {
-	$items = [];
-	$rawItems = is_array($payload) && isset($payload['items']) && is_array($payload['items']) ? $payload['items'] : [];
-
-	foreach ($rawItems as $item) {
-		$id = isset($item['id']) ? (int)$item['id'] : 0;
-		if ($id < 1) {
-			continue;
-		}
-
-		$items[] = [
-			'id' => $id,
-			'title' => trim((string)($item['title'] ?? '')),
-			'description' => trim((string)($item['description'] ?? ''))
-		];
-	}
-
-	return ['items' => $items];
+function normalizeRecordText($value) {
+	return trim((string)$value);
 }
 
 
@@ -251,140 +110,143 @@ function getDataQueryParams() {
 }
 
 
-function filterAndSortItems($items, $search, $sortColumn, $sortOrder) {
-	$normalizedSearch = strtolower($search);
-	$filteredItems = [];
-
-	foreach ($items as $item) {
-		$title = strtolower((string)($item['title'] ?? ''));
-		$description = strtolower((string)($item['description'] ?? ''));
-		if ($normalizedSearch === '' || strpos($title, $normalizedSearch) !== false || strpos($description, $normalizedSearch) !== false) {
-			$filteredItems[] = $item;
-		}
+function mapChangeTypeToAuditAction($changeType) {
+	$type = strtoupper(trim((string)$changeType));
+	if ($type === 'ADD') {
+		return 'create';
 	}
-
-	usort($filteredItems, function($left, $right) use ($sortColumn, $sortOrder) {
-		$leftValue = $left[$sortColumn] ?? '';
-		$rightValue = $right[$sortColumn] ?? '';
-
-		if ($sortColumn === 'id') {
-			$leftValue = (int)$leftValue;
-			$rightValue = (int)$rightValue;
-		} else {
-			$leftValue = strtolower((string)$leftValue);
-			$rightValue = strtolower((string)$rightValue);
-		}
-
-		if ($leftValue === $rightValue) {
-			return 0;
-		}
-
-		if ($sortOrder === 'asc') {
-			return $leftValue < $rightValue ? -1 : 1;
-		}
-
-		return $leftValue > $rightValue ? -1 : 1;
-	});
-
-	return $filteredItems;
+	if ($type === 'EDIT') {
+		return 'update';
+	}
+	if ($type === 'DELETE') {
+		return 'delete';
+	}
+	if ($type === 'BULK_DELETE') {
+		return 'bulk_delete';
+	}
+	if ($type === 'RESET') {
+		return 'reset';
+	}
+	return 'update';
 }
 
 
-function buildDataPagePayload($includeAllFilteredItems = false) {
-	$dataPayload = sanitizeDataPayload(getDataPayload());
-	$params = getDataQueryParams();
-	$allItems = $dataPayload['items'];
-	$filteredItems = filterAndSortItems($allItems, $params['search'], $params['sortColumn'], $params['sortOrder']);
-	$totalCount = count($allItems);
-	$filteredCount = count($filteredItems);
-	$totalPages = max(1, (int)ceil($filteredCount / $params['pageSize']));
-	$page = min($params['page'], $totalPages);
-	$offset = ($page - 1) * $params['pageSize'];
-	$pagedItems = array_slice($filteredItems, $offset, $params['pageSize']);
-
-	$payload = [
-		'items' => $pagedItems,
-		'page' => $page,
-		'pageSize' => $params['pageSize'],
-		'totalPages' => $totalPages,
-		'totalCount' => $totalCount,
-		'filteredCount' => $filteredCount,
-		'search' => $params['search'],
-		'sortColumn' => $params['sortColumn'],
-		'sortOrder' => $params['sortOrder']
-	];
-
-	if ($includeAllFilteredItems) {
-		$payload['filteredItems'] = $filteredItems;
+function mapAuditActionToChangeType($action, $fieldName = '') {
+	$action = strtolower((string)$action);
+	if ($action === 'create') {
+		return 'ADD';
 	}
-
-	return $payload;
+	if ($action === 'update') {
+		return 'EDIT';
+	}
+	if ($action === 'delete' || $action === 'bulk_delete') {
+		return 'DELETE';
+	}
+	if ($action === 'reset') {
+		return 'RESET';
+	}
+	return strtoupper((string)$action);
 }
 
 
-function addLog($event) {
-	$logsData = getLogsPayload();
-	$logs = isset($logsData['logs']) && is_array($logsData['logs']) ? $logsData['logs'] : [];
-	$date = date('Y-m-d', time() - 3600);
-	$time = date('H:i:s', time() - 3600);
-	$newId = 1;
+function getDataPayload(PDO $pdo) {
+	$stmt = $pdo->query('SELECT id, title, description FROM records WHERE deleted_at IS NULL ORDER BY id ASC');
+	$items = $stmt->fetchAll();
+	return ['items' => is_array($items) ? $items : []];
+}
 
-	if (!empty($logs)) {
-		$ids = array_column($logs, 'id');
-		if (!empty($ids)) {
-			$newId = max($ids) + 1;
+
+function getLogsPayload(PDO $pdo) {
+	$stmt = $pdo->query('SELECT id, DATE_FORMAT(created_at, "%Y-%m-%d") AS `date`, DATE_FORMAT(created_at, "%H:%i:%s") AS `time`, message AS event FROM activity_log ORDER BY id ASC');
+	$rows = $stmt->fetchAll();
+	return ['logs' => is_array($rows) ? $rows : []];
+}
+
+
+function getAuditPayload(PDO $pdo) {
+	$stmt = $pdo->query('SELECT id, DATE_FORMAT(created_at, "%Y-%m-%d") AS `date`, DATE_FORMAT(created_at, "%H:%i:%s") AS `time`, action, record_id, field_name, old_value, new_value FROM audit_log ORDER BY id ASC');
+	$rows = $stmt->fetchAll();
+	$entries = [];
+
+	foreach ($rows as $row) {
+		$fieldName = (string)($row['field_name'] ?? '');
+		$recordId = $row['record_id'];
+		if ($recordId === null && $fieldName === 'bulk_action') {
+			$recordId = 'BULK';
 		}
+		if ($recordId === null) {
+			$recordId = '';
+		}
+
+		$entries[] = [
+			'id' => (int)$row['id'],
+			'date' => (string)$row['date'],
+			'time' => (string)$row['time'],
+			'change_type' => mapAuditActionToChangeType($row['action'] ?? '', $fieldName),
+			'record_id' => $recordId,
+			'field_name' => $fieldName,
+			'old_value' => (string)($row['old_value'] ?? ''),
+			'new_value' => (string)($row['new_value'] ?? ''),
+		];
 	}
 
-	$logs[] = [
-		'id' => $newId,
-		'date' => $date,
-		'time' => $time,
-		'event' => $event
-	];
-
-	return writeEncryptedJsonFile(LOGS_FILE, ['logs' => $logs]);
+	return ['entries' => $entries];
 }
 
 
-function addAuditEntries($entries) {
+function addLog(PDO $pdo, $event, $eventType = 'event', $relatedRecordType = null, $relatedRecordId = null) {
+	$message = trim((string)$event);
+	if ($message === '') {
+		return true;
+	}
+
+	$timestamp = getDashboardSqlTimestamp();
+	$stmt = $pdo->prepare('INSERT INTO activity_log (event_type, message, related_record_type, related_record_id, created_at) VALUES (:event_type, :message, :related_record_type, :related_record_id, :created_at)');
+	return $stmt->execute([
+		':event_type' => (string)$eventType,
+		':message' => $message,
+		':related_record_type' => $relatedRecordType,
+		':related_record_id' => $relatedRecordId,
+		':created_at' => $timestamp,
+	]);
+}
+
+
+function addAuditEntries(PDO $pdo, $entries) {
 	if (!is_array($entries) || empty($entries)) {
 		return false;
 	}
 
-	$auditData = getAuditPayload();
-	$auditEntries = isset($auditData['entries']) && is_array($auditData['entries']) ? $auditData['entries'] : [];
-	$date = date('Y-m-d', time() - 3600);
-	$time = date('H:i:s', time() - 3600);
-	$newId = 1;
+	$timestamp = getDashboardSqlTimestamp();
+	$stmt = $pdo->prepare('INSERT INTO audit_log (record_type, record_id, action, field_name, old_value, new_value, created_at) VALUES (:record_type, :record_id, :action, :field_name, :old_value, :new_value, :created_at)');
 
-	if (!empty($auditEntries)) {
-		$ids = array_column($auditEntries, 'id');
-		if (!empty($ids)) {
-			$newId = max($ids) + 1;
+	foreach ($entries as $entry) {
+		$recordIdRaw = $entry['recordId'] ?? null;
+		$recordId = is_numeric($recordIdRaw) ? (int)$recordIdRaw : null;
+		$fieldName = (string)($entry['fieldName'] ?? '');
+		$action = mapChangeTypeToAuditAction($entry['changeType'] ?? '');
+
+		$ok = $stmt->execute([
+			':record_type' => 'record',
+			':record_id' => $recordId,
+			':action' => $action,
+			':field_name' => $fieldName !== '' ? $fieldName : null,
+			':old_value' => isset($entry['oldValue']) ? (string)$entry['oldValue'] : null,
+			':new_value' => isset($entry['newValue']) ? (string)$entry['newValue'] : null,
+			':created_at' => $timestamp,
+		]);
+
+		if (!$ok) {
+			return false;
 		}
 	}
 
-	foreach ($entries as $entry) {
-		$auditEntries[] = [
-			'id' => $newId,
-			'date' => $date,
-			'time' => $time,
-			'change_type' => $entry['changeType'] ?? '',
-			'record_id' => $entry['recordId'] ?? '',
-			'field_name' => $entry['fieldName'] ?? '',
-			'old_value' => $entry['oldValue'] ?? '',
-			'new_value' => $entry['newValue'] ?? ''
-		];
-		$newId++;
-	}
-
-	return writeEncryptedJsonFile(DATA_DIR . '/audit_trail.json', ['entries' => $auditEntries]);
+	return true;
 }
 
 
-function addAuditEntry($changeType, $recordId, $fieldName, $oldValue, $newValue) {
-	return addAuditEntries([[
+function addAuditEntry(PDO $pdo, $changeType, $recordId, $fieldName, $oldValue, $newValue) {
+	return addAuditEntries($pdo, [[
 		'changeType' => $changeType,
 		'recordId' => $recordId,
 		'fieldName' => $fieldName,
@@ -394,20 +256,62 @@ function addAuditEntry($changeType, $recordId, $fieldName, $oldValue, $newValue)
 }
 
 
-function getNextDataRecordId($items) {
-	$maxId = 0;
-	foreach ($items as $item) {
-		$itemId = isset($item['id']) ? (int)$item['id'] : 0;
-		if ($itemId > $maxId) {
-			$maxId = $itemId;
-		}
+function buildDataPagePayload(PDO $pdo, $includeAllFilteredItems = false) {
+	$params = getDataQueryParams();
+	$search = $params['search'];
+	$sortColumn = $params['sortColumn'];
+	$sortOrder = $params['sortOrder'];
+	$page = $params['page'];
+	$pageSize = $params['pageSize'];
+
+	$where = 'WHERE deleted_at IS NULL';
+	$bindings = [];
+	if ($search !== '') {
+		$where .= ' AND (title LIKE :search OR description LIKE :search)';
+		$bindings[':search'] = '%' . $search . '%';
 	}
-	return $maxId + 1;
-}
 
+	$totalCountStmt = $pdo->query('SELECT COUNT(*) FROM records WHERE deleted_at IS NULL');
+	$totalCount = (int)$totalCountStmt->fetchColumn();
 
-function normalizeRecordText($value) {
-	return trim((string)$value);
+	$filteredCountStmt = $pdo->prepare('SELECT COUNT(*) FROM records ' . $where);
+	$filteredCountStmt->execute($bindings);
+	$filteredCount = (int)$filteredCountStmt->fetchColumn();
+
+	$totalPages = max(1, (int)ceil($filteredCount / $pageSize));
+	$page = min($page, $totalPages);
+	$offset = ($page - 1) * $pageSize;
+
+	$dataSql = 'SELECT id, title, description FROM records ' . $where . ' ORDER BY ' . $sortColumn . ' ' . $sortOrder . ' LIMIT :limit OFFSET :offset';
+	$dataStmt = $pdo->prepare($dataSql);
+	foreach ($bindings as $key => $value) {
+		$dataStmt->bindValue($key, $value, PDO::PARAM_STR);
+	}
+	$dataStmt->bindValue(':limit', $pageSize, PDO::PARAM_INT);
+	$dataStmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+	$dataStmt->execute();
+	$pagedItems = $dataStmt->fetchAll();
+
+	$payload = [
+		'items' => is_array($pagedItems) ? $pagedItems : [],
+		'page' => $page,
+		'pageSize' => $pageSize,
+		'totalPages' => $totalPages,
+		'totalCount' => $totalCount,
+		'filteredCount' => $filteredCount,
+		'search' => $search,
+		'sortColumn' => $sortColumn,
+		'sortOrder' => $sortOrder
+	];
+
+	if ($includeAllFilteredItems) {
+		$allFilteredSql = 'SELECT id, title, description FROM records ' . $where . ' ORDER BY ' . $sortColumn . ' ' . $sortOrder;
+		$allFilteredStmt = $pdo->prepare($allFilteredSql);
+		$allFilteredStmt->execute($bindings);
+		$payload['filteredItems'] = $allFilteredStmt->fetchAll();
+	}
+
+	return $payload;
 }
 
 
@@ -420,25 +324,10 @@ if ($method === 'OPTIONS') {
 
 requireApiKeyAuthentication();
 
-$initFile = DATA_DIR . '/.encrypted_init';
-if (!file_exists($initFile) && (file_exists($dataFile) || file_exists($logsFile))) {
-	if (file_exists($dataFile)) {
-		$dataContent = file_get_contents($dataFile);
-		if (substr($dataContent, 0, 4) !== 'base') {
-			$encryptedData = encryptData($dataContent, $encryptionKey, $encryptionCipher);
-			writeFileWithLockRetry($dataFile, $encryptedData);
-		}
-	}
-
-	if (file_exists($logsFile)) {
-		$logsContent = file_get_contents($logsFile);
-		if (substr($logsContent, 0, 4) !== 'base') {
-			$encryptedLogs = encryptData($logsContent, $encryptionKey, $encryptionCipher);
-			writeFileWithLockRetry($logsFile, $encryptedLogs);
-		}
-	}
-
-	writeFileWithLockRetry($initFile, 'initialized');
+try {
+	$pdo = getDashboardPdo();
+} catch (Throwable $e) {
+	respondJson(500, ['success' => false, 'message' => 'Database connection failed']);
 }
 
 
@@ -454,27 +343,19 @@ if ($method === 'POST') {
 	$postAction = $data['action'] ?? '';
 
 	if ($postAction === 'reset_data') {
-		$testData = [
-			'items' => [
-				['id' => 1, 'title' => 'Sample Entry 1', 'description' => 'This is a test entry to demonstrate the system.'],
-				['id' => 2, 'title' => 'Sample Entry 2', 'description' => 'Another test entry showing the data management features.'],
-				['id' => 3, 'title' => 'Sample Entry 3', 'description' => 'A third test entry to provide a complete example.']
-			]
-		];
+		if (APP_MODE !== 'demo') {
+			respondJson(403, ['success' => false, 'message' => 'Reset is only allowed in demo mode']);
+		}
 
-		$dataWriteSuccess = writeEncryptedJsonFile($dataFile, $testData);
-		$logsWriteSuccess = writeEncryptedJsonFile($logsFile, ['logs' => []]);
-		$auditWriteSuccess = writeEncryptedJsonFile(DATA_DIR . '/audit_trail.json', ['entries' => []]);
-
-		if ($dataWriteSuccess && $logsWriteSuccess && $auditWriteSuccess) {
+		if (resetDashboardSqlData($pdo)) {
 			respondJson(200, ['success' => true, 'message' => 'Data reset successfully']);
 		}
 
-		respondJson(500, ['success' => false, 'message' => 'Failed to reset one or more data files']);
+		respondJson(500, ['success' => false, 'message' => 'Failed to reset data']);
 	}
 
 	if ($postAction === 'add_audit_entry') {
-		$success = addAuditEntry($data['changeType'] ?? '', $data['recordId'] ?? '', $data['fieldName'] ?? '', $data['oldValue'] ?? '', $data['newValue'] ?? '');
+		$success = addAuditEntry($pdo, $data['changeType'] ?? '', $data['recordId'] ?? '', $data['fieldName'] ?? '', $data['oldValue'] ?? '', $data['newValue'] ?? '');
 		if ($success) {
 			respondJson(200, ['success' => true, 'message' => 'Audit entry added']);
 		}
@@ -482,7 +363,7 @@ if ($method === 'POST') {
 	}
 
 	if ($postAction === 'add_audit_entries') {
-		$success = addAuditEntries($data['entries'] ?? []);
+		$success = addAuditEntries($pdo, $data['entries'] ?? []);
 		if ($success) {
 			respondJson(200, ['success' => true, 'message' => 'Audit entries added']);
 		}
@@ -497,20 +378,27 @@ if ($method === 'POST') {
 			respondJson(400, ['success' => false, 'message' => 'Title and description are required']);
 		}
 
-		$dataPayload = sanitizeDataPayload(getDataPayload());
-		$newId = getNextDataRecordId($dataPayload['items']);
-		$newItem = ['id' => $newId, 'title' => $title, 'description' => $description];
-		$dataPayload['items'][] = $newItem;
+		$timestamp = getDashboardSqlTimestamp();
+		$stmt = $pdo->prepare('INSERT INTO records (title, description, created_at, updated_at) VALUES (:title, :description, :created_at, :updated_at)');
+		$ok = $stmt->execute([
+			':title' => $title,
+			':description' => $description,
+			':created_at' => $timestamp,
+			':updated_at' => $timestamp,
+		]);
 
-		if (!saveDataPayload($dataPayload)) {
+		if (!$ok) {
 			respondJson(500, ['success' => false, 'message' => 'Failed to save data']);
 		}
 
-		addAuditEntries([
+		$newId = (int)$pdo->lastInsertId();
+		$newItem = ['id' => $newId, 'title' => $title, 'description' => $description];
+
+		addAuditEntries($pdo, [
 			['changeType' => 'ADD', 'recordId' => $newId, 'fieldName' => 'title', 'oldValue' => '', 'newValue' => $title],
 			['changeType' => 'ADD', 'recordId' => $newId, 'fieldName' => 'description', 'oldValue' => '', 'newValue' => $description]
 		]);
-		addLog('A new entry has been added; ID ' . $newId . ' with title: "' . $title . '", and description: "' . $description . '"');
+		addLog($pdo, 'A new entry has been added; ID ' . $newId . ' with title: "' . $title . '", and description: "' . $description . '"', 'record_created', 'record', $newId);
 
 		respondJson(200, ['success' => true, 'message' => 'Record created successfully', 'item' => $newItem]);
 	}
@@ -524,44 +412,40 @@ if ($method === 'POST') {
 			respondJson(400, ['success' => false, 'message' => 'Valid id, title, and description are required']);
 		}
 
-		$dataPayload = sanitizeDataPayload(getDataPayload());
-		$items = $dataPayload['items'];
-		$foundIndex = -1;
+		$findStmt = $pdo->prepare('SELECT id, title, description FROM records WHERE id = :id AND deleted_at IS NULL LIMIT 1');
+		$findStmt->execute([':id' => $recordId]);
+		$existingItem = $findStmt->fetch();
 
-		for ($i = 0; $i < count($items); $i++) {
-			if ((int)$items[$i]['id'] === $recordId) {
-				$foundIndex = $i;
-				break;
-			}
-		}
-
-		if ($foundIndex === -1) {
+		if (!$existingItem) {
 			respondJson(404, ['success' => false, 'message' => 'Record not found']);
 		}
 
-		$existingItem = $items[$foundIndex];
-		$auditEntries = [];
-		if ($existingItem['title'] !== $title) {
-			$auditEntries[] = ['changeType' => 'EDIT', 'recordId' => $recordId, 'fieldName' => 'title', 'oldValue' => $existingItem['title'], 'newValue' => $title];
-		}
-		if ($existingItem['description'] !== $description) {
-			$auditEntries[] = ['changeType' => 'EDIT', 'recordId' => $recordId, 'fieldName' => 'description', 'oldValue' => $existingItem['description'], 'newValue' => $description];
-		}
+		$updateStmt = $pdo->prepare('UPDATE records SET title = :title, description = :description, updated_at = :updated_at WHERE id = :id');
+		$ok = $updateStmt->execute([
+			':title' => $title,
+			':description' => $description,
+			':updated_at' => getDashboardSqlTimestamp(),
+			':id' => $recordId,
+		]);
 
-		$items[$foundIndex]['title'] = $title;
-		$items[$foundIndex]['description'] = $description;
-		$dataPayload['items'] = $items;
-
-		if (!saveDataPayload($dataPayload)) {
+		if (!$ok) {
 			respondJson(500, ['success' => false, 'message' => 'Failed to save data']);
 		}
 
-		if (!empty($auditEntries)) {
-			addAuditEntries($auditEntries);
+		$auditEntries = [];
+		if ((string)$existingItem['title'] !== $title) {
+			$auditEntries[] = ['changeType' => 'EDIT', 'recordId' => $recordId, 'fieldName' => 'title', 'oldValue' => $existingItem['title'], 'newValue' => $title];
 		}
-		addLog('An entry has been edited; ID ' . $recordId . ' with title: "' . $title . '", and description: "' . $description . '"');
+		if ((string)$existingItem['description'] !== $description) {
+			$auditEntries[] = ['changeType' => 'EDIT', 'recordId' => $recordId, 'fieldName' => 'description', 'oldValue' => $existingItem['description'], 'newValue' => $description];
+		}
+		if (!empty($auditEntries)) {
+			addAuditEntries($pdo, $auditEntries);
+		}
 
-		respondJson(200, ['success' => true, 'message' => 'Record updated successfully', 'item' => $items[$foundIndex]]);
+		addLog($pdo, 'An entry has been edited; ID ' . $recordId . ' with title: "' . $title . '", and description: "' . $description . '"', 'record_updated', 'record', $recordId);
+
+		respondJson(200, ['success' => true, 'message' => 'Record updated successfully', 'item' => ['id' => $recordId, 'title' => $title, 'description' => $description]]);
 	}
 
 	if ($postAction === 'data_delete') {
@@ -570,29 +454,22 @@ if ($method === 'POST') {
 			respondJson(400, ['success' => false, 'message' => 'A valid record id is required']);
 		}
 
-		$dataPayload = sanitizeDataPayload(getDataPayload());
-		$deletedItem = null;
-		$remainingItems = [];
+		$findStmt = $pdo->prepare('SELECT id, title, description FROM records WHERE id = :id AND deleted_at IS NULL LIMIT 1');
+		$findStmt->execute([':id' => $recordId]);
+		$deletedItem = $findStmt->fetch();
 
-		foreach ($dataPayload['items'] as $item) {
-			if ((int)$item['id'] === $recordId) {
-				$deletedItem = $item;
-				continue;
-			}
-			$remainingItems[] = $item;
-		}
-
-		if ($deletedItem === null) {
+		if (!$deletedItem) {
 			respondJson(404, ['success' => false, 'message' => 'Record not found']);
 		}
 
-		$dataPayload['items'] = $remainingItems;
-		if (!saveDataPayload($dataPayload)) {
+		$deleteStmt = $pdo->prepare('DELETE FROM records WHERE id = :id');
+		$ok = $deleteStmt->execute([':id' => $recordId]);
+		if (!$ok) {
 			respondJson(500, ['success' => false, 'message' => 'Failed to save data']);
 		}
 
-		addAuditEntry('DELETE', $recordId, 'record', 'Title: "' . $deletedItem['title'] . '", Description: "' . $deletedItem['description'] . '"', '');
-		addLog('An entry has been deleted; ID ' . $deletedItem['id'] . ' with title: "' . $deletedItem['title'] . '", and description: "' . $deletedItem['description'] . '"');
+		addAuditEntry($pdo, 'DELETE', $recordId, 'record', 'Title: "' . $deletedItem['title'] . '", Description: "' . $deletedItem['description'] . '"', '');
+		addLog($pdo, 'An entry has been deleted; ID ' . $deletedItem['id'] . ' with title: "' . $deletedItem['title'] . '", and description: "' . $deletedItem['description'] . '"', 'record_deleted', 'record', (int)$deletedItem['id']);
 
 		respondJson(200, ['success' => true, 'message' => 'Record deleted successfully', 'item' => $deletedItem]);
 	}
@@ -611,35 +488,28 @@ if ($method === 'POST') {
 			respondJson(400, ['success' => false, 'message' => 'At least one valid record id is required']);
 		}
 
-		$dataPayload = sanitizeDataPayload(getDataPayload());
-		$deletedItems = [];
-		$remainingItems = [];
-
-		foreach ($dataPayload['items'] as $item) {
-			$itemId = (int)$item['id'];
-			if (isset($normalizedIds[$itemId])) {
-				$deletedItems[] = $item;
-				continue;
-			}
-			$remainingItems[] = $item;
-		}
+		$placeholders = implode(', ', array_fill(0, count($normalizedIds), '?'));
+		$idValues = array_keys($normalizedIds);
+		$selectSql = 'SELECT id, title, description FROM records WHERE id IN (' . $placeholders . ') AND deleted_at IS NULL ORDER BY id ASC';
+		$selectStmt = $pdo->prepare($selectSql);
+		$selectStmt->execute($idValues);
+		$deletedItems = $selectStmt->fetchAll();
 
 		if (empty($deletedItems)) {
 			respondJson(404, ['success' => false, 'message' => 'No matching records were found']);
 		}
 
-		$dataPayload['items'] = $remainingItems;
-		if (!saveDataPayload($dataPayload)) {
-			respondJson(500, ['success' => false, 'message' => 'Failed to save data']);
-		}
+		$deleteSql = 'DELETE FROM records WHERE id IN (' . $placeholders . ')';
+		$deleteStmt = $pdo->prepare($deleteSql);
+		$deleteStmt->execute($idValues);
 
 		$deletedIds = [];
 		$auditEntries = [];
 		foreach ($deletedItems as $item) {
-			$deletedIds[] = $item['id'];
+			$deletedIds[] = (int)$item['id'];
 			$auditEntries[] = [
 				'changeType' => 'DELETE',
-				'recordId' => $item['id'],
+				'recordId' => (int)$item['id'],
 				'fieldName' => 'record',
 				'oldValue' => 'Title: "' . $item['title'] . '", Description: "' . $item['description'] . '"',
 				'newValue' => ''
@@ -647,15 +517,14 @@ if ($method === 'POST') {
 		}
 
 		$auditEntries[] = [
-			'changeType' => 'DELETE',
-			'recordId' => 'BULK',
+			'changeType' => 'BULK_DELETE',
+			'recordId' => null,
 			'fieldName' => 'bulk_action',
 			'oldValue' => 'Selected IDs: ' . implode(', ', $deletedIds),
 			'newValue' => 'Deleted ' . count($deletedItems) . ' records'
 		];
-
-		addAuditEntries($auditEntries);
-		addLog('Bulk delete completed for ' . count($deletedItems) . ' records (IDs: ' . implode(', ', $deletedIds) . ')');
+		addAuditEntries($pdo, $auditEntries);
+		addLog($pdo, 'Bulk delete completed for ' . count($deletedItems) . ' records (IDs: ' . implode(', ', $deletedIds) . ')', 'record_bulk_deleted', 'record', null);
 
 		respondJson(200, ['success' => true, 'message' => 'Bulk delete completed successfully', 'deletedCount' => count($deletedItems), 'deletedIds' => $deletedIds]);
 	}
@@ -663,17 +532,54 @@ if ($method === 'POST') {
 	$eventMessage = $data['event'] ?? '';
 	$logSuccess = true;
 	if ($eventMessage !== '') {
-		$logSuccess = addLog($eventMessage);
+		$eventType = ($action === 'report_downloaded') ? 'report_downloaded' : (($action === 'report_generated') ? 'report_generated' : 'event');
+		$logSuccess = addLog($pdo, $eventMessage, $eventType, null, null);
 	}
 
 	if ($action !== 'report_generated' && $action !== 'report_downloaded') {
-		$payload = sanitizeDataPayload($data['data'] ?? ['items' => []]);
-		if (saveDataPayload($payload) && $logSuccess) {
+		$items = [];
+		$rawItems = is_array($data['data'] ?? null) && is_array(($data['data']['items'] ?? null)) ? $data['data']['items'] : [];
+		foreach ($rawItems as $item) {
+			$id = isset($item['id']) ? (int)$item['id'] : 0;
+			$title = normalizeRecordText($item['title'] ?? '');
+			$description = normalizeRecordText($item['description'] ?? '');
+			if ($id > 0 && $title !== '' && $description !== '') {
+				$items[] = ['id' => $id, 'title' => $title, 'description' => $description];
+			}
+		}
+
+		try {
+			$pdo->beginTransaction();
+			$pdo->exec('DELETE FROM records');
+			$insertStmt = $pdo->prepare('INSERT INTO records (id, title, description, created_at, updated_at) VALUES (:id, :title, :description, :created_at, :updated_at)');
+			$ts = getDashboardSqlTimestamp();
+			$maxId = 0;
+			foreach ($items as $item) {
+				$insertStmt->execute([
+					':id' => $item['id'],
+					':title' => $item['title'],
+					':description' => $item['description'],
+					':created_at' => $ts,
+					':updated_at' => $ts,
+				]);
+				if ($item['id'] > $maxId) {
+					$maxId = $item['id'];
+				}
+			}
+			$pdo->exec('ALTER TABLE records AUTO_INCREMENT = ' . ((int)$maxId + 1));
+			$pdo->commit();
+		} catch (Throwable $e) {
+			if ($pdo->inTransaction()) {
+				$pdo->rollBack();
+			}
+			respondJson(500, ['success' => false, 'message' => 'Failed to save data']);
+		}
+
+		if ($logSuccess) {
 			respondJson(200, ['success' => true, 'message' => 'Data saved successfully']);
 		}
 
-		$errorMsg = $logSuccess ? 'Failed to save data' : 'Failed to save log entry';
-		respondJson(500, ['success' => false, 'message' => $errorMsg]);
+		respondJson(500, ['success' => false, 'message' => 'Failed to save log entry']);
 	}
 
 	respondJson(200, ['success' => true, 'message' => 'Event logged successfully']);
@@ -682,30 +588,29 @@ if ($method === 'POST') {
 
 if ($method === 'GET') {
 	if ($action === 'audit_trail') {
-		echo json_encode(getAuditPayload());
+		echo json_encode(getAuditPayload($pdo));
 		exit;
 	}
 
 	if ($action === 'logs') {
-		echo json_encode(getLogsPayload());
+		echo json_encode(getLogsPayload($pdo));
 		exit;
 	}
 
 	if ($action === 'data_page') {
-		echo json_encode(buildDataPagePayload(false));
+		echo json_encode(buildDataPagePayload($pdo, false));
 		exit;
 	}
 
 	if ($action === 'data_filtered_export') {
-		echo json_encode(buildDataPagePayload(true));
+		echo json_encode(buildDataPagePayload($pdo, true));
 		exit;
 	}
 
-	echo json_encode(getDataPayload());
+	echo json_encode(getDataPayload($pdo));
 	exit;
 }
 
 
 respondJson(405, ['success' => false, 'message' => 'Method not allowed']);
 ?>
-

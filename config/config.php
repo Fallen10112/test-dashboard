@@ -16,11 +16,8 @@ if (file_exists($envFile)) {
 	}
 }
 
-define('ENCRYPTION_KEY', getenv('ENCRYPTION_KEY') ?: 'showcase-dashboard-encryption-key-2026');
-define('ENCRYPTION_CIPHER', 'AES-256-CBC');
 define('API_KEY', getenv('API_KEY') ?: 'local-dev-api-key-change-me');
 define('API_KEY_HEADER', 'X-API-Key');
-define('STORAGE_DRIVER', strtolower(getenv('STORAGE_DRIVER') ?: 'json'));
 define('DB_CONNECTION', strtolower(getenv('DB_CONNECTION') ?: 'mysql'));
 define('DB_HOST', getenv('DB_HOST') ?: '127.0.0.1');
 define('DB_PORT', getenv('DB_PORT') ?: '3306');
@@ -46,13 +43,5 @@ define('APP_MODE', $appMode);
 
 $defaultResetOnIndexVisit = APP_MODE === 'demo';
 define('RESET_ON_INDEX_VISIT', envToBool(getenv('RESET_ON_INDEX_VISIT'), $defaultResetOnIndexVisit));
-
-define('DATA_DIR', __DIR__ . '/../data');
-define('DATA_FILE', DATA_DIR . '/data.json');
-define('LOGS_FILE', DATA_DIR . '/logs.json');
-
-if (!is_dir(DATA_DIR)) {
-	mkdir(DATA_DIR, 0755, true);
-}
 ?>
 

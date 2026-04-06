@@ -7,6 +7,7 @@
 	<?php require_once __DIR__ . '/../config/config.php'; ?>
 	<script>
 		window.DASHBOARD_API_KEY = <?php echo json_encode((string)API_KEY, JSON_UNESCAPED_SLASHES); ?>;
+		window.DASHBOARD_APP_MODE = <?php echo json_encode((string)APP_MODE, JSON_UNESCAPED_SLASHES); ?>;
 	</script>
 
 	<script src="../js/core/shared.js"></script>

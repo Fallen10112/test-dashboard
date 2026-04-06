@@ -14,7 +14,7 @@
 				<li><strong>Reliable Change History</strong> - Every add/edit/delete is captured with field-level audit detail</li>
 				<li><strong>Exports That Match Your View</strong> - Download filtered results as PDF or CSV</li>
 				<li><strong>Operational Visibility</strong> - Header KPIs show totals and daily activity at a glance</li>
-				<li><strong>Secure by Default</strong> - Encrypted storage (AES-256-CBC) plus write lock/retry protection</li>
+				<li><strong>Secure by Default</strong> - SQL-backed storage with API key protection and validated server-side operations</li>
 				<li><strong>Mobile-Ready UI</strong> - Responsive layout for desktop and phone screens</li>
 			</ul>
 			
@@ -28,9 +28,9 @@
 			
 			<h3 style="margin-top: 30px; margin-bottom: 10px; color: #2c3e50; font-size: 1.3em;">Built With</h3>
 			<ul>
-				<li><strong>Backend</strong> - PHP + OpenSSL (AES-256-CBC)</li>
+				<li><strong>Backend</strong> - PHP + MySQL (SQL API endpoints)</li>
 				<li><strong>Frontend</strong> - HTML, CSS, jQuery, modular JavaScript</li>
-				<li><strong>Storage</strong> - Encrypted JSON data, logs, and audit trail files</li>
+				<li><strong>Storage</strong> - MySQL tables for records, activity logs, and audit trail</li>
 			</ul>
 		</section>
 	</main>

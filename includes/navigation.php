@@ -17,9 +17,11 @@
 		</div>
 		
 		
+		<?php if (APP_MODE === 'demo'): ?>
 		<div class="reset-button-container">
 			<button id="reset-data-btn" class="btn btn-reset">Reset Data</button>
 		</div>
+		<?php endif; ?>
 
 		<div class="sidebar-footer">
 			<a href="https://github.com/Fallen10112/test-dashboard" target="_blank" rel="noopener noreferrer" class="sidebar-footer-link">

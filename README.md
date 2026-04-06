@@ -1,12 +1,12 @@
 # Dashboard Showcase
 
-A comprehensive web-based dashboard built with PHP, jQuery, HTML, CSS, and modern web technologies. Features secure data management with AES-256-CBC encryption, complete audit trail tracking, activity logging, and report generation capabilities.
+A comprehensive web-based dashboard built with PHP, MySQL, jQuery, HTML, CSS, and modern web technologies. Features secure SQL-backed data management, complete audit trail tracking, activity logging, and report generation capabilities.
 
 ## Project Structure
 
 ```
 test-dashboard/
-├── index.php              # Entry point (resets JSON files, then redirects to home.php)
+├── index.php              # Entry point (demo-mode SQL reset, then redirects to home.php)
 ├── pages/
 │   ├── home.php           # Home/Welcome page with project overview
 │   ├── data.php           # Data management page (CRUD operations)
@@ -30,21 +30,17 @@ test-dashboard/
 │   │   └── audit-page.js  # Audit trail filters, table/timeline rendering, diff markup
 │   └── pages/
 │       └── app-init.js    # Page-aware bootstrap and shared UI initialization
-├── data/
-│   ├── data.json          # Main data storage (encrypted)
-│   ├── logs.json          # Administrative activity logs (encrypted)
-│   └── audit_trail.json   # Complete change history (encrypted)
 ├── api.php                # Backend API for all operations
 └── README.md              # This file
 ```
 
 ## Technologies Used
 
-- **Backend**: PHP 7.0+ with OpenSSL encryption (AES-256-CBC)
+- **Backend**: PHP 7.0+ with PDO MySQL
 - **Frontend**: jQuery, HTML5, CSS3 with responsive design
-- **Data Storage**: Encrypted JSON files
-- **Security**: AES-256-CBC encryption for all sensitive data
-- **Encryption Key Management**: Environment variable support via `.env` file, with a built-in fallback key if not set
+- **Data Storage**: MySQL tables (`records`, `activity_log`, `audit_log`)
+- **Security**: API key authentication for all API requests
+- **Configuration Management**: Environment variable support via `.env`
 
 ## Features
 
@@ -89,7 +85,7 @@ test-dashboard/
 - **Record Linking**: Associates changes with their respective record IDs
 
 ### 📌 Header Analytics Widgets
-- **Total Entries**: Live count of records in `data.json`
+- **Total Entries**: Live count of records in SQL
 - **Total Edits**: Total number of EDIT events in audit history
 - **Adds Today**: Number of records added today
 - **Deletes Today**: Number of records deleted today
@@ -114,9 +110,8 @@ test-dashboard/
 - **RESET_ON_INDEX_VISIT**: Override auto-reset behavior (true/false)
   - Can be set to `true` in production mode if manual resets are needed
   - Can be set to `false` in demo mode if data persistence is desired for testing
-- **STORAGE_DRIVER**: Set to `json` (current default) or reserve `sql` for the upcoming database-backed implementation
-- **DB_CONNECTION**: Planned SQL driver, currently defaults to `mysql`
-- **DB_HOST / DB_PORT / DB_DATABASE / DB_USERNAME / DB_PASSWORD / DB_CHARSET**: SQL connection settings staged for future database support
+- **DB_CONNECTION**: SQL driver (`mysql`)
+- **DB_HOST / DB_PORT / DB_DATABASE / DB_USERNAME / DB_PASSWORD / DB_CHARSET**: Active SQL connection settings
 - **Configuration Location**: Edit `.env` file in the `config/` directory or use system environment variables
 - **Default Behavior**: Demo mode resets on index visit; production mode does not
 
@@ -142,7 +137,7 @@ test-dashboard/
 ### 🧹 Bulk Actions (Data Page Only)
 - **Multi-Select Support**: Use row checkboxes and Select All in the Data table
 - **Single Bulk Action**: Bulk delete selected records from the Data page
-- **Scope**: Applies to Data records and data JSON updates only
+- **Scope**: Applies to Data records and SQL table updates
 - **Confirmation Required**: Bulk delete always asks for confirmation via custom toast prompt
 - **Audit Logging**: Each deleted record still generates DELETE audit trail entries, plus one dedicated bulk-action summary entry
 
@@ -162,14 +157,14 @@ test-dashboard/
   - Filtered Data export downloaded (PDF/CSV)
   - Report generated
   - Report downloaded (PDF or CSV)
-- **Encryption**: All logs encrypted at rest for security
+- **Storage**: Logs are persisted in the SQL `activity_log` table
 - **Timezone Handling**: Uses a fixed one-hour offset when generating log timestamps
 - **Searchable**: Logs are available through the Reports page dataset selector
 
-### 🔒 API Reliability (Lock + Retry)
-- **Write Locking**: API file writes use exclusive file locks to reduce concurrent write collisions
-- **Retry Logic**: Failed lock/write attempts are retried automatically with short delay
-- **Coverage**: Data, logs, audit trail, reset operations, and initialization writes use lock+retry path
+### 🔒 API Reliability
+- **Transactional Writes**: Multi-step SQL operations run in database transactions where needed
+- **Prepared Statements**: API operations use parameterized SQL queries
+- **Coverage**: Data, logs, audit trail, and reset operations are SQL-backed
 
 ### 🎯 Layout & Design
 - **Fixed Title Bar**: Consistent fixed height (72px) with a gradient background
@@ -191,7 +186,6 @@ test-dashboard/
 
 ### 1. Installation
 - Place the folder in your XAMPP `htdocs/` directory
-- Ensure the `data/` directory has write permissions (755 or 777)
 
 ### 2. First Use
 - Home page explains all features
@@ -203,7 +197,7 @@ test-dashboard/
 ### 3. File Descriptions
 
 #### Main Pages
-- **index.php**: Entry point that resets `data.json`, `logs.json`, and `audit_trail.json`, then redirects to `home.php`
+- **index.php**: Entry point that can reset SQL demo data in demo mode, then redirects to `home.php`
 - **pages/home.php**: Comprehensive welcome with feature overview
 - **pages/data.php**: Data management interface with CRUD operations and bulk delete selection
 - **pages/reports.php**: Report generation with multiple export options
@@ -216,13 +210,12 @@ test-dashboard/
 
 #### Backend
 - **api.php**: Handles all backend operations:
-  - Get/save data from/to encrypted JSON files
+  - Get/save data from/to MySQL tables
   - Serve paginated, filtered, and sorted Data page responses
   - Process dedicated Data page create, update, delete, and bulk delete requests
   - Manage logs and audit trails
   - Track all data changes with field-level detail
-  - Encrypt/decrypt using AES-256-CBC
-  - Apply file locking and retry logic to write operations
+  - Use prepared SQL statements and transactions
   - Generate timestamps using a fixed one-hour offset
 
 #### API Endpoints
@@ -298,9 +291,9 @@ Auth usage pattern for every POST endpoint:
   - Page-aware bootstrap that initializes only relevant feature modules
 
 #### Data Storage
-- **data/data.json**: Main data storage (encrypted)
-- **data/logs.json**: Administrative activity logs (encrypted)
-- **data/audit_trail.json**: Complete change history (encrypted)
+- **records** (SQL table): Main data storage
+- **activity_log** (SQL table): Administrative activity logs
+- **audit_log** (SQL table): Complete change history
 
 ## Usage Examples
 
@@ -315,7 +308,7 @@ Auth usage pattern for every POST endpoint:
 2. Select records using row checkboxes (or use Select All)
 3. Click "Delete Selected"
 4. Confirm in the custom toast prompt
-5. Selected records are removed, saved to data JSON, and logged in audit trail (including a bulk-action summary line)
+5. Selected records are removed in SQL and logged in audit trail (including a bulk-action summary line)
 
 ### Export Filtered Data
 1. Navigate to Data page and apply search/sort filters
@@ -359,9 +352,9 @@ Auth usage pattern for every POST endpoint:
 2. A custom top-center success toast appears
 3. You can click `Okay` to dismiss immediately, or allow it to auto-fade after 3 seconds
 
-## Data Structures
+## API Payload Structures
 
-### Data Format
+### Data Payload
 ```json
 {
   "items": [
@@ -370,7 +363,7 @@ Auth usage pattern for every POST endpoint:
 }
 ```
 
-### Logs Format
+### Logs Payload
 ```json
 {
   "logs": [
@@ -384,7 +377,7 @@ Auth usage pattern for every POST endpoint:
 }
 ```
 
-### Audit Trail Format
+### Audit Trail Payload
 ```json
 {
   "entries": [
@@ -410,12 +403,11 @@ Auth usage pattern for every POST endpoint:
 - **Client-side Validation**: Real-time feedback
 - **Error Messages**: Clear, user-friendly guidance
 
-### Data Encryption
-- **Method**: AES-256-CBC
-- **Coverage**: All data, logs, and audit trail files encrypted at rest
-- **Transparent**: Automatic encryption on save, decryption on load
-- **Key Management**: Uses environment variable if available, otherwise uses built-in fallback key
-- **Security**: Cannot be accessed without the encryption key
+### API and Storage Security
+- **Authentication**: API key required for all API calls
+- **Prepared Statements**: Parameterized SQL queries for CRUD endpoints
+- **Controlled Resets**: Reset operations are restricted to demo mode
+- **Storage**: Data persisted in MySQL tables (`records`, `activity_log`, `audit_log`)
 
 ### Error Handling
 - **Fixed Issues**:
@@ -434,11 +426,11 @@ Auth usage pattern for every POST endpoint:
 - ✅ Dual report generation (Data and Logs)  
 - ✅ Multiple export formats (PDF and CSV)  
 - ✅ Data validation with helpful error messages  
-- ✅ Data encryption at rest (AES-256-CBC)  
+- ✅ SQL-backed persistent storage  
 - ✅ Production-ready environment configuration  
 - ✅ **Audit Trail System** with field-level tracking  
 - ✅ **Dark Mode Theme** with persistent settings  
-- ✅ **Fixed JSON Response Handling** for reliable operations  
+- ✅ **Consistent JSON API Response Handling** for reliable operations  
 - ✅ **Reset Data Functionality** for fresh starts
 - ✅ **Bulk Delete Actions (Data Page)** with checkbox selection and confirmation prompt
 - ✅ **Bulk Delete Audit Summary Entry** added for each batch delete action
@@ -449,7 +441,7 @@ Auth usage pattern for every POST endpoint:
 - ✅ **Virtualized Row Rendering** for improved Data page performance on larger lists
 - ✅ **Server-Side Data Queries** for Data page pagination, filtering, and sorting
 - ✅ **API-Driven Data CRUD** for Data page add, edit, delete, and bulk delete actions
-- ✅ **API File Lock + Retry Writes** for improved reliability under concurrent operations
+- ✅ **Transactional SQL Writes** for multi-step operations
 - ✅ **Deployable Environment Modes** (`demo` and `production`) with configurable index reset behavior
 - ✅ **Modular JavaScript Loading** with shared core + page-specific feature modules
 - ✅ **Mobile Responsive Shell** with phone-first layout overrides for header, navigation, controls, and content flow
@@ -457,7 +449,7 @@ Auth usage pattern for every POST endpoint:
 
 ## Important Notes
 
-- ✅ The `data/` directory must have write permissions for PHP
+- ✅ MySQL must be reachable using values in `config/.env`
 - ✅ Timestamps are generated with a fixed one-hour offset
 - ✅ All logs auto-generated with detailed descriptions
 - ✅ All data operations immediately saved
@@ -487,12 +479,12 @@ Auth usage pattern for every POST endpoint:
 1. Update the form in `pages/data.php`
 2. Update the relevant feature module in `js/features/` (for example `data-page.js`)
 3. Update audit trail tracking
-4. Data automatically encrypted
+4. Ensure corresponding SQL columns and API payload mapping are updated
 
 ## Requirements
 
-- PHP 7.0+ (with OpenSSL extension)
+- PHP 7.0+ (PDO MySQL enabled)
 - jQuery (loaded from CDN)
 - Modern web browser (Chrome, Firefox, Safari, Edge)
-- Write permissions on `data/` directory
+- MySQL/MariaDB server (XAMPP MySQL supported)
 - Local server (XAMPP, WAMP, or similar)

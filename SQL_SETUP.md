@@ -1,10 +1,10 @@
 # SQL Setup Guide
 
-This document explains the recommended MySQL schema for replacing JSON storage and adding user authentication with fine-grained permissions.
+This document explains the recommended MySQL schema for dashboard storage and user authentication with fine-grained permissions.
 
 ## Goals
 
-- Replace JSON files with relational tables.
+- Use relational tables for application storage.
 - Support login sessions and user management.
 - Support per-user and per-role permissions per resource.
 - Preserve audit and activity history.
@@ -26,9 +26,9 @@ Recommended defaults:
 - permissions: Allowed actions (read, create, update, delete, etc.).
 - role_permissions: Default permissions granted by role.
 - user_permissions: Per-user allow/deny overrides.
-- records: Main business records (replaces data.json).
-- audit_log: Immutable change tracking (replaces audit_trail.json).
-- activity_log: Human-readable operational events (replaces logs.json).
+- records: Main records table for application data.
+- audit_log: Immutable change tracking table.
+- activity_log: Readable operational events table.
 - user_sessions: Login session tracking.
 - password_reset_tokens: Password reset flow support.
 
@@ -170,7 +170,7 @@ Note:
 
 Purpose:
 
-Main application data table replacing encrypted JSON item storage.
+Main application data table for dashboard records.
 
 Columns:
 
