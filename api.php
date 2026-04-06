@@ -49,11 +49,6 @@ function getProvidedApiKey() {
 		return trim(substr($authorization, 7));
 	}
 
-	$queryApiKey = isset($_GET['api_key']) ? trim((string)$_GET['api_key']) : '';
-	if ($queryApiKey !== '') {
-		return $queryApiKey;
-	}
-
 	return '';
 }
 

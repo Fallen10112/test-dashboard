@@ -28,7 +28,7 @@ function getDashboardPdo() {
 }
 
 function getDashboardSqlTimestamp() {
-	return date('Y-m-d H:i:s', time() - 3600);
+	return date('Y-m-d H:i:s', time());
 }
 
 function resetDashboardSqlData(PDO $pdo) {
