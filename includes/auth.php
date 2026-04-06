@@ -219,12 +219,12 @@ function loginUser(string $identifier, string $password): bool {
 		$pdo->prepare('UPDATE users SET last_login_at = NOW(), updated_at = NOW() WHERE id = :id')
 		    ->execute([':id' => $user['id']]);
 
-		writeAuditEvent($pdo, [
+			writeAuditEvent($pdo, [
 			'record_type' => 'auth',
 			'record_id' => null,
 			'action' => 'login',
 			'details' => 'Signed out -> Signed in successfully',
-			'actor_user_id' => (int)$user['id'],
+				'source_user_id' => (int)$user['id'],
 		]);
 
 		startAuthSession();
@@ -253,7 +253,7 @@ function logoutUser(): void {
 					'record_id' => null,
 					'action' => 'logout',
 					'details' => 'Signed in -> Signed out',
-					'actor_user_id' => $authUserId,
+						'source_user_id' => $authUserId,
 				]);
 			}
 		} catch (Throwable $e) {

@@ -79,6 +79,36 @@ function doesTableIndexExist(PDO $pdo, $tableName, $indexName) {
 	return (bool)$stmt->fetchColumn();
 }
 
+function ensureActivityLogSchema(PDO $pdo) {
+	$pdo->exec(
+		'CREATE TABLE IF NOT EXISTS activity_log (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			event_type VARCHAR(100) NOT NULL,
+			message TEXT NOT NULL,
+			related_record_type VARCHAR(50) NULL,
+			related_record_id BIGINT UNSIGNED NULL,
+			source_user_id BIGINT UNSIGNED NULL,
+			ip_address VARCHAR(45) NULL,
+			created_at DATETIME NOT NULL,
+			PRIMARY KEY (id)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+	);
+
+	if (!doesTableColumnExist($pdo, 'activity_log', 'source_user_id')) {
+		$pdo->exec('ALTER TABLE activity_log ADD COLUMN source_user_id BIGINT UNSIGNED NULL AFTER related_record_id');
+	}
+	if (!doesTableColumnExist($pdo, 'activity_log', 'ip_address')) {
+		$pdo->exec('ALTER TABLE activity_log ADD COLUMN ip_address VARCHAR(45) NULL AFTER source_user_id');
+	}
+
+	if (!doesTableIndexExist($pdo, 'activity_log', 'idx_activity_created_at')) {
+		$pdo->exec('ALTER TABLE activity_log ADD INDEX idx_activity_created_at (created_at)');
+	}
+	if (!doesTableIndexExist($pdo, 'activity_log', 'idx_activity_source')) {
+		$pdo->exec('ALTER TABLE activity_log ADD INDEX idx_activity_source (source_user_id)');
+	}
+}
+
 function ensureAuditLogSchema(PDO $pdo) {
 	$pdo->exec(
 		'CREATE TABLE IF NOT EXISTS audit_log (
@@ -87,7 +117,7 @@ function ensureAuditLogSchema(PDO $pdo) {
 			record_id BIGINT UNSIGNED NULL,
 			action VARCHAR(50) NOT NULL DEFAULT "update",
 			details TEXT NULL,
-			actor_user_id BIGINT UNSIGNED NULL,
+			source_user_id BIGINT UNSIGNED NULL,
 			target_user_id BIGINT UNSIGNED NULL,
 			ip_address VARCHAR(45) NULL,
 			user_agent VARCHAR(255) NULL,
@@ -104,11 +134,11 @@ function ensureAuditLogSchema(PDO $pdo) {
 		$pdo->exec('ALTER TABLE audit_log DROP COLUMN field_name');
 	}
 
-	if (!doesTableColumnExist($pdo, 'audit_log', 'actor_user_id')) {
-		$pdo->exec('ALTER TABLE audit_log ADD COLUMN actor_user_id BIGINT UNSIGNED NULL AFTER details');
+	if (!doesTableColumnExist($pdo, 'audit_log', 'source_user_id')) {
+		$pdo->exec('ALTER TABLE audit_log ADD COLUMN source_user_id BIGINT UNSIGNED NULL AFTER details');
 	}
 	if (!doesTableColumnExist($pdo, 'audit_log', 'target_user_id')) {
-		$pdo->exec('ALTER TABLE audit_log ADD COLUMN target_user_id BIGINT UNSIGNED NULL AFTER actor_user_id');
+		$pdo->exec('ALTER TABLE audit_log ADD COLUMN target_user_id BIGINT UNSIGNED NULL AFTER source_user_id');
 	}
 	if (!doesTableColumnExist($pdo, 'audit_log', 'ip_address')) {
 		$pdo->exec('ALTER TABLE audit_log ADD COLUMN ip_address VARCHAR(45) NULL AFTER target_user_id');
@@ -133,8 +163,8 @@ function ensureAuditLogSchema(PDO $pdo) {
 	if (!doesTableIndexExist($pdo, 'audit_log', 'idx_audit_created_at')) {
 		$pdo->exec('ALTER TABLE audit_log ADD INDEX idx_audit_created_at (created_at)');
 	}
-	if (!doesTableIndexExist($pdo, 'audit_log', 'idx_audit_actor')) {
-		$pdo->exec('ALTER TABLE audit_log ADD INDEX idx_audit_actor (actor_user_id)');
+	if (!doesTableIndexExist($pdo, 'audit_log', 'idx_audit_source')) {
+		$pdo->exec('ALTER TABLE audit_log ADD INDEX idx_audit_source (source_user_id)');
 	}
 	if (!doesTableIndexExist($pdo, 'audit_log', 'idx_audit_target')) {
 		$pdo->exec('ALTER TABLE audit_log ADD INDEX idx_audit_target (target_user_id)');
@@ -156,15 +186,15 @@ function writeAuditEvent(PDO $pdo, array $entry) {
 	$action = trim((string)($entry['action'] ?? 'event'));
 	$recordIdRaw = $entry['record_id'] ?? null;
 	$recordId = is_numeric($recordIdRaw) ? (int)$recordIdRaw : null;
-	$actorUserIdRaw = $entry['actor_user_id'] ?? null;
-	$actorUserId = is_numeric($actorUserIdRaw) ? (int)$actorUserIdRaw : null;
+	$sourceUserIdRaw = $entry['source_user_id'] ?? null;
+	$sourceUserId = is_numeric($sourceUserIdRaw) ? (int)$sourceUserIdRaw : null;
 	$targetUserIdRaw = $entry['target_user_id'] ?? null;
 	$targetUserId = is_numeric($targetUserIdRaw) ? (int)$targetUserIdRaw : null;
 	$details = isset($entry['details']) ? (string)$entry['details'] : '';
 
 	$stmt = $pdo->prepare(
-		'INSERT INTO audit_log (record_type, record_id, action, details, actor_user_id, target_user_id, ip_address, user_agent, created_at)
-		 VALUES (:record_type, :record_id, :action, :details, :actor_user_id, :target_user_id, :ip_address, :user_agent, :created_at)'
+		'INSERT INTO audit_log (record_type, record_id, action, details, source_user_id, target_user_id, ip_address, user_agent, created_at)
+		 VALUES (:record_type, :record_id, :action, :details, :source_user_id, :target_user_id, :ip_address, :user_agent, :created_at)'
 	);
 
 	return $stmt->execute([
@@ -172,7 +202,7 @@ function writeAuditEvent(PDO $pdo, array $entry) {
 		':record_id' => $recordId,
 		':action' => $action !== '' ? substr($action, 0, 50) : 'event',
 		':details' => $details !== '' ? $details : null,
-		':actor_user_id' => $actorUserId,
+		':source_user_id' => $sourceUserId,
 		':target_user_id' => $targetUserId,
 		':ip_address' => isset($entry['ip_address']) ? (string)$entry['ip_address'] : getRequestIpAddress(),
 		':user_agent' => isset($entry['user_agent']) ? (string)$entry['user_agent'] : getRequestUserAgent(),

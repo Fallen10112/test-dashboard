@@ -199,7 +199,7 @@ Columns:
 - record_id (BIGINT UNSIGNED, NULL): Entity ID when available.
 - action (VARCHAR(50), NOT NULL): Event type (examples: create, update, delete, bulk_delete, login, logout, password_change, notification_sent, notification_read, notification_deleted, reset).
 - details (TEXT, NULL): Event details payload. For updates, stores `old_value -> new_value` text.
-- actor_user_id (BIGINT UNSIGNED, NULL, FK -> users.id): Who performed action.
+- source_user_id (BIGINT UNSIGNED, NULL, FK -> users.id): Who performed action.
 - target_user_id (BIGINT UNSIGNED, NULL, FK -> users.id): Optional target user for user-to-user events.
 - ip_address (VARCHAR(45), NULL): Source IP (IPv4/IPv6).
 - user_agent (VARCHAR(255), NULL): Client user agent string.
@@ -207,7 +207,7 @@ Columns:
 
 Notes:
 
-- If `actor_user_id` is NULL, the UI displays actor as `System`.
+- If `source_user_id` is NULL, the UI displays source as `System`.
 
 ---
 
@@ -224,7 +224,7 @@ Columns:
 - message (TEXT, NOT NULL): Human-readable event details.
 - related_record_type (VARCHAR(50), NULL): Entity kind related to event.
 - related_record_id (BIGINT UNSIGNED, NULL): Entity ID related to event.
-- actor_user_id (BIGINT UNSIGNED, NULL, FK -> users.id): Responsible user.
+- source_user_id (BIGINT UNSIGNED, NULL, FK -> users.id): Responsible user.
 - ip_address (VARCHAR(45), NULL): Source IP.
 - created_at (DATETIME, NOT NULL): Event timestamp.
 

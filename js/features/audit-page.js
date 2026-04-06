@@ -1,14 +1,19 @@
 let currentAuditView = 'table';
+let auditCurrentPage = 1;
+let auditPageSize = 25;
 
 function setupAuditTrailPageHandlers() {
 	const debouncedAuditFilter = debounce(filterAuditTrail, 180);
 	$('#search-input').on('keyup', function() {
+		auditCurrentPage = 1;
 		debouncedAuditFilter();
 	});
 	$('#audit-record-type-filter').on('change', function() {
+		auditCurrentPage = 1;
 		filterAuditTrail();
 	});
 	$('#audit-action-filter').on('change', function() {
+		auditCurrentPage = 1;
 		filterAuditTrail();
 	});
 	$('#audit-view-table').on('click', function() {
@@ -16,6 +21,23 @@ function setupAuditTrailPageHandlers() {
 	});
 	$('#audit-view-timeline').on('click', function() {
 		setAuditView('timeline');
+	});
+	$('#audit-container').on('change', '#audit-page-size', function() {
+		const requested = parseInt($(this).val(), 10);
+		const allowed = [10, 20, 25, 50, 100];
+		auditPageSize = !Number.isNaN(requested) && allowed.indexOf(requested) !== -1 ? requested : 25;
+		auditCurrentPage = 1;
+		filterAuditTrail();
+	});
+	$('#audit-container').on('click', '#audit-page-prev', function() {
+		if (auditCurrentPage > 1) {
+			auditCurrentPage -= 1;
+			filterAuditTrail();
+		}
+	});
+	$('#audit-container').on('click', '#audit-page-next', function() {
+		auditCurrentPage += 1;
+		filterAuditTrail();
 	});
 }
 
@@ -53,23 +75,52 @@ function renderAuditTrail(entries, emptyMessage) {
 		container.html('<p>' + emptyMessage + '</p>');
 		return;
 	}
-	if (currentAuditView === 'timeline') {
-		renderAuditTimeline(entries);
-	} else {
-		renderAuditTable(entries);
+	const totalEntries = entries.length;
+	const totalPages = Math.max(1, Math.ceil(totalEntries / auditPageSize));
+	if (auditCurrentPage > totalPages) {
+		auditCurrentPage = totalPages;
 	}
+	const pageStart = (auditCurrentPage - 1) * auditPageSize;
+	const pagedEntries = entries.slice(pageStart, pageStart + auditPageSize);
+	if (currentAuditView === 'timeline') {
+		renderAuditTimeline(pagedEntries);
+	} else {
+		renderAuditTable(pagedEntries);
+	}
+
+	const pageEnd = pageStart + pagedEntries.length;
+	let paginationHTML = '<div class="data-pagination">';
+	paginationHTML += '<span class="data-pagination-summary">Showing ' + (pageStart + 1) + '-' + pageEnd + ' of ' + totalEntries + '</span>';
+	paginationHTML += '<div class="data-pagination-controls">';
+	paginationHTML += '<div class="data-page-size-group">';
+	paginationHTML += '<label class="data-page-size-label" for="audit-page-size">Rows per page</label>';
+	paginationHTML += '<select id="audit-page-size" class="data-page-size-select">';
+	paginationHTML += '<option value="10"' + (auditPageSize === 10 ? ' selected' : '') + '>10</option>';
+	paginationHTML += '<option value="20"' + (auditPageSize === 20 ? ' selected' : '') + '>20</option>';
+	paginationHTML += '<option value="25"' + (auditPageSize === 25 ? ' selected' : '') + '>25</option>';
+	paginationHTML += '<option value="50"' + (auditPageSize === 50 ? ' selected' : '') + '>50</option>';
+	paginationHTML += '<option value="100"' + (auditPageSize === 100 ? ' selected' : '') + '>100</option>';
+	paginationHTML += '</select>';
+	paginationHTML += '</div>';
+	paginationHTML += '<button type="button" id="audit-page-prev" class="btn btn-sm btn-secondary"' + (auditCurrentPage <= 1 ? ' disabled' : '') + '>Previous</button>';
+	paginationHTML += '<span class="data-page-label">Page ' + auditCurrentPage + ' of ' + totalPages + '</span>';
+	paginationHTML += '<button type="button" id="audit-page-next" class="btn btn-sm btn-secondary"' + (auditCurrentPage >= totalPages ? ' disabled' : '') + '>Next</button>';
+	paginationHTML += '</div>';
+	paginationHTML += '</div>';
+
+	container.append(paginationHTML);
 }
 
 
 function renderAuditTable(entries) {
 	const container = $('#audit-container');
-	let tableHTML = '<table class="data-table"><thead><tr><th>ID</th><th>Date</th><th>Time</th><th>Type</th><th>Action</th><th>Actor</th><th>IP</th><th>Record ID</th><th>Details</th></tr></thead><tbody>';
+	let tableHTML = '<table class="data-table"><thead><tr><th>ID</th><th>Date</th><th>Time</th><th>Type</th><th>Action</th><th>Source</th><th>IP</th><th>Record ID</th><th>Details</th></tr></thead><tbody>';
 	entries.forEach(function(entry) {
 		const detailsMarkup = buildDetailsMarkup(entry);
-		tableHTML += '<tr><td>' + entry.id + '</td><td>' + entry.date + '</td><td>' + entry.time + '</td><td>' + (entry.record_type || '') + '</td><td>' + getActionBadgeHtml(entry.action) + '</td><td>' + (entry.actor_display_name || 'System') + '</td><td>' + (entry.ip_address || '') + '</td><td>' + entry.record_id + '</td><td>' + detailsMarkup + '</td></tr>';
+		tableHTML += '<tr><td>' + entry.id + '</td><td>' + entry.date + '</td><td>' + entry.time + '</td><td>' + (entry.record_type || '') + '</td><td>' + getActionBadgeHtml(entry.action) + '</td><td>' + (entry.source_display_name || 'System') + '</td><td>' + (entry.ip_address || '') + '</td><td>' + entry.record_id + '</td><td>' + detailsMarkup + '</td></tr>';
 	});
 	tableHTML += '</tbody></table>';
-	container.html(tableHTML);
+	container.html('<div class="audit-table-scroll">' + tableHTML + '</div>');
 }
 
 
@@ -92,7 +143,7 @@ function renderAuditTimeline(entries) {
 		}
 
 		const detailsMarkup = buildDetailsMarkup(entry);
-		timelineHTML += '<div class="timeline-item"><div class="timeline-dot ' + getActionDotClass(entry.action) + '"></div><div class="timeline-card"><div class="timeline-card-header">' + getActionBadgeHtml(entry.action) + '<span class="timeline-time">' + entry.time + '</span><span class="timeline-id">#' + entry.id + '</span></div><p class="timeline-line"><strong>Type:</strong> ' + (entry.record_type || '') + ' | <strong>Actor:</strong> ' + (entry.actor_display_name || 'System') + '</p><p class="timeline-line"><strong>Record:</strong> ' + entry.record_id + '</p><p class="timeline-line"><strong>Details:</strong> ' + detailsMarkup + '</p></div></div>';
+		timelineHTML += '<div class="timeline-item"><div class="timeline-dot ' + getActionDotClass(entry.action) + '"></div><div class="timeline-card"><div class="timeline-card-header">' + getActionBadgeHtml(entry.action) + '<span class="timeline-time">' + entry.time + '</span><span class="timeline-id">#' + entry.id + '</span></div><p class="timeline-line"><strong>Type:</strong> ' + (entry.record_type || '') + ' | <strong>Source:</strong> ' + (entry.source_display_name || 'System') + '</p><p class="timeline-line"><strong>Record:</strong> ' + entry.record_id + '</p><p class="timeline-line"><strong>Details:</strong> ' + detailsMarkup + '</p></div></div>';
 	});
 
 	if (currentDate !== '') {
@@ -124,12 +175,12 @@ function getActionBadgeInfo(action) {
 		'reset':                      { label: 'Reset',                color: 'orange' },
 		'login':                      { label: 'Login',                color: 'green' },
 		'logout':                     { label: 'Logout',               color: 'red' },
-		'password_change':            { label: 'Changed',              color: 'blue' },
+		'password_change':            { label: 'Change',               color: 'blue' },
 		'notification_sent':          { label: 'Sent',                 color: 'blue' },
 		'notification_read':          { label: 'Read',                 color: 'green' },
 		'notification_mark_all_read': { label: 'Read',                 color: 'green' },
-		'notification_deleted':       { label: 'Deleted',              color: 'red' },
-		'notification_delete_all':    { label: 'Deleted',              color: 'red' }
+		'notification_deleted':       { label: 'Delete',               color: 'red' },
+		'notification_delete_all':    { label: 'Delete',               color: 'red' }
 	};
 	return map[a] || { label: a || 'Unknown', color: 'blue' };
 }
@@ -238,7 +289,7 @@ function filterAuditTrail() {
 		const details = String(entry.details || '').toLowerCase();
 		const recordType = String(entry.record_type || '').toLowerCase();
 		const action = String(entry.action || '').toLowerCase();
-		const actor = String(entry.actor_display_name || '').toLowerCase();
+		const source = String(entry.source_display_name || '').toLowerCase();
 		const target = String(entry.target_display_name || '').toLowerCase();
 		const ipAddress = String(entry.ip_address || '').toLowerCase();
 
@@ -252,7 +303,7 @@ function filterAuditTrail() {
 		return entry.record_id.toString().includes(searchValue) ||
 			recordType.includes(searchValue) ||
 			action.includes(searchValue) ||
-			actor.includes(searchValue) ||
+			source.includes(searchValue) ||
 			target.includes(searchValue) ||
 			ipAddress.includes(searchValue) ||
 			entry.change_type.toLowerCase().includes(searchValue) ||

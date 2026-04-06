@@ -55,7 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 					'record_id' => $currentUserId,
 					'action' => 'password_change',
 					'details' => '[REDACTED] -> [REDACTED]',
-					'actor_user_id' => $currentUserId,
+					'source_user_id' => $currentUserId,
 				]);
 				$success = 'Password updated successfully.';
 			}

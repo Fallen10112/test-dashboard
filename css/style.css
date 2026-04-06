@@ -296,6 +296,12 @@ body {
     table-layout: auto;
 }
 
+.audit-table-scroll,
+.report-table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
 
 .audit-container .data-table tbody tr td:nth-child(1),
 .audit-container .data-table thead tr th:nth-child(1) {
@@ -304,12 +310,12 @@ body {
 
 .audit-container .data-table tbody tr td:nth-child(2),
 .audit-container .data-table thead tr th:nth-child(2) {
-    width: 110px;
+    width: 125px;
 }
 
 .audit-container .data-table tbody tr td:nth-child(3),
 .audit-container .data-table thead tr th:nth-child(3) {
-    width: 96px;
+    width: 50px;
 }
 
 .audit-container .data-table tbody tr td:nth-child(4),
@@ -1657,6 +1663,10 @@ body.dark-mode .custom-toast-message {
     .data-table,
     .report-table {
         min-width: 640px;
+    }
+
+    .audit-container .data-table {
+        min-width: 980px;
     }
 
     .toast-host {

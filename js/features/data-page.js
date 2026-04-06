@@ -39,7 +39,7 @@ function setupDataPageHandlers() {
 
 	$('#data-container').on('change', '#data-page-size', function() {
 		const requested = parseInt($(this).val(), 10);
-		const allowedPageSizes = [25, 50, 100];
+		const allowedPageSizes = [10, 20, 25, 50, 100];
 		pageSize = !Number.isNaN(requested) && allowedPageSizes.indexOf(requested) !== -1 ? requested : 25;
 		localStorage.setItem(dataPageSizeStorageKey, String(pageSize));
 		currentPage = 1;
@@ -131,7 +131,7 @@ function setupDataPageHandlers() {
 function initializeDataPagePreferences() {
 	const storedValue = localStorage.getItem(dataPageSizeStorageKey);
 	const parsed = parseInt(storedValue, 10);
-	const allowedPageSizes = [25, 50, 100];
+	const allowedPageSizes = [10, 20, 25, 50, 100];
 	if (!Number.isNaN(parsed) && allowedPageSizes.indexOf(parsed) !== -1) {
 		pageSize = parsed;
 	}
@@ -477,7 +477,7 @@ function renderDataTableView(response) {
 	const pageSizeSelect = document.createElement('select');
 	pageSizeSelect.id = 'data-page-size';
 	pageSizeSelect.className = 'data-page-size-select';
-	['25', '50', '100'].forEach(function(sizeValue) {
+	['10', '20', '25', '50', '100'].forEach(function(sizeValue) {
 		const option = document.createElement('option');
 		option.value = sizeValue;
 		option.textContent = sizeValue;

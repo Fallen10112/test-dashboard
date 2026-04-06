@@ -105,7 +105,7 @@ try {
 						'record_id' => (int)$pdo->lastInsertId(),
 						'action' => 'notification_sent',
 						'details' => 'Notification (' . substr($title !== '' ? $title : '', 0, 160) . '): Sent | From ' . $senderLabel . ' to ' . $recipientLabel,
-						'actor_user_id' => $currentUserId > 0 ? $currentUserId : null,
+						'source_user_id' => $currentUserId > 0 ? $currentUserId : null,
 						'target_user_id' => $recipientUserId,
 					]);
 					$postSuccess = 'Test notification sent successfully.';

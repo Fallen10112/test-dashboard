@@ -101,7 +101,10 @@ function generateDataReport() {
 	});
 	tbody.appendChild(rowsFragment);
 	table.appendChild(tbody);
-	report.appendChild(table);
+	const tableScroll = document.createElement('div');
+	tableScroll.className = 'report-table-scroll';
+	tableScroll.appendChild(table);
+	report.appendChild(tableScroll);
 
 	const footer = document.createElement('div');
 	footer.className = 'report-footer';
@@ -182,7 +185,10 @@ function generateLogsReport() {
 	});
 	tbody.appendChild(rowsFragment);
 	table.appendChild(tbody);
-	report.appendChild(table);
+	const tableScroll = document.createElement('div');
+	tableScroll.className = 'report-table-scroll';
+	tableScroll.appendChild(table);
+	report.appendChild(tableScroll);
 
 	const footer = document.createElement('div');
 	footer.className = 'report-footer';

@@ -119,7 +119,7 @@ function normalizeRecordText($value) {
 
 function getValidatedPageSize($value) {
 	$pageSize = (int)$value;
-	$allowed = [25, 50, 100];
+	$allowed = [10, 20, 25, 50, 100];
 	return in_array($pageSize, $allowed, true) ? $pageSize : 25;
 }
 
@@ -428,6 +428,7 @@ function notifyOriginalSenderOfRecipientAction(PDO $pdo, $recipientUserId, $orig
 
 
 function getLogsPayload(PDO $pdo) {
+	ensureActivityLogSchema($pdo);
 	$stmt = $pdo->query('SELECT id, DATE_FORMAT(created_at, "%Y-%m-%d") AS `date`, DATE_FORMAT(created_at, "%H:%i:%s") AS `time`, message AS event FROM activity_log ORDER BY id ASC');
 	$rows = $stmt->fetchAll();
 	return ['logs' => is_array($rows) ? $rows : []];
@@ -445,10 +446,10 @@ function getAuditPayload(PDO $pdo) {
 		        a.record_id,
 		        a.details,
 		        a.ip_address,
-		        COALESCE(NULLIF(u.display_name, ""), NULLIF(u.username, ""), u.email, "System") AS actor_display_name,
+		        COALESCE(NULLIF(u.display_name, ""), NULLIF(u.username, ""), u.email, "System") AS source_display_name,
 		        COALESCE(NULLIF(tu.display_name, ""), NULLIF(tu.username, ""), tu.email) AS target_display_name
 		 FROM audit_log a
-		 LEFT JOIN users u ON u.id = a.actor_user_id
+		 LEFT JOIN users u ON u.id = a.source_user_id
 		 LEFT JOIN users tu ON tu.id = a.target_user_id
 		 ORDER BY a.id ASC'
 	);
@@ -470,7 +471,7 @@ function getAuditPayload(PDO $pdo) {
 			'time' => (string)$row['time'],
 			'record_type' => (string)($row['record_type'] ?? ''),
 			'action' => (string)($row['action'] ?? ''),
-			'actor_display_name' => (string)($row['actor_display_name'] ?? ''),
+			'source_display_name' => (string)($row['source_display_name'] ?? ''),
 			'target_display_name' => (string)($row['target_display_name'] ?? ''),
 			'ip_address' => (string)($row['ip_address'] ?? ''),
 			'change_type' => mapAuditActionToChangeType($row['action'] ?? '', ''),
@@ -489,13 +490,26 @@ function addLog(PDO $pdo, $event, $eventType = 'event', $relatedRecordType = nul
 		return true;
 	}
 
+	ensureActivityLogSchema($pdo);
+
+	$sourceUserId = null;
+	$authUser = $GLOBALS['auth_user'] ?? null;
+	if (is_array($authUser) && isset($authUser['id'])) {
+		$candidate = (int)$authUser['id'];
+		if ($candidate > 0) {
+			$sourceUserId = $candidate;
+		}
+	}
+
 	$timestamp = getDashboardSqlTimestamp();
-	$stmt = $pdo->prepare('INSERT INTO activity_log (event_type, message, related_record_type, related_record_id, created_at) VALUES (:event_type, :message, :related_record_type, :related_record_id, :created_at)');
+	$stmt = $pdo->prepare('INSERT INTO activity_log (event_type, message, related_record_type, related_record_id, source_user_id, ip_address, created_at) VALUES (:event_type, :message, :related_record_type, :related_record_id, :source_user_id, :ip_address, :created_at)');
 	return $stmt->execute([
 		':event_type' => (string)$eventType,
 		':message' => $message,
 		':related_record_type' => $relatedRecordType,
 		':related_record_id' => $relatedRecordId,
+		':source_user_id' => $sourceUserId,
+		':ip_address' => getRequestIpAddress(),
 		':created_at' => $timestamp,
 	]);
 }
@@ -506,12 +520,12 @@ function addAuditEntries(PDO $pdo, $entries) {
 		return false;
 	}
 
-	$actorUserId = null;
+	$sourceUserId = null;
 	$authUser = $GLOBALS['auth_user'] ?? null;
 	if (is_array($authUser) && isset($authUser['id'])) {
 		$candidate = (int)$authUser['id'];
 		if ($candidate > 0) {
-			$actorUserId = $candidate;
+			$sourceUserId = $candidate;
 		}
 	}
 
@@ -541,7 +555,7 @@ function addAuditEntries(PDO $pdo, $entries) {
 			'record_id' => $recordId,
 			'action' => $action,
 			'details' => $details,
-			'actor_user_id' => $actorUserId,
+			'source_user_id' => $sourceUserId,
 		]);
 
 		if (!$ok) {
@@ -644,6 +658,7 @@ requireApiSessionAuthentication();
 
 try {
 	$pdo = getDashboardPdo();
+	ensureActivityLogSchema($pdo);
 	ensureAuditLogSchema($pdo);
 } catch (Throwable $e) {
 	respondJson(500, ['success' => false, 'message' => 'Database connection failed']);
@@ -672,7 +687,7 @@ if ($method === 'POST') {
 				'record_id' => null,
 				'action' => 'reset',
 				'details' => 'Dashboard data reset to seed state',
-				'actor_user_id' => getApiAuthUserId(),
+				'source_user_id' => getApiAuthUserId(),
 			]);
 			respondJson(200, ['success' => true, 'message' => 'Data reset successfully']);
 		}
@@ -689,7 +704,7 @@ if ($method === 'POST') {
 				'record_id' => null,
 				'action' => 'reset',
 				'details' => 'Notifications table truncated',
-				'actor_user_id' => $userId,
+				'source_user_id' => $userId,
 			]);
 			respondJson(200, ['success' => true, 'message' => 'Notifications table reset successfully']);
 		} catch (Throwable $e) {
@@ -734,7 +749,7 @@ if ($method === 'POST') {
 			'record_id' => (int)$created['id'],
 			'action' => 'notification_sent',
 			'details' => 'Notification (' . substr((string)($data['title'] ?? ''), 0, 160) . '): Sent by user #' . $userId . ' to user #' . $userId,
-			'actor_user_id' => $userId,
+			'source_user_id' => $userId,
 			'target_user_id' => $userId,
 		]);
 
@@ -780,7 +795,7 @@ if ($method === 'POST') {
 				'record_id' => $notificationId,
 				'action' => 'notification_read',
 				'details' => 'Notification (' . substr((string)($notification['title'] ?? ''), 0, 160) . '): Unread -> Read',
-				'actor_user_id' => $userId,
+				'source_user_id' => $userId,
 			]);
 
 			notifyOriginalSenderOfRecipientAction(
@@ -823,7 +838,7 @@ if ($method === 'POST') {
 			'record_id' => null,
 			'action' => 'notification_mark_all_read',
 			'details' => 'Marked all notifications as read',
-			'actor_user_id' => $userId,
+			'source_user_id' => $userId,
 		]);
 
 		$recipientDisplayName = getApiAuthUserDisplayName();
@@ -878,7 +893,7 @@ if ($method === 'POST') {
 			'record_id' => $notificationId,
 			'action' => 'notification_deleted',
 			'details' => 'Notification (' . substr((string)($notification['title'] ?? ''), 0, 160) . '): existed -> deleted',
-			'actor_user_id' => $userId,
+			'source_user_id' => $userId,
 		]);
 
 		notifyOriginalSenderOfRecipientAction(
@@ -917,7 +932,7 @@ if ($method === 'POST') {
 			'record_id' => null,
 			'action' => 'notification_delete_all',
 			'details' => 'Deleted all notifications',
-			'actor_user_id' => $userId,
+			'source_user_id' => $userId,
 		]);
 
 		$recipientDisplayName = getApiAuthUserDisplayName();

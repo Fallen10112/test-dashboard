@@ -393,7 +393,7 @@ Auth usage pattern for every POST endpoint:
       "record_type": "record",
       "action": "update",
       "change_type": "ADD",
-      "actor_display_name": "System",
+      "source_display_name": "System",
       "target_display_name": "",
       "ip_address": "127.0.0.1",
       "record_id": 1,
