@@ -823,6 +823,34 @@ function getLogsPayload(PDO $pdo) {
 }
 
 
+function getAuditDatasetDefinitions() {
+	return [
+		'records' => ['friendly_name' => 'Data'],
+		'notifications' => ['friendly_name' => 'Notifications'],
+		'users' => ['friendly_name' => 'Users'],
+		'user_sessions' => ['friendly_name' => 'Sessions'],
+	];
+}
+
+
+function getAuditDatasetDisplayName($dataset) {
+	$key = strtolower(trim((string)$dataset));
+	if ($key === '') {
+		return '';
+	}
+
+	$definitions = getAuditDatasetDefinitions();
+	if (isset($definitions[$key]) && is_array($definitions[$key])) {
+		$name = trim((string)($definitions[$key]['friendly_name'] ?? ''));
+		if ($name !== '') {
+			return $name;
+		}
+	}
+
+	return $key;
+}
+
+
 function getAuditPayload(PDO $pdo) {
 	ensureAuditLogSchema($pdo);
 	$stmt = $pdo->query(
@@ -832,6 +860,7 @@ function getAuditPayload(PDO $pdo) {
 		        a.record_type,
 		        a.action,
 		        a.record_id,
+			        a.dataset,
 		        a.details,
 		        a.ip_address,
 		        COALESCE(NULLIF(u.display_name, ""), NULLIF(u.username, ""), u.email, "System") AS source_display_name,
@@ -853,6 +882,8 @@ function getAuditPayload(PDO $pdo) {
 			$recordId = '';
 		}
 
+		$dataset = trim((string)($row['dataset'] ?? ''));
+
 		$entries[] = [
 			'id' => (int)$row['id'],
 			'date' => (string)$row['date'],
@@ -862,6 +893,8 @@ function getAuditPayload(PDO $pdo) {
 			'source_display_name' => (string)($row['source_display_name'] ?? ''),
 			'target_display_name' => (string)($row['target_display_name'] ?? ''),
 			'ip_address' => (string)($row['ip_address'] ?? ''),
+			'dataset' => $dataset,
+			'dataset_display_name' => getAuditDatasetDisplayName($dataset),
 			'change_type' => mapAuditActionToChangeType($row['action'] ?? '', ''),
 			'record_id' => $recordId,
 			'details' => (string)($row['details'] ?? ''),
@@ -1779,9 +1812,45 @@ if ($method === 'POST') {
 
 	$eventMessage = $data['event'] ?? '';
 	$logSuccess = true;
+
 	if ($eventMessage !== '') {
 		$eventType = ($action === 'report_downloaded') ? 'report_downloaded' : (($action === 'report_generated') ? 'report_generated' : 'event');
 		$logSuccess = addLog($pdo, $eventMessage, $eventType, null, null);
+
+		// --- AUDIT LOGGING FOR REPORT EVENTS ---
+		$dataset = strtolower(trim((string)($data['dataset'] ?? '')));
+		$auditDataset = '';
+		if ($dataset === 'data') {
+			$auditDataset = 'records';
+		} elseif ($dataset === 'logs') {
+			$auditDataset = 'activity_log';
+		}
+
+		if ($action === 'report_generated') {
+			writeAuditEvent($pdo, [
+				'record_type' => 'report',
+				'action' => 'generate',
+				'dataset' => $auditDataset,
+				'details' => 'Report generated for dataset: ' . $dataset,
+				'source_user_id' => $GLOBALS['auth_user']['id'] ?? null,
+			]);
+		} elseif ($action === 'report_downloaded' && strpos(strtolower($eventMessage), 'pdf') !== false) {
+			writeAuditEvent($pdo, [
+				'record_type' => 'report',
+				'action' => 'download_pdf',
+				'dataset' => $auditDataset,
+				'details' => 'PDF report downloaded for dataset: ' . $dataset,
+				'source_user_id' => $GLOBALS['auth_user']['id'] ?? null,
+			]);
+		} elseif ($action === 'report_downloaded' && strpos(strtolower($eventMessage), 'csv') !== false) {
+			writeAuditEvent($pdo, [
+				'record_type' => 'report',
+				'action' => 'download_csv',
+				'dataset' => $auditDataset,
+				'details' => 'CSV report downloaded for dataset: ' . $dataset,
+				'source_user_id' => $GLOBALS['auth_user']['id'] ?? null,
+			]);
+		}
 	}
 
 	if ($action !== 'report_generated' && $action !== 'report_downloaded') {

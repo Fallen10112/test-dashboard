@@ -155,10 +155,11 @@ function renderAuditTrail(entries, emptyMessage) {
 
 function renderAuditTable(entries) {
 	const container = $('#audit-container');
-	let tableHTML = '<table class="data-table"><thead><tr><th>ID</th><th>Date</th><th>Time</th><th>Type</th><th>Action</th><th>Source</th><th>IP</th><th>Record ID</th><th>Details</th></tr></thead><tbody>';
+	let tableHTML = '<table class="data-table audit-table-wide"><thead><tr><th>ID</th><th>Date</th><th>Time</th><th>Type</th><th>Action</th><th>Source</th><th>IP</th><th>Dataset</th><th class="col-record-id">Record ID</th><th class="col-details">Details</th></tr></thead><tbody>';
 	entries.forEach(function(entry) {
 		const detailsMarkup = buildDetailsMarkup(entry);
-		tableHTML += '<tr><td>' + entry.id + '</td><td>' + entry.date + '</td><td>' + entry.time + '</td><td>' + (entry.record_type || '') + '</td><td>' + getActionBadgeHtml(entry.action) + '</td><td>' + (entry.source_display_name || 'System') + '</td><td>' + (entry.ip_address || '') + '</td><td>' + entry.record_id + '</td><td>' + detailsMarkup + '</td></tr>';
+		const datasetDisplay = String(entry.dataset_display_name || entry.dataset || '');
+		tableHTML += '<tr><td>' + entry.id + '</td><td>' + entry.date + '</td><td>' + entry.time + '</td><td>' + (entry.record_type || '') + '</td><td>' + getActionBadgeHtml(entry.action) + '</td><td>' + (entry.source_display_name || 'System') + '</td><td>' + (entry.ip_address || '') + '</td><td>' + escapeHtml(datasetDisplay) + '</td><td>' + escapeHtml(String(entry.record_id == null ? '' : entry.record_id)) + '</td><td>' + detailsMarkup + '</td></tr>';
 	});
 	tableHTML += '</tbody></table>';
 	container.html('<div class="audit-table-scroll">' + tableHTML + '</div>');
@@ -184,7 +185,8 @@ function renderAuditTimeline(entries) {
 		}
 
 		const detailsMarkup = buildDetailsMarkup(entry);
-		timelineHTML += '<div class="timeline-item"><div class="timeline-dot ' + getActionDotClass(entry.action) + '"></div><div class="timeline-card"><div class="timeline-card-header">' + getActionBadgeHtml(entry.action) + '<span class="timeline-time">' + entry.time + '</span><span class="timeline-id">#' + entry.id + '</span></div><p class="timeline-line"><strong>Type:</strong> ' + (entry.record_type || '') + ' | <strong>Source:</strong> ' + (entry.source_display_name || 'System') + '</p><p class="timeline-line"><strong>Record:</strong> ' + entry.record_id + '</p><p class="timeline-line"><strong>Details:</strong> ' + detailsMarkup + '</p></div></div>';
+		const datasetDisplay = String(entry.dataset_display_name || entry.dataset || '');
+		timelineHTML += '<div class="timeline-item"><div class="timeline-dot ' + getActionDotClass(entry.action) + '"></div><div class="timeline-card"><div class="timeline-card-header">' + getActionBadgeHtml(entry.action) + '<span class="timeline-time">' + entry.time + '</span><span class="timeline-id">#' + entry.id + '</span></div><p class="timeline-line"><strong>Type:</strong> ' + (entry.record_type || '') + ' | <strong>Source:</strong> ' + (entry.source_display_name || 'System') + '</p><p class="timeline-line"><strong>Dataset:</strong> ' + escapeHtml(datasetDisplay) + ' | <strong>Record:</strong> ' + escapeHtml(String(entry.record_id == null ? '' : entry.record_id)) + '</p><p class="timeline-line"><strong>Details:</strong> ' + detailsMarkup + '</p></div></div>';
 	});
 
 	if (currentDate !== '') {
@@ -222,7 +224,10 @@ function getActionBadgeInfo(action) {
 		'notification_read':          { label: 'Read',                 color: 'green' },
 		'notification_mark_all_read': { label: 'Read',                 color: 'green' },
 		'notification_deleted':       { label: 'Delete',               color: 'red' },
-		'notification_delete_all':    { label: 'Delete',               color: 'red' }
+		'notification_delete_all':    { label: 'Delete',               color: 'red' },
+		'generate':                   { label: 'Generate',             color: 'blue' },
+		'download_pdf':               { label: 'Download',             color: 'blue' },
+		'download_csv':               { label: 'Download',             color: 'blue' }
 	};
 	return map[a] || { label: a || 'Unknown', color: 'blue' };
 }
@@ -274,13 +279,18 @@ function buildInlineDiffMarkup(oldValue, newValue) {
 
 
 function buildDetailsMarkup(entry) {
-	const details = String(entry.details || '');
+	let details = String(entry.details || '');
 	const recordType = String(entry.record_type || '').toLowerCase();
 	const action = String(entry.action || '').toLowerCase();
 	const allowDiff = recordType === 'record' && (action === 'create' || action === 'update' || action === 'delete');
 
 	if (!allowDiff) {
 		return escapeHtml(details || '(empty)');
+	}
+
+	const detailsPrefixMatch = details.match(/^([^:]{1,40}):\s+(?=(?:Title|Description):\s*)/);
+	if (detailsPrefixMatch) {
+		details = details.slice(detailsPrefixMatch[0].length);
 	}
 
 	const labeledSegments = [];
@@ -331,6 +341,8 @@ function filterAuditTrail() {
 		const details = String(entry.details || '').toLowerCase();
 		const recordType = String(entry.record_type || '').toLowerCase();
 		const action = String(entry.action || '').toLowerCase();
+		const dataset = String(entry.dataset || '').toLowerCase();
+		const datasetDisplay = String(entry.dataset_display_name || '').toLowerCase();
 		const source = String(entry.source_display_name || '').toLowerCase();
 		const target = String(entry.target_display_name || '').toLowerCase();
 		const ipAddress = String(entry.ip_address || '').toLowerCase();
@@ -345,6 +357,8 @@ function filterAuditTrail() {
 		return entry.record_id.toString().includes(searchValue) ||
 			recordType.includes(searchValue) ||
 			action.includes(searchValue) ||
+			dataset.includes(searchValue) ||
+			datasetDisplay.includes(searchValue) ||
 			source.includes(searchValue) ||
 			target.includes(searchValue) ||
 			ipAddress.includes(searchValue) ||

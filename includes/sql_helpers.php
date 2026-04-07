@@ -115,6 +115,7 @@ function ensureAuditLogSchema(PDO $pdo) {
 			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 			record_type VARCHAR(50) NOT NULL DEFAULT "system",
 			record_id BIGINT UNSIGNED NULL,
+			dataset VARCHAR(100) NULL,
 			action VARCHAR(50) NOT NULL DEFAULT "update",
 			details TEXT NULL,
 			source_user_id BIGINT UNSIGNED NULL,
@@ -128,6 +129,10 @@ function ensureAuditLogSchema(PDO $pdo) {
 
 	if (!doesTableColumnExist($pdo, 'audit_log', 'details')) {
 		$pdo->exec('ALTER TABLE audit_log ADD COLUMN details TEXT NULL AFTER action');
+	}
+
+	if (!doesTableColumnExist($pdo, 'audit_log', 'dataset')) {
+		$pdo->exec('ALTER TABLE audit_log ADD COLUMN dataset VARCHAR(100) NULL AFTER record_id');
 	}
 
 	if (doesTableColumnExist($pdo, 'audit_log', 'field_name')) {
@@ -171,6 +176,9 @@ function ensureAuditLogSchema(PDO $pdo) {
 	}
 	if (!doesTableIndexExist($pdo, 'audit_log', 'idx_audit_record')) {
 		$pdo->exec('ALTER TABLE audit_log ADD INDEX idx_audit_record (record_type, record_id)');
+	}
+	if (!doesTableIndexExist($pdo, 'audit_log', 'idx_audit_dataset')) {
+		$pdo->exec('ALTER TABLE audit_log ADD INDEX idx_audit_dataset (dataset)');
 	}
 }
 
@@ -344,6 +352,7 @@ function writeAuditEvent(PDO $pdo, array $entry) {
 
 	$recordType = trim((string)($entry['record_type'] ?? 'system'));
 	$action = trim((string)($entry['action'] ?? 'event'));
+	$datasetRaw = trim((string)($entry['dataset'] ?? ''));
 	$recordIdRaw = $entry['record_id'] ?? null;
 	$recordId = is_numeric($recordIdRaw) ? (int)$recordIdRaw : null;
 	$sourceUserIdRaw = $entry['source_user_id'] ?? null;
@@ -351,15 +360,29 @@ function writeAuditEvent(PDO $pdo, array $entry) {
 	$targetUserIdRaw = $entry['target_user_id'] ?? null;
 	$targetUserId = is_numeric($targetUserIdRaw) ? (int)$targetUserIdRaw : null;
 	$details = isset($entry['details']) ? (string)$entry['details'] : '';
+	$dataset = $datasetRaw;
+	if ($dataset === '') {
+		$typeKey = strtolower($recordType);
+		if ($typeKey === 'record') {
+			$dataset = 'records';
+		} elseif ($typeKey === 'notification') {
+			$dataset = 'notifications';
+		} elseif ($typeKey === 'users' || $typeKey === 'user') {
+			$dataset = 'users';
+		} elseif ($typeKey === 'auth') {
+			$dataset = 'user_sessions';
+		}
+	}
 
 	$stmt = $pdo->prepare(
-		'INSERT INTO audit_log (record_type, record_id, action, details, source_user_id, target_user_id, ip_address, user_agent, created_at)
-		 VALUES (:record_type, :record_id, :action, :details, :source_user_id, :target_user_id, :ip_address, :user_agent, :created_at)'
+		'INSERT INTO audit_log (record_type, record_id, dataset, action, details, source_user_id, target_user_id, ip_address, user_agent, created_at)
+		 VALUES (:record_type, :record_id, :dataset, :action, :details, :source_user_id, :target_user_id, :ip_address, :user_agent, :created_at)'
 	);
 
 	return $stmt->execute([
 		':record_type' => $recordType !== '' ? substr($recordType, 0, 50) : 'system',
 		':record_id' => $recordId,
+		':dataset' => $dataset !== '' ? substr($dataset, 0, 100) : null,
 		':action' => $action !== '' ? substr($action, 0, 50) : 'event',
 		':details' => $details !== '' ? $details : null,
 		':source_user_id' => $sourceUserId,
