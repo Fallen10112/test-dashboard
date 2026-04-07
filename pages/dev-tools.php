@@ -227,6 +227,15 @@ try {
 			<div class="account-card dev-tool-module" data-dev-tool-category="system">
 				<h3>Maintenance Tools</h3>
 				<p>Run maintenance actions for targeted table resets.</p>
+							<?php if (defined('RESET_ON_INDEX_VISIT') && RESET_ON_INDEX_VISIT): ?>
+							<div class="dev-tools-warning" style="color:#b00;font-weight:bold;margin-bottom:1em;">
+								Reset_on_index_visit is currently TRUE - all data will be reset upon visiting the landing page.
+							</div>
+							<?php elseif (defined('APP_MODE') && APP_MODE === 'demo' && defined('RESET_ON_INDEX_VISIT') && !RESET_ON_INDEX_VISIT): ?>
+							<div class="dev-tools-warning" style="color:#007700;font-weight:bold;margin-bottom:1em;">
+								Application mode is in Demo mode - reset_on_index_visit is FALSE - all data will be preserved on visiting the landing page.
+							</div>
+							<?php endif; ?>
 				<div class="dev-tools-actions-row">
 					<button id="reset-activity-log-btn" class="btn btn-reset">Reset Activity Log</button>
 				</div>
