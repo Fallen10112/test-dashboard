@@ -40,7 +40,8 @@ function getAppSettingsFromDb() {
 			PDO::ATTR_EMULATE_PREPARES => false,
 		];
 		$pdo = new PDO($dsn, DB_USERNAME, DB_PASSWORD, $options);
-		$stmt = $pdo->query('SELECT `key`, `value` FROM app_settings');
+		// Use correct column names for your schema
+		$stmt = $pdo->query('SELECT setting_key AS `key`, setting_value AS `value` FROM app_settings');
 		$settings = [];
 		foreach ($stmt as $row) {
 			$settings[$row['key']] = $row['value'];
@@ -57,30 +58,38 @@ function getSetting($settings, $key, $default = null) {
 	return isset($settings[$key]) ? $settings[$key] : $default;
 }
 
-define('API_KEY', getSetting($appSettings, 'api_key', 'local-dev-api-key-change-me'));
-define('API_KEY_HEADER', 'X-API-Key');
 
-$appTimezone = getSetting($appSettings, 'app_timezone', 'Europe/London');
-define('APP_TIMEZONE', $appTimezone);
-if (!@date_default_timezone_set(APP_TIMEZONE)) {
-	date_default_timezone_set('UTC');
+// Helper to require a setting from the DB
+function requireSetting($settings, $key) {
+	if (!isset($settings[$key]) || $settings[$key] === '' || $settings[$key] === null) {
+		die("FATAL: Required app setting '$key' missing from app_settings table.");
+	}
+	return $settings[$key];
 }
 
-function envToBool($value, $default = false) {
+define('API_KEY', requireSetting($appSettings, 'api_key'));
+define('API_KEY_HEADER', 'X-API-Key');
+
+$appTimezone = requireSetting($appSettings, 'app_timezone');
+define('APP_TIMEZONE', $appTimezone);
+if (!@date_default_timezone_set(APP_TIMEZONE)) {
+	die("FATAL: Invalid timezone in app_settings: '" . $appTimezone . "'");
+}
+
+function envToBool($value) {
 	if ($value === false || $value === null || $value === '') {
-		return $default;
+		return false;
 	}
 	$value = strtolower(trim((string)$value));
 	return in_array($value, ['1', 'true', 'yes', 'on'], true);
 }
 
-$appMode = strtolower(getSetting($appSettings, 'app_mode', 'demo'));
+$appMode = strtolower(requireSetting($appSettings, 'app_mode'));
 if (!in_array($appMode, ['demo', 'production'], true)) {
-	$appMode = 'demo';
+	die("FATAL: Invalid app_mode in app_settings: '" . $appMode . "'. Allowed: demo, production");
 }
 define('APP_MODE', $appMode);
 
-$defaultResetOnIndexVisit = APP_MODE === 'demo';
-$resetOnIndexVisit = getSetting($appSettings, 'reset_on_index_visit', null);
-define('RESET_ON_INDEX_VISIT', envToBool($resetOnIndexVisit, $defaultResetOnIndexVisit));
+$resetOnIndexVisit = requireSetting($appSettings, 'reset_on_index_visit');
+define('RESET_ON_INDEX_VISIT', envToBool($resetOnIndexVisit));
 
