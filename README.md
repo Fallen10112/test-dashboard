@@ -1,566 +1,180 @@
 # Dashboard Showcase
 
-A comprehensive web-based dashboard built with PHP, MySQL, jQuery, HTML, CSS, and modern web technologies. Features secure SQL-backed data management, complete audit trail tracking, activity logging, and report generation capabilities.
+A web dashboard built with PHP, MySQL, jQuery, HTML, and CSS.
+
+The app includes:
+
+- Session-based authentication (single-device policy)
+- CRUD data management with server-side paging/filter/sort
+- Audit trail (table + timeline)
+- Reports and export (PDF/CSV)
+- In-app notifications
+- Dev tools for resets and user operations
+- Per-user header widget preferences
 
 ## Project Structure
 
 ```
 test-dashboard/
-├── index.php              # Entry point (demo-mode SQL reset, then redirects to home.php)
-├── pages/
-│   ├── home.php           # Home/Welcome page with project overview
-│   ├── data.php           # Data management page (CRUD operations)
-│   ├── reports.php        # Reports & analytics with PDF/CSV export
-│   ├── audit.php          # Audit trail history viewer
-│   ├── ui-customization.php# Per-user header widget visibility controls
-│   └── dev-tools.php      # Modular dev tools with category-based utilities
-├── includes/
-│   ├── header.php         # HTML head and fixed-height title bar
-│   ├── navigation.php     # Fixed left sidebar with scroll-safe navigation and utility controls
-│   └── footer.php         # Closing HTML tags and script includes
-├── config/
-│   ├── config.php         # Configuration, app mode, and security settings
-│   └── .env.example       # Environment variables template
-├── css/
-│   └── style.css          # Main stylesheet with light & dark mode support
-├── js/
-│   ├── core/
-│   │   └── shared.js      # Shared state/utilities, theme, reset flow, common data/log loaders
-│   ├── features/
-│   │   ├── data-page.js   # Data page server-backed CRUD, pagination, sorting, and filtered export
-│   │   ├── reports-page.js# Reports generation and PDF/CSV downloads
-│   │   └── audit-page.js  # Audit trail filters, table/timeline rendering, diff markup
+├── api.php                             # JSON API router for GET/POST actions (data, audit, logs, notifications, admin/dev tools)
+├── index.php		                    # App entry point; enforces login and runs demo reset-on-entry flow when enabled
+├── LICENSE		                        # Project license terms
+├── README.md	                	    # Project documentation and setup guide
+├── SQL_SETUP.md                	    # Database schema/setup reference for required tables
+├── config/		                        # Runtime configuration files
+│   ├── .env	                	    # Local environment values (DB connection credentials)
+│   ├── .env.example	                # Template for .env keys
+│   └── config.php	                    # Loads env values + app settings from DB (mode, reset behavior, timezone)
+├── css/		                        # Stylesheets
+│   └── style.css	                    # Main UI styling (layout, components, dark mode, responsive rules)
+├── includes/		                    # Shared PHP includes used by multiple pages
+│   ├── auth.php		                # Session auth helpers (login/logout/requireAuth/CSRF/session invalidation)
+│   ├── footer.php                      # Shared script includes and page-aware JS module loading
+│   ├── header.php	                    # Shared page header/top bar and authenticated shell bootstrap
+│   ├── navigation.php	                # Sidebar navigation and theme toggle shell
+│   └── sql_helpers.php	                # PDO helpers, schema checks, resets, and SQL utility functions
+├── js/			                        # Frontend JavaScript modules
+│   ├── core/		                    # Cross-page shared logic
+│   │   └── shared.js	                # Toasts, auth/session guards, header metrics, notifications, common helpers
+│   ├── features/	                    # Feature/page-specific behavior modules
+│   │   ├── audit-page.js		        # Audit page rendering, filtering, timeline/table views, realtime polling
+│   │   ├── data-page.js		        # Data page CRUD UI, pagination/sort/search, bulk actions, exports, realtime polling
+│   │   ├── reports-page.js	            # Reports generation and PDF/CSV download flows
+│   │   └── ui-customization-page.js	# Per-user header widget visibility settings UI and save flow
 │   └── pages/
-│       └── app-init.js    # Page-aware bootstrap and shared UI initialization
-├── api.php                # Backend API for all operations
-└── README.md              # This file
+│       └── app-init.js	                # Main client bootstrap; initializes only handlers needed for current page
+├── pages/		                        # Server-rendered page views
+│   ├── audit.php		                # Audit trail page container (filters + audit results area)
+│   ├── data.php		                # Data management page container (table, actions, modals)
+│   ├── dev-tools.php	                # Developer/admin tools page for resets, notifications, and user operations
+│   ├── home.php		                # Landing/home page content for signed-in users
+│   ├── login.php		                # Login page and logout POST handler endpoint
+│   ├── reports.php	                    # Reports page container and export controls
+│   ├── ui-customization.php	        # UI customization page for per-user header widget preferences
+│   └── user.php		                # Account settings page
 ```
 
-## Technologies Used
-
-- **Backend**: PHP 7.0+ with PDO MySQL
-- **Frontend**: jQuery, HTML5, CSS3 with responsive design
-- **Data Storage**: MySQL tables (`records`, `activity_log`, `audit_log`)
-- **Security**: API key authentication for all API requests
-- **Configuration Management**: Environment variable support via `.env`
-
-## Features
-
-### 🏠 Home Page
-- Comprehensive project overview
-- Key features explanation
-- Getting started guide
-- Technical stack information
-
-### 📊 Data Management Page
-- **View Data**: Displays records in a responsive, sortable table powered by server-side queries
-- **Server-Side Pagination**: Previous/Next navigation and page summaries are driven by the backend instead of paging the full dataset in the browser
-- **Rows-Per-Page Selector**: Change visible page size from bottom-right pagination controls (25/50/100)
-- **Server-Side Filtering & Sorting**: Search and column sorting are sent to the API so the browser only renders the active page results
-- **Virtualized Rendering**: Only visible rows on the current page are rendered for smoother performance
-- **Preference Persistence**: Selected rows-per-page value is saved in localStorage and restored automatically
-- **API-Backed CRUD**: Add, edit, delete, and bulk delete actions are executed through dedicated API operations
-- **Filtered Export (PDF/CSV)**: Export uses a backend-filtered dataset so downloaded files match the active search/sort state
-- **Action Order**: Data controls are arranged as Add, Delete, Export PDF, Export CSV
-- **Search & Filter**: Real-time search by title and description via API request
-- **Column Sorting**: Click column headers to sort (ascending/descending) via API request
-- **Auto-Save**: All changes are saved immediately through backend mutation endpoints
-- **Activity Logging**: Every operation automatically logged with timestamps
-- **Audit Integration**: All changes tracked in the audit trail with field-level detail
-
-### 📈 Reports Page
-- **Dataset Selector**: Choose between "Data" or "Logs" dataset
-- **Report Generation**: Creates formatted reports on-screen
-- **PDF Export**: Download reports as PDF files with timestamps
-- **CSV Export**: Download reports as CSV for spreadsheet applications
-- **Data Report**: Displays all records with metadata
-- **Logs Report**: Shows all activities with detailed descriptions
-
-### 🔍 Audit Trail Page
-- **Complete Change History**: View all data modifications
-- **Dual View Modes**: Switch between classic Table view and Timeline view
-- **Field-Level Tracking**: See exactly what changed in each field
-- **Before & After Values**: Compare old and new values
-- **Search Functionality**: Find specific changes quickly
-- **Timestamps**: Exact date and time of each modification
-- **Change Classification**: Clearly identifies ADD, EDIT, or DELETE operations
-- **Record Linking**: Associates changes with their respective record IDs
-
-### 🛠️ Dev Tools Page
-- **Category Selector**: Choose between `System`, `Users`, and `Notifications` to load only relevant tools
-- **Default Category**: `System` is selected by default
-- **System Tools**:
-  - `Reset Activity Log` maintenance action
-  - `Reset Audit Log` maintenance action
-  - `Reset Records` maintenance action (restores 3 sample entries)
-  - `Reset Widget Prefs` maintenance action (reseeds default widget visibility for all active users)
-  - `Reset Notifications Table` maintenance action
-  - `Reset all` maintenance action
-- **Users Tools**:
-  - Create user (auto-generates password and seeds default widget preferences)
-  - Update user details/status and optional password reset
-  - Force delete user with self-delete protection
-  - Reset widget preferences for a single detected user
-- **Notifications Tools**: Includes the `Create Notification` test form for QA flows
-
-### 📌 Header Analytics Widgets
-- **Total Entries**: Live count of records in SQL
-- **Total Edits**: Total number of EDIT events in audit history
-- **Adds Today**: Number of records added today
-- **Deletes Today**: Number of records deleted today
-- **Local Time**: Current browser local time in `HH:MM` format
-- **Always Visible**: Displayed in the top-right of the fixed header for quick status checks
-
-### 🧩 Widget Customization (Per User)
-- **Dedicated Page**: `UI Customization` page allows each user to choose which header widgets are visible
-- **Current Options**: `Entries`, `Edits`, `Adds Today`, `Deletes Today`, `Local Time`
-- **Server-Side Storage**: Preferences are persisted in SQL and loaded on every page request
-- **Cross-Device Sync**: The same account sees the same widget visibility choices on different devices
-
-### 🎨 Dark Mode Theme
-- **Theme Toggle**: Toggle switch in the bottom-left area of navigation
-- **Small-Window Safe Layout**: Navigation links scroll independently so bottom controls never overlap page links
-- **Visual Separation**: Subtle divider line separates navigation links from utility controls
-- **Persistent Settings**: Theme preference saved via localStorage
-- **Light Mode**: Original clean white interface
-- **Dark Mode**: Professional dark color palette for reduced eye strain
-- **Full Coverage**: Dark mode applies to all pages and components
-
-### ⚙️ Environment Configuration
-- **APP_MODE**: Set to `demo` (default) or `production`
-  - Demo mode: Auto-resets all data when `index.php` is loaded (fresh start for testing)
-  - Production mode: Preserves all data across application restarts
-- **RESET_ON_INDEX_VISIT**: Override auto-reset behavior (true/false)
-  - Can be set to `true` in production mode if manual resets are needed
-  - Can be set to `false` in demo mode if data persistence is desired for testing
-- **DB_CONNECTION**: SQL driver (`mysql`)
-- **DB_HOST / DB_PORT / DB_DATABASE / DB_USERNAME / DB_PASSWORD / DB_CHARSET**: Active SQL connection settings
-- **Configuration Location**: Edit `.env` file in the `config/` directory or use system environment variables
-- **Default Behavior**: Demo mode resets on index visit; production mode does not
-
-### 🔄 Maintenance Reset Actions
-- **Button Location**: Located on Dev Tools page under `System` category
-- **Available Buttons**:
-  - `Reset Activity Log`
-  - `Reset Audit Log`
-  - `Reset Records`
-  - `Reset Widget Prefs`
-  - `Reset Notifications Table`
-  - `Reset all`
-- **Toast Confirmation Prompt**: Each action uses a custom top-center confirmation prompt before execution
-- **Safe Operation**: Page reloads after successful maintenance action
-- **Widget Prefs Reset Behavior**: Rebuilds one default preference row per active user
-
-### 🔔 Custom Toast Notification System
-- **Top-Center Toasts**: Small notifications shown at the top-center of the page
-- **Consistent Styling**: Matches the dashboard visual design in both light and dark mode
-- **Interactive Option**: Toasts can include action buttons (for example, confirmation prompts)
-- **Dismiss Option**: Success/error toasts support an `Okay` button or auto-fade after 3 seconds
-- **Implemented Flows**:
-  - Dev Tools maintenance reset confirmations use custom toast actions instead of browser confirm
-  - Data Add success now shows a confirmation toast
-  - Data Edit success now shows a confirmation toast
-  - Bulk Delete confirmation prompt now uses custom toast actions
-
-### 🔔 In-App Notification Center
-- **Header Bell Icon**: Located in the top-right corner of the fixed header bar
-- **Unread Badge**: Badge displays unread notification count (99+ for very high counts)
-- **Notification Dropdown**: Click the bell to open a scrollable dropdown with all notifications
-- **Compact Display**: Notifications shown as single-line items with titles and truncated messages ending with `...`
-- **Interactive Click-to-View**: Click any notification to display full details in a persistent toast
-- **Details Toast Metadata**:
-  - Full title and message
-  - Creation date/time
-  - Sender name (if not a system notification)
-  - Mark as Read button (only shown for unread notifications)
-  - Delete button
-  - Close button
-- **Quick Actions in Dropdown**:
-  - Mark individual notification as read (checkmark button)
-  - Delete individual notification (X button)
-  - Mark all as read (header-level action)
-  - Delete all (header-level action)
-- **Real-Time Sync**: Notifications automatically poll from the server every 3 seconds
-- **Visibility-Aware Polling**: Polling pauses when the browser tab is hidden or unfocused
-- **Toast Integration**: New incoming notifications show as top-center toasts with auto-dismiss
-- **Data Validation**: Notification titles limited to 64 characters (enforced client and server-side)
-
-### 🧹 Bulk Actions (Data Page Only)
-- **Multi-Select Support**: Use row checkboxes and Select All in the Data table
-- **Single Bulk Action**: Bulk delete selected records from the Data page
-- **Scope**: Applies to Data records and SQL table updates
-- **Confirmation Required**: Bulk delete always asks for confirmation via custom toast prompt
-- **Audit Logging**: Each deleted record still generates DELETE audit trail entries, plus one dedicated bulk-action summary entry
-
-### ♻️ Automatic Reset on Entry
-- **Configurable Reset**: Reset-on-index behavior is controlled by environment mode/settings
-- **Demo Mode Default**: `APP_MODE=demo` enables reset on index by default
-- **Production Mode Default**: `APP_MODE=production` disables reset on index by default
-- **Override Available**: `RESET_ON_INDEX_VISIT=true|false` can explicitly control behavior
-- **Clean Test Environment**: Demo mode provides predictable showcase startup
-
-### 📝 Administrative Logging System
-- **Automatic Tracking**: Logs all user actions with timestamps
-- **Event Types Tracked**:
-  - New entry added
-  - Entry edited (with field-level changes)
-  - Entry deleted
-  - Filtered Data export downloaded (PDF/CSV)
-  - Report generated
-  - Report downloaded (PDF or CSV)
-- **Storage**: Logs are persisted in the SQL `activity_log` table
-- **Timezone Handling**: Uses a fixed one-hour offset when generating log timestamps
-- **Searchable**: Logs are available through the Reports page dataset selector
-
-### 🔒 API Reliability
-- **Transactional Writes**: Multi-step SQL operations run in database transactions where needed
-- **Prepared Statements**: API operations use parameterized SQL queries
-- **Coverage**: Data, logs, audit trail, and reset operations are SQL-backed
-
-### 🎯 Layout & Design
-- **Fixed Title Bar**: Consistent fixed height (72px) with a gradient background
-- **Fixed Left Navigation**: 250px sidebar with active page highlighting
-- **Scroll-Safe Sidebar**: Menu area scrolls while bottom utility controls remain visible and non-overlapping
-- **Responsive Main Content**: Scrollable content area that adapts to the active theme
-- **Mobile-Optimized Layout**: At smaller breakpoints, the fixed desktop shell converts to a stacked flow with sticky header, full-width navigation, and touch-friendly spacing
-- **Mobile-Friendly Tables**: Data and report tables use horizontal overflow on small screens to preserve readability
-- **Professional Styling**: Modern UI with smooth transitions and hover effects
-- **Consistent Design**: Unified look across all pages
-
-### 🧩 Modular Frontend Architecture
-- **Shared Core Module**: Common state, utilities, theme, reset flow, and shared loaders in `js/core/shared.js`
-- **Feature Modules**: Page-focused logic split into `js/features/data-page.js`, `js/features/reports-page.js`, and `js/features/audit-page.js`
-- **Page-Aware Bootstrap**: `js/pages/app-init.js` initializes only the handlers needed for the current page
-- **Conditional Script Loading**: `includes/footer.php` loads only relevant feature scripts for each page
-
-## Getting Started
-
-### 1. Installation
-- Place the folder in your XAMPP `htdocs/` directory
-
-### 2. First Use
-- Home page explains all features
-- Start by adding records on the Data page
-- View changes in the Audit Trail
-- Generate reports on the Reports page
-- Toggle dark mode using the switch in the sidebar
-
-### 3. File Descriptions
-
-#### Main Pages
-- **index.php**: Entry point that can reset SQL demo data in demo mode, then redirects to `home.php`
-- **pages/home.php**: Comprehensive welcome with feature overview
-- **pages/data.php**: Data management interface with CRUD operations and bulk delete selection
-- **pages/reports.php**: Report generation with multiple export options
-- **pages/audit.php**: Audit trail viewer with search, plus table/timeline display toggle
-- **pages/ui-customization.php**: Per-user header widget visibility controls (5 current widget options)
-- **pages/dev-tools.php**: Category-driven maintenance and QA utilities (`System` default, plus `Users` and `Notifications`)
-
-#### Include Files (Reusable Components)
-- **includes/header.php**: HTML head tags and fixed-height title bar
-- **includes/navigation.php**: Fixed left sidebar with independent menu scrolling and theme toggle utility controls
-- **includes/footer.php**: Closing HTML tags and page-aware script includes, including PDF library loading for Reports and Data pages
-
-#### Backend
-- **api.php**: Handles all backend operations:
-  - Get/save data from/to MySQL tables
-  - Serve paginated, filtered, and sorted Data page responses
-  - Process dedicated Data page create, update, delete, and bulk delete requests
-  - Manage logs and audit trails
-  - Track all data changes with field-level detail
-  - Use prepared SQL statements and transactions
-  - Generate timestamps using a fixed one-hour offset
-
-#### API Endpoints
-
-All responses are JSON.
-
-Authentication (required):
-- Login-backed session cookie. Sign in at `pages/login.php` before calling endpoints from the browser.
-
-##### GET Endpoints
-
-| Endpoint | Purpose | Key Params |
-| --- | --- | --- |
-| `GET api.php?action=data_page` | Paged, filtered, sorted data for Data page | `search`, `sortColumn(id/title/description)`, `sortOrder(asc/desc)`, `page`, `pageSize(25/50/100)` |
-| `GET api.php?action=data_filtered_export` | Full filtered/sorted data (no pagination) | `search`, `sortColumn`, `sortOrder` |
-| `GET api.php?action=audit_trail` | Full audit history | none |
-| `GET api.php?action=logs` | Full activity logs | none |
-| `GET api.php?action=notifications` | User notification inbox + unread count | `limit` (optional, max 100) |
-| `GET api.php?action=widget_preferences` | Current user's header widget visibility preferences | none |
-| `GET api.php` | Full raw data payload | none |
-
-##### POST Endpoints
-
-All POST endpoints require `Content-Type: application/json` and JSON body containing `action`.
-
-| Action (`POST api.php`) | Purpose | Required Body Fields |
-| --- | --- | --- |
-| `data_create` | Create one record | `title`, `description` |
-| `data_update` | Update one record | `id`, `title`, `description` |
-| `data_delete` | Delete one record | `id` |
-| `data_bulk_delete` | Delete many records | `ids` (array) |
-| `add_audit_entry` | Write one audit entry | `changeType`, `recordId`, `fieldName`, `oldValue`, `newValue` |
-| `add_audit_entries` | Write multiple audit entries | `entries` (array of audit entry objects) |
-| `notification_create` | Create one in-app notification for current user | `title` or `message`, optional `type` (title max 64 chars) |
-| `notification_mark_read` | Mark one notification as read | `id` |
-| `notifications_mark_all_read` | Mark all notifications as read for current user | `action` |
-| `widget_preferences_update` | Save current user's header widget visibility settings | `widgets` (object with `total_entries`, `total_edits`, `adds_today`, `deletes_today`, `local_time`) |
-| `admin_user_lookup` | Lookup user by id or username | `lookup` |
-| `admin_user_create` | Create user from Dev Tools | `email`, `username`, optional `display_name`, optional `status` |
-| `admin_user_update` | Update user details and optional password | `user_id`, `email`, `username`, `display_name`, `status`, optional `reset_password` |
-| `admin_user_force_delete` | Hard delete one user | `user_id` |
-| `admin_user_reset_widget_prefs` | Reset widget prefs for one user to defaults | `user_id` |
-| `reset_activity_log` | Reset activity_log table | `action` |
-| `reset_audit_log` | Reset audit_log table | `action` |
-| `reset_records` | Reset records table to sample rows | `action` |
-| `reset_widget_prefs` | Reset and reseed widget prefs for all active users | `action` |
-| `reset_notifications_table` | Reset notifications table | `action` |
-| `reset_all` | Reset activity, audit, records, and notifications | `action` |
-| `reset_data` | Reset data/logs/audit to sample state | `action` |
-
-POST usage pattern:
-- URL: `POST /api.php`
-- Headers: `Content-Type: application/json`
-- Body: JSON with selected `action` + required fields
-- Requires active authenticated session cookie
-
-#### Frontend Assets
-- **css/style.css**:
-  - Fixed layout with responsive design
-  - Sortable table headers
-  - Search box styling
-  - Modal dialogs
-  - Button variations
-  - Light and dark mode styles
-- **js/core/shared.js**:
-  - Shared app state and utility helpers
-  - Header analytics metric calculations and refresh
-  - Theme initialization/persistence and reset workflow
-  - Shared data and logs loading helpers
-- **js/features/data-page.js**:
-  - Server-backed Data table rendering with search, sorting, and pagination queries
-  - Modal form management with API-driven create/update/delete actions
-  - Data-page bulk selection and bulk delete logic
-  - Row virtualization for the active page and filtered PDF/CSV export
-- **js/features/reports-page.js**:
-  - Report generation and report PDF/CSV download handlers
-- **js/features/audit-page.js**:
-  - Audit Trail table/timeline rendering, filtering, and diff markup
-- **js/pages/app-init.js**:
-  - Page-aware bootstrap that initializes only relevant feature modules
-
-#### Data Storage
-- **records** (SQL table): Main data storage
-- **activity_log** (SQL table): Administrative activity logs
-- **audit_log** (SQL table): Complete change history
-- **notifications** (SQL table): Per-user in-app notifications with unread/read tracking
-- **user_widget_preferences** (SQL table): One row per user with JSON widget visibility settings
-
-## Usage Examples
-
-### Add a New Record
-1. Navigate to Data page
-2. Click "Add New Record" button
-3. Enter title and description
-4. Click "Save" - record is added, logged, and tracked
-
-### Bulk Delete Records
-1. Navigate to Data page
-2. Select records using row checkboxes (or use Select All)
-3. Click "Delete Selected"
-4. Confirm in the custom toast prompt
-5. Selected records are removed in SQL and logged in audit trail (including a bulk-action summary line)
-
-### Export Filtered Data
-1. Navigate to Data page and apply search/sort filters
-2. Use action buttons in order: Add, Delete, Export PDF, Export CSV
-3. Click "Export Filtered PDF" or "Export Filtered CSV"
-4. The export endpoint returns the full filtered/sorted dataset that matches the active Data page query
-5. Export action is logged in the system logs
-
-### View Changes
-1. Go to Audit Trail page
-2. Choose Table View or Timeline View
-3. Search for specific records or changes
-4. View exactly what changed with before/after values
-5. See timestamps for each modification
-
-### Header Analytics
-1. Look at the top-right of the header bar
-2. Review total entries and total edits
-3. Review adds today, deletes today, and local time for quick daily context
-
-### Generate and Export Reports
-1. Go to Reports page
-2. Select dataset: "Data" or "Logs"
-3. Click "Generate Report"
-4. Choose export: "Download as PDF" or "Download as CSV"
-
-### Switch Theme
-1. Look for the toggle switch in the bottom-left area of the navigation sidebar
-2. Click to switch between Light and Dark mode
-3. Theme preference saves automatically and persists across pages
-
-### Run Maintenance Reset Action
-1. Go to Dev Tools page
-2. Select `System` in the category dropdown (default)
-3. Click one target action (`Reset Activity Log`, `Reset Audit Log`, `Reset Records`, `Reset Widget Prefs`, `Reset Notifications Table`, or `Reset all`)
-4. Confirm the action in the custom top-center toast prompt
-5. The selected table reset runs
-6. Page automatically reloads after completion
-
-### Reset Widget Preferences For One User
-1. Go to Dev Tools page
-2. Select `Users`
-3. In `Reset Widget Preferences`, detect a user by id or username
-4. Click `Reset Widget Preferences` and confirm
-5. That user is reset to default widget visibility
-
-### Toast Notifications
-1. Add or edit a record on the Data page
-2. A custom top-center success toast appears
-3. You can click `Okay` to dismiss immediately, or allow it to auto-fade after 3 seconds
-
-## API Payload Structures
-
-### Data Payload
-```json
-{
-  "items": [
-    { "id": 1, "title": "Project Name", "description": "Description text" }
-  ]
-}
-```
-
-### Logs Payload
-```json
-{
-  "logs": [
-    {
-      "id": 1,
-      "date": "2026-03-31",
-      "time": "15:57",
-      "event": "A new entry has been added..."
-    }
-  ]
-}
-```
-
-### Audit Trail Payload
-```json
-{
-  "entries": [
-    {
-      "id": 1,
-      "date": "2026-03-31",
-      "time": "15:57",
-      "record_type": "record",
-      "action": "update",
-      "change_type": "ADD",
-      "source_display_name": "System",
-      "target_display_name": "",
-      "ip_address": "127.0.0.1",
-      "record_id": 1,
-      "details": "Old title -> Project Name"
-    }
-  ]
-}
-```
-
-## Security Features
-
-### Data Validation
-- **Required Fields**: All fields must be non-empty
-- **Minimum Length**: At least 1 character required
-- **Client-side Validation**: Real-time feedback
-- **Error Messages**: Clear, user-friendly guidance
-
-### API and Storage Security
-- **Authentication**: API key required for all API calls
-- **Prepared Statements**: Parameterized SQL queries for CRUD endpoints
-- **Controlled Resets**: `reset_data` is demo-mode only, while Dev Tools maintenance resets are available through system actions
-- **Storage**: Data persisted in MySQL tables (`records`, `activity_log`, `audit_log`)
-
-### Error Handling
-- **Fixed Issues**:
-  - Proper JSON response handling
-  - No extra output corruption
-  - Graceful error messages
-  - Proper HTTP status codes
-- **Error Suppression**: PHP errors won't break JSON responses
-
-## Implemented Enhancements
-
-- ✅ Search/filtering for data records (title/description) and audit trail entries  
-- ✅ Data sorting by columns with visual indicators  
-- ✅ Data export to CSV format  
-- ✅ Comprehensive administrative logging  
-- ✅ Dual report generation (Data and Logs)  
-- ✅ Multiple export formats (PDF and CSV)  
-- ✅ Data validation with helpful error messages  
-- ✅ SQL-backed persistent storage  
-- ✅ Production-ready environment configuration  
-- ✅ **Audit Trail System** with field-level tracking  
-- ✅ **Dark Mode Theme** with persistent settings  
-- ✅ **Consistent JSON API Response Handling** for reliable operations  
-- ✅ **Reset Data Functionality** for fresh starts
-- ✅ **Bulk Delete Actions (Data Page)** with checkbox selection and confirmation prompt
-- ✅ **Bulk Delete Audit Summary Entry** added for each batch delete action
-- ✅ **Header Analytics Widgets** with total and daily activity counts
-- ✅ **Audit Trail Timeline View** with date-grouped change history
-- ✅ **Filtered Data Export (PDF/CSV)** for current visible results
-- ✅ **Paginated Data Grid** with bottom-right rows-per-page selector and persistent preference
-- ✅ **Virtualized Row Rendering** for improved Data page performance on larger lists
-- ✅ **Server-Side Data Queries** for Data page pagination, filtering, and sorting
-- ✅ **API-Driven Data CRUD** for Data page add, edit, delete, and bulk delete actions
-- ✅ **Transactional SQL Writes** for multi-step operations
-- ✅ **Deployable Environment Modes** (`demo` and `production`) with configurable index reset behavior
-- ✅ **Modular JavaScript Loading** with shared core + page-specific feature modules
-- ✅ **Modular Dev Tools Page** with category-based utility rendering and `System` as default selection
-- ✅ **Dev Tools User Management** with create, update, force delete, and per-user widget reset
-- ✅ **Widget Preference Seeding** during user creation and widget reset operations
-- ✅ **Mobile Responsive Shell** with phone-first layout overrides for header, navigation, controls, and content flow
-- ✅ **Small-Screen Table Handling** with touch scrolling support and safer table sizing
-- ✅ **Server-Side Widget Preferences** with per-user header widget sync
-
-## Important Notes
-
-- ✅ MySQL must be reachable using values in `config/.env`
-- ✅ Timestamps are generated with a fixed one-hour offset
-- ✅ All logs auto-generated with detailed descriptions
-- ✅ All data operations immediately saved
-- ✅ Theme preference persists across pages
-- ✅ Data search works on title and description fields
-- ✅ Dark mode fully supported across all components
-- ✅ `index.php` reset behavior is controlled by environment mode/settings (`APP_MODE` and `RESET_ON_INDEX_VISIT`)
-- ✅ Bulk actions are currently limited to bulk delete on the Data page only
-- ✅ Audit Trail supports both Table and Timeline views
-- ✅ Data-page filtered exports log export events and include the full filtered/sorted dataset returned by the backend export endpoint
-- ✅ Data page rows-per-page preference persists across reloads
-- ✅ For real phone testing on a local server, open the app using your computer's LAN IP (not `localhost`)
-
-## Maintenance & Customization
-
-### Adding a New Page
-1. Create new page with reusable includes
-2. Add link to `includes/navigation.php`
-3. Theme support is applied automatically
-
-### Updating Styling
-- Modify `css/style.css` and all pages update automatically
-- Both light and dark mode styles included
-
-### Adding New Fields
-1. Update the form in `pages/data.php`
-2. Update the relevant feature module in `js/features/` (for example `data-page.js`)
-3. Update audit trail tracking
-4. Ensure corresponding SQL columns and API payload mapping are updated
-
-## Requirements
-
-- PHP 7.0+ (PDO MySQL enabled)
-- jQuery (loaded from CDN)
-- Modern web browser (Chrome, Firefox, Safari, Edge)
-- MySQL/MariaDB server (XAMPP MySQL supported)
-- Local server (XAMPP, WAMP, or similar)
+## Tech Stack
+
+- Backend: PHP 7+ with PDO (MySQL)
+- Frontend: jQuery + vanilla JS modules
+- Database: MySQL/MariaDB
+- Exports: html2pdf.js for client-side PDF generation
+
+## Authentication and Security
+
+- Login is required for app pages and API usage.
+- Auth uses session cookie + server-side session records (`user_sessions`).
+- Single-device sign-in policy: new login revokes previous active sessions for that account.
+- API auth is not API-key based.
+- SQL queries use prepared statements.
+- Password updates are available in Account Settings (`pages/user.php`) with CSRF protection.
+
+## Configuration
+
+`config/.env` is used for database connection values:
+
+- `DB_CONNECTION`
+- `DB_HOST`
+- `DB_PORT`
+- `DB_DATABASE`
+- `DB_USERNAME`
+- `DB_PASSWORD`
+- `DB_CHARSET`
+
+Application behavior settings are loaded from the `app_settings` table (not from `.env`):
+
+- `app_mode` (`demo` or `production`)
+- `reset_on_index_visit` (`true`/`false`)
+- `app_timezone`
+
+`index.php` redirects unauthenticated users to login, and in demo mode can reset data on entry when `reset_on_index_visit` is enabled.
+
+## Key Features
+
+### Data Page
+
+- Server-side search, sort, pagination (`10/20/25/50/100`)
+- Virtualized table rendering for the current page
+- Add/Edit/Delete + bulk delete
+- Filtered export endpoint support for CSV/PDF flows
+- Realtime refresh every 10 seconds
+- Footer status text: `Last refreshed HH:MM:SS`
+
+### Audit Trail Page
+
+- Table and timeline modes
+- Search + type/action filters
+- Diff-friendly details rendering for update events
+- Realtime refresh every 10 seconds
+- Active filters persist across realtime refreshes
+- Footer status text: `Last refreshed HH:MM:SS`
+
+### Reports Page
+
+- Dataset selector (Data or Logs)
+- On-screen report generation
+- PDF and CSV download actions
+
+### Notifications
+
+- Header bell dropdown with unread badge
+- Mark read, mark all read, delete, delete all
+- Realtime sync polling
+- Toast display for incoming notifications
+
+### Dev Tools
+
+- System maintenance actions (logs/audit/records/widget prefs/notifications/reset-all)
+- User management actions (lookup/create/update/force delete/reset widget prefs)
+
+### UI and Personalization
+
+- Dark mode toggle with persistence
+- Header metric widgets with per-user visibility preferences
+- UI customization page for widget visibility
+
+## Realtime Polling Intervals
+
+- Data page poll: 10 seconds
+- Audit page poll: 10 seconds
+- Notifications poll: 3 seconds
+- Session enforcement poll: 2 seconds
+
+## API Overview
+
+All responses are JSON. Most app actions are served through `api.php`.
+
+GET actions:
+
+- `action=session_status`
+- `action=audit_trail`
+- `action=logs`
+- `action=notifications`
+- `action=widget_preferences`
+- `action=data_page`
+- `action=data_filtered_export`
+- `action=data` (or empty action)
+
+POST actions (`Content-Type: application/json`):
+
+- Data: `data_create`, `data_update`, `data_delete`, `data_bulk_delete`
+- Audit write helpers: `add_audit_entry`, `add_audit_entries`
+- Notifications: `notification_create`, `notification_mark_read`, `notifications_mark_all_read`, `notification_delete`, `notifications_delete_all`
+- Widget preferences: `widget_preferences_update`
+- Dev tools/system: `reset_activity_log`, `reset_audit_log`, `reset_records`, `reset_widget_prefs`, `reset_notifications_table`, `reset_all`, `reset_data`, `logout_all_users`
+- Dev tools/users: `admin_user_lookup`, `admin_user_create`, `admin_user_update`, `admin_user_force_delete`, `admin_user_reset_widget_prefs`
+
+## Setup
+
+1. Place the project in your web root (for example XAMPP `htdocs`).
+2. Configure DB credentials in `config/.env`.
+3. Ensure required SQL schema/tables exist (see `SQL_SETUP.md`).
+4. Start Apache + MySQL.
+5. Open the app and sign in at `pages/login.php`.
+
+## Notes
+
+- This repo is session-authenticated; references to API-key auth are outdated.
+- App mode/reset/timezone are database settings (`app_settings`).
+- If testing from a phone on LAN, use your machine IP (not `localhost`).
