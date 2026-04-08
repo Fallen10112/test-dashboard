@@ -27,4 +27,17 @@ function setupAdminPageHandlers() {
 	});
 
 	activateTab('1');
+
+	var accordionHeaders = Array.prototype.slice.call(document.querySelectorAll('.admin-accordion-header'));
+	accordionHeaders.forEach(function(header) {
+		header.addEventListener('click', function() {
+			var expanded = header.getAttribute('aria-expanded') === 'true';
+			var bodyId = header.getAttribute('aria-controls');
+			var body = bodyId ? document.getElementById(bodyId) : null;
+			header.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+			if (body) {
+				body.hidden = expanded;
+			}
+		});
+	});
 }

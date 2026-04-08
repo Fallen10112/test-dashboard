@@ -24,75 +24,85 @@
 					<p>Create new users and update existing users details.</p>
 					<input type="hidden" id="dev-tools-current-user-id" value="<?php echo $adminCurrentUserId; ?>">
 
-					<div class="admin-user-grid">
-						<div class="dev-tools-user-section">
-							<h4>Create New User</h4>
-							<div class="account-form" autocomplete="off">
-								<div class="form-group">
-									<label for="dev-users-create-email">Email</label>
-									<input type="email" id="dev-users-create-email" maxlength="255" placeholder="new.user@example.com">
+					<div class="admin-accordion">
+						<div class="admin-accordion-section">
+							<button type="button" class="admin-accordion-header" aria-expanded="false" aria-controls="admin-accordion-body-create">
+								<span>Create New User</span>
+								<svg class="admin-accordion-chevron" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+							</button>
+							<div class="admin-accordion-body" id="admin-accordion-body-create" hidden>
+								<div class="account-form" autocomplete="off">
+									<div class="form-group">
+										<label for="dev-users-create-email">Email</label>
+										<input type="email" id="dev-users-create-email" maxlength="255" placeholder="new.user@example.com">
+									</div>
+									<div class="form-group">
+										<label for="dev-users-create-username">Username</label>
+										<input type="text" id="dev-users-create-username" maxlength="100" placeholder="newuser">
+									</div>
+									<div class="form-group">
+										<label for="dev-users-create-display-name">Display Name</label>
+										<input type="text" id="dev-users-create-display-name" maxlength="150" placeholder="New User">
+									</div>
+									<div class="form-group">
+										<label for="dev-users-create-status">Status</label>
+										<select id="dev-users-create-status">
+											<option value="active" selected>active</option>
+											<option value="disabled">disabled</option>
+										</select>
+									</div>
+									<div class="form-actions">
+										<button id="dev-users-create-btn" type="button" class="btn btn-primary">Create User</button>
+									</div>
+									<p id="dev-users-create-result" class="dev-tools-inline-result" hidden></p>
 								</div>
-								<div class="form-group">
-									<label for="dev-users-create-username">Username</label>
-									<input type="text" id="dev-users-create-username" maxlength="100" placeholder="newuser">
-								</div>
-								<div class="form-group">
-									<label for="dev-users-create-display-name">Display Name</label>
-									<input type="text" id="dev-users-create-display-name" maxlength="150" placeholder="New User">
-								</div>
-								<div class="form-group">
-									<label for="dev-users-create-status">Status</label>
-									<select id="dev-users-create-status">
-										<option value="active" selected>active</option>
-										<option value="disabled">disabled</option>
-									</select>
-								</div>
-								<div class="form-actions">
-									<button id="dev-users-create-btn" type="button" class="btn btn-primary">Create User</button>
-								</div>
-								<p id="dev-users-create-result" class="dev-tools-inline-result" hidden></p>
 							</div>
 						</div>
 
-						<div class="dev-tools-user-section">
-							<h4>Update User</h4>
-							<div class="account-form" autocomplete="off">
-								<div class="form-group">
-									<label for="dev-users-update-lookup">Lookup (username or id)</label>
-									<input type="text" id="dev-users-update-lookup" maxlength="100" placeholder="e.g. 12 or johndoe">
-								</div>
-								<div class="form-actions">
-									<button id="dev-users-update-detect-btn" type="button" class="btn btn-secondary">Detect User</button>
-								</div>
-								<p id="dev-users-update-detected" class="dev-tools-inline-result" hidden></p>
+						<div class="admin-accordion-section">
+							<button type="button" class="admin-accordion-header" aria-expanded="false" aria-controls="admin-accordion-body-update">
+								<span>Update User</span>
+								<svg class="admin-accordion-chevron" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+							</button>
+							<div class="admin-accordion-body" id="admin-accordion-body-update" hidden>
+								<div class="account-form" autocomplete="off">
+									<div class="form-group">
+										<label for="dev-users-update-lookup">Lookup (username or id)</label>
+										<input type="text" id="dev-users-update-lookup" maxlength="100" placeholder="e.g. 12 or johndoe">
+									</div>
+									<div class="form-actions">
+										<button id="dev-users-update-detect-btn" type="button" class="btn btn-secondary">Detect User</button>
+									</div>
+									<p id="dev-users-update-detected" class="dev-tools-inline-result" hidden></p>
 
-								<div class="form-group">
-									<label for="dev-users-update-email">Email</label>
-									<input type="email" id="dev-users-update-email" maxlength="255" placeholder="user@example.com" disabled>
+									<div class="form-group">
+										<label for="dev-users-update-email">Email</label>
+										<input type="email" id="dev-users-update-email" maxlength="255" placeholder="user@example.com" disabled>
+									</div>
+									<div class="form-group">
+										<label for="dev-users-update-username">Username</label>
+										<input type="text" id="dev-users-update-username" maxlength="100" placeholder="username" disabled>
+									</div>
+									<div class="form-group">
+										<label for="dev-users-update-display-name">Display Name</label>
+										<input type="text" id="dev-users-update-display-name" maxlength="150" placeholder="Display name" disabled>
+									</div>
+									<div class="form-group">
+										<label for="dev-users-update-status">Status</label>
+										<select id="dev-users-update-status" disabled>
+											<option value="active">active</option>
+											<option value="disabled">disabled</option>
+										</select>
+									</div>
+									<div class="form-group">
+										<label for="dev-users-update-reset-password">Reset Password</label>
+										<input type="checkbox" id="dev-users-update-reset-password" disabled>
+									</div>
+									<div class="form-actions">
+										<button id="dev-users-update-btn" type="button" class="btn btn-primary" disabled>Update User</button>
+									</div>
+									<p id="dev-users-update-result" class="dev-tools-inline-result" hidden></p>
 								</div>
-								<div class="form-group">
-									<label for="dev-users-update-username">Username</label>
-									<input type="text" id="dev-users-update-username" maxlength="100" placeholder="username" disabled>
-								</div>
-								<div class="form-group">
-									<label for="dev-users-update-display-name">Display Name</label>
-									<input type="text" id="dev-users-update-display-name" maxlength="150" placeholder="Display name" disabled>
-								</div>
-								<div class="form-group">
-									<label for="dev-users-update-status">Status</label>
-									<select id="dev-users-update-status" disabled>
-										<option value="active">active</option>
-										<option value="disabled">disabled</option>
-									</select>
-								</div>
-								<div class="form-group">
-									<label for="dev-users-update-reset-password">Reset Password</label>
-									<input type="checkbox" id="dev-users-update-reset-password" disabled>
-								</div>
-								<div class="form-actions">
-									<button id="dev-users-update-btn" type="button" class="btn btn-primary" disabled>Update User</button>
-								</div>
-								<p id="dev-users-update-result" class="dev-tools-inline-result" hidden></p>
 							</div>
 						</div>
 					</div>

@@ -2777,6 +2777,88 @@ body.dark-mode .user-dropdown-signout:hover {
     align-items: start;
 }
 
+.admin-accordion {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+}
+
+.admin-accordion-section {
+    border: 1px solid #dbe3ef;
+    border-radius: 10px;
+    overflow: hidden;
+    width: 100%;
+}
+
+.admin-accordion-header {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 13px 18px;
+    background: #f3f6fb;
+    border: none;
+    cursor: pointer;
+    font-size: 0.97em;
+    font-weight: 600;
+    color: #2c3e50;
+    text-align: left;
+    transition: background 0.2s ease;
+}
+
+.admin-accordion-header:hover {
+    background: #e8eef8;
+}
+
+.admin-accordion-header[aria-expanded="true"] {
+    background: #eef2ff;
+    color: #1f2f63;
+    border-bottom: 1px solid #dbe3ef;
+}
+
+.admin-accordion-chevron {
+    flex-shrink: 0;
+    transition: transform 0.22s ease;
+}
+
+.admin-accordion-header[aria-expanded="true"] .admin-accordion-chevron {
+    transform: rotate(180deg);
+}
+
+.admin-accordion-body {
+    padding: 16px 18px;
+    background: #f9fbff;
+}
+
+.admin-accordion-body[hidden] {
+    display: none !important;
+}
+
+body.dark-mode .admin-accordion-section {
+    border-color: #3e4b66;
+}
+
+body.dark-mode .admin-accordion-header {
+    background: #242c3a;
+    color: #dbe4f3;
+}
+
+body.dark-mode .admin-accordion-header:hover {
+    background: #2c3850;
+}
+
+body.dark-mode .admin-accordion-header[aria-expanded="true"] {
+    background: #1f2940;
+    color: #f5f7ff;
+    border-bottom-color: #3e4b66;
+}
+
+body.dark-mode .admin-accordion-body {
+    background: #1e2636;
+}
+
 .widget-options-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
