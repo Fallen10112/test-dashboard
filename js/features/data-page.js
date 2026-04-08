@@ -7,8 +7,6 @@ let currentFilteredDataItems = [];
 let currentPage = 1;
 let pageSize = 25;
 let currentPagedItems = [];
-const virtualRowHeightPx = 52;
-const virtualOverscanRows = 6;
 const dataPageSizeStorageKey = 'data-page-size';
 let dataRealtimePollTimerId = null;
 let isDataRealtimePollInFlight = false;
@@ -25,7 +23,6 @@ function updateDataLastRefreshedTime() {
 
 function setupDataPageHandlers() {
 	const debouncedFilter = debounce(loadDataPage, 180);
-	const debouncedVirtualRender = debounce(renderVirtualizedRows, 16);
 
 	$('#add-record-btn').on('click', function() {
 		openAddModal();
@@ -91,10 +88,6 @@ function setupDataPageHandlers() {
 			currentPage += 1;
 			loadDataPage();
 		}
-	});
-
-	$('#data-container').on('scroll', '#data-table-viewport', function() {
-		debouncedVirtualRender();
 	});
 
 	$('#data-container').on('click', '.edit-btn', function() {
@@ -447,38 +440,10 @@ function renderVirtualizedRows() {
 	if (!Array.isArray(currentPagedItems) || currentPagedItems.length === 0) {
 		return;
 	}
-
-	const viewportHeight = viewport.clientHeight || 520;
-	const scrollTop = viewport.scrollTop;
-	const totalRows = currentPagedItems.length;
-	const startIndex = Math.max(0, Math.floor(scrollTop / virtualRowHeightPx) - virtualOverscanRows);
-	const visibleCount = Math.ceil(viewportHeight / virtualRowHeightPx) + (virtualOverscanRows * 2);
-	const endIndex = Math.min(totalRows, startIndex + visibleCount);
 	const fragment = document.createDocumentFragment();
-
-	if (startIndex > 0) {
-		const topSpacer = document.createElement('tr');
-		topSpacer.className = 'virtual-spacer-row';
-		const topSpacerCell = document.createElement('td');
-		topSpacerCell.colSpan = 5;
-		topSpacerCell.style.height = String(startIndex * virtualRowHeightPx) + 'px';
-		topSpacer.appendChild(topSpacerCell);
-		fragment.appendChild(topSpacer);
-	}
-
-	for (let i = startIndex; i < endIndex; i += 1) {
-		fragment.appendChild(createDataRowElement(currentPagedItems[i]));
-	}
-
-	if (endIndex < totalRows) {
-		const bottomSpacer = document.createElement('tr');
-		bottomSpacer.className = 'virtual-spacer-row';
-		const bottomSpacerCell = document.createElement('td');
-		bottomSpacerCell.colSpan = 5;
-		bottomSpacerCell.style.height = String((totalRows - endIndex) * virtualRowHeightPx) + 'px';
-		bottomSpacer.appendChild(bottomSpacerCell);
-		fragment.appendChild(bottomSpacer);
-	}
+	currentPagedItems.forEach(function(item) {
+		fragment.appendChild(createDataRowElement(item));
+	});
 
 	tbody.appendChild(fragment);
 }

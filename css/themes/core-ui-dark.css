@@ -99,9 +99,6 @@ body.dark-mode .data-refresh-status,
 body.dark-mode .audit-refresh-status {
     color: #9ca3af;
 }
-body.dark-mode .data-table-viewport {
-    border: 1px solid #333;
-}
 body.dark-mode .data-table-viewport,
 body.dark-mode .audit-table-scroll,
 body.dark-mode #audit-container.audit-view-timeline {
