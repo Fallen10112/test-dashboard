@@ -157,6 +157,32 @@
         padding: 18px 12px 22px;
     }
 
+    .main-content.main-content-table-page {
+        position: static;
+        top: auto;
+        left: auto;
+        right: auto;
+        height: auto;
+        overflow: visible;
+        display: block;
+    }
+
+    .table-page-section {
+        display: block;
+        min-height: auto;
+    }
+
+    .content-section.active.table-page-section {
+        display: block;
+    }
+
+    #data-container,
+    #audit-container {
+        display: block;
+        overflow: visible;
+        min-height: auto;
+    }
+
     .content-section h2 {
         font-size: 1.45em;
     }

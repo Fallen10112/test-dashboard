@@ -142,6 +142,7 @@ function startAuditTrailRealtimeSync() {
 function renderAuditTrail(entries, emptyMessage) {
 	const container = $('#audit-container');
 	container.empty();
+	container.toggleClass('audit-view-timeline', currentAuditView === 'timeline');
 	if (!Array.isArray(entries) || entries.length === 0) {
 		container.html('<p>' + emptyMessage + '</p>');
 		return;

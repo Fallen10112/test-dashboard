@@ -2,8 +2,8 @@
 <?php include '../includes/navigation.php'; ?>
 	
 	
-	<main class="main-content">
-		<section class="content-section active">
+	<main class="main-content main-content-table-page">
+		<section class="content-section active table-page-section">
 			<h2>Data</h2>
 			<div class="data-controls">
 				<div class="search-container">
