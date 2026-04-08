@@ -2702,6 +2702,81 @@ body.dark-mode .user-dropdown-signout:hover {
     max-width: 680px;
 }
 
+.admin-card {
+    max-width: none;
+    width: 100%;
+    min-height: calc(100vh - var(--header-height) - 132px);
+    display: flex;
+    flex-direction: column;
+}
+
+.admin-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: -1px;
+    padding-left: 8px;
+}
+
+.admin-tab-btn {
+    border: 1px solid #cfd8e6;
+    border-bottom: 1px solid #cfd8e6;
+    background: #f3f6fb;
+    color: #2c3e50;
+    border-radius: 10px 10px 0 0;
+    padding: 8px 12px;
+    font-size: 0.92em;
+    font-weight: 600;
+    cursor: pointer;
+    position: relative;
+    top: 0;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.admin-tab-btn:hover {
+    background: #e8eef8;
+    border-color: #b7c6df;
+}
+
+.admin-tab-btn.active {
+    background: #eef2ff;
+    border-color: #667eea;
+    border-bottom-color: #f9fbff;
+    color: #1f2f63;
+    top: 1px;
+    z-index: 2;
+}
+
+.admin-tab-panel {
+    border: 1px solid #dbe3ef;
+    border-radius: 10px;
+    background: #f9fbff;
+    padding: 14px;
+    margin-top: 0;
+    flex: 1;
+}
+
+.admin-tab-panel h4 {
+    margin: 0 0 10px;
+    color: #2c3e50;
+}
+
+.admin-tab-panel ul {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.admin-tab-panel ul li {
+    margin-bottom: 6px;
+}
+
+.admin-user-grid {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    align-items: start;
+}
+
 .widget-options-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2752,9 +2827,58 @@ body.dark-mode .widget-option-label {
     color: #e5e7eb;
 }
 
+body.dark-mode .admin-tab-btn {
+    background: #242c3a;
+    border-color: #3e4b66;
+    color: #dbe4f3;
+}
+
+body.dark-mode .admin-tab-btn:hover {
+    background: #2c3850;
+    border-color: #5a6f98;
+}
+
+body.dark-mode .admin-tab-btn.active {
+    background: #1f2940;
+    border-color: #7f93ff;
+    border-bottom-color: #242c3a;
+    color: #f5f7ff;
+    top: 1px;
+}
+
+body.dark-mode .admin-tab-panel {
+    background: #242c3a;
+    border-color: #3e4b66;
+}
+
+body.dark-mode .admin-tab-panel h4 {
+    color: #e5e7eb;
+}
+
+body.dark-mode .admin-tab-panel ul li {
+    color: #d1d5db;
+}
+
 @media (max-width: 768px) {
     .widget-options-grid {
         grid-template-columns: 1fr;
+    }
+
+    .admin-tabs {
+        width: 100%;
+    }
+
+    .admin-tab-btn {
+        flex: 1 1 calc(33.333% - 8px);
+        min-width: 90px;
+    }
+
+    .admin-user-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .admin-card {
+        min-height: calc(100vh - var(--header-height) - 104px);
     }
 }
 

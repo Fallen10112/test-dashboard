@@ -22,6 +22,9 @@
 	<?php if ($currentPage === 'ui-customization.php'): ?>
 	<script src="../js/features/ui-customization-page.js"></script>
 	<?php endif; ?>
+	<?php if ($currentPage === 'admin.php'): ?>
+	<script src="../js/features/admin-page.js"></script>
+	<?php endif; ?>
 	<script src="../js/pages/app-init.js"></script>
 </body>
 </html>

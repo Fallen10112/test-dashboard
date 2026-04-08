@@ -100,6 +100,7 @@ $pageTitle = "Dashboard Showcase";
 					<a href="user.php" class="user-dropdown-item">Account Settings</a>
 					<a href="ui-customization.php" class="user-dropdown-item">UI Customization</a>
 					<a href="dev-tools.php" class="user-dropdown-item">Dev Tools</a>
+					<a href="admin.php" class="user-dropdown-item">Admin</a>
 					<form method="POST" action="login.php">
 						<input type="hidden" name="action" value="logout">
 						<button type="submit" class="user-dropdown-item user-dropdown-signout">Sign Out</button>

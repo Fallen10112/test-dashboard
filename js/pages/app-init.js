@@ -54,6 +54,10 @@ $(document).ready(function() {
 	if ($('#ui-customization-container').length > 0 && typeof setupUiCustomizationPageHandlers === 'function') {
 		setupUiCustomizationPageHandlers();
 	}
+
+	if ($('#admin-container').length > 0 && typeof setupAdminPageHandlers === 'function') {
+		setupAdminPageHandlers();
+	}
 });
 
 
