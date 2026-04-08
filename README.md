@@ -32,7 +32,7 @@ test-dashboard/
 │   │   └── foundation.css              # CSS reset, box-sizing, body declaration, --header-height variable
 │   ├── layout/		                    # 2) Layout layer: structural shell
 │   │   ├── index.css
-│   │   └── app-shell.css              # title-bar, sidebar, nav-menu, main-content, content-section
+│   │   └── app-shell.css               # title-bar, sidebar, nav-menu, main-content, content-section
 │   ├── components/	                    # 3) Components layer: reusable UI patterns
 │   │   ├── index.css
 │   │   ├── prelude.css                 # Select dropdowns, audit controls, scrollbars, scroll-to-top
@@ -41,7 +41,7 @@ test-dashboard/
 │   ├── pages/		                    # 4) Pages layer: page-scoped styles
 │   │   ├── index.css
 │   │   ├── login.css                   # Login page styles
-│   │   └── account-admin.css          # Account settings and admin/dev-tools page styles
+│   │   └── account-admin.css           # Account settings and admin/dev-tools page styles
 │   ├── themes/		                    # 5) Themes layer: centralized dark-mode overrides (body.dark-mode)
 │   │   ├── index.css
 │   │   ├── prelude-dark.css            # Dark overrides for select dropdowns, audit toggles, scroll-to-top
