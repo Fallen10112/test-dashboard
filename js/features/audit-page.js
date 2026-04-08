@@ -3,6 +3,15 @@ let auditCurrentPage = 1;
 let auditPageSize = 25;
 let auditRealtimePollTimerId = null;
 let isAuditRealtimePollInFlight = false;
+let auditLastRefreshedTimeText = '--:--:--';
+
+function updateAuditLastRefreshedTime() {
+	const now = new Date();
+	const hours = String(now.getHours()).padStart(2, '0');
+	const minutes = String(now.getMinutes()).padStart(2, '0');
+	const seconds = String(now.getSeconds()).padStart(2, '0');
+	auditLastRefreshedTimeText = hours + ':' + minutes + ':' + seconds;
+}
 
 function setupAuditTrailPageHandlers() {
 	const debouncedAuditFilter = debounce(filterAuditTrail, 180);
@@ -61,7 +70,8 @@ function loadAuditTrail(onComplete) {
 		dataType: 'json',
 		success: function(data) {
 			allAuditTrail = data;
-			displayAuditTrail(data);
+			updateAuditLastRefreshedTime();
+			filterAuditTrail();
 			if (typeof onComplete === 'function') {
 				onComplete();
 			}
@@ -99,7 +109,7 @@ function startAuditTrailRealtimeSync() {
 		});
 	};
 
-	auditRealtimePollTimerId = setInterval(poll, 3000);
+	auditRealtimePollTimerId = setInterval(poll, 10000);
 
 	document.addEventListener('visibilitychange', function() {
 		if (document.visibilityState === 'visible') {
@@ -132,6 +142,7 @@ function renderAuditTrail(entries, emptyMessage) {
 	const pageEnd = pageStart + pagedEntries.length;
 	let paginationHTML = '<div class="data-pagination">';
 	paginationHTML += '<span class="data-pagination-summary">Showing ' + (pageStart + 1) + '-' + pageEnd + ' of ' + totalEntries + '</span>';
+	paginationHTML += '<div class="data-pagination-controls-wrap">';
 	paginationHTML += '<div class="data-pagination-controls">';
 	paginationHTML += '<div class="data-page-size-group">';
 	paginationHTML += '<label class="data-page-size-label" for="audit-page-size">Rows per page</label>';
@@ -146,6 +157,8 @@ function renderAuditTrail(entries, emptyMessage) {
 	paginationHTML += '<button type="button" id="audit-page-prev" class="btn btn-sm btn-secondary"' + (auditCurrentPage <= 1 ? ' disabled' : '') + '>Previous</button>';
 	paginationHTML += '<span class="data-page-label">Page ' + auditCurrentPage + ' of ' + totalPages + '</span>';
 	paginationHTML += '<button type="button" id="audit-page-next" class="btn btn-sm btn-secondary"' + (auditCurrentPage >= totalPages ? ' disabled' : '') + '>Next</button>';
+	paginationHTML += '</div>';
+	paginationHTML += '<div class="audit-refresh-status">Last refreshed ' + auditLastRefreshedTimeText + '</div>';
 	paginationHTML += '</div>';
 	paginationHTML += '</div>';
 

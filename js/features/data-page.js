@@ -12,6 +12,15 @@ const virtualOverscanRows = 6;
 const dataPageSizeStorageKey = 'data-page-size';
 let dataRealtimePollTimerId = null;
 let isDataRealtimePollInFlight = false;
+let dataLastRefreshedTimeText = '--:--:--';
+
+function updateDataLastRefreshedTime() {
+	const now = new Date();
+	const hours = String(now.getHours()).padStart(2, '0');
+	const minutes = String(now.getMinutes()).padStart(2, '0');
+	const seconds = String(now.getSeconds()).padStart(2, '0');
+	dataLastRefreshedTimeText = hours + ':' + minutes + ':' + seconds;
+}
 
 
 function setupDataPageHandlers() {
@@ -165,6 +174,7 @@ function loadDataPage(callback, onComplete) {
 		dataType: 'json',
 		data: buildDataPageRequestParams(),
 		success: function(response) {
+			updateDataLastRefreshedTime();
 			renderDataTableView(response || {});
 			if (typeof callback === 'function') {
 				callback(response || {});
@@ -216,7 +226,7 @@ function startDataPageRealtimeSync() {
 		});
 	};
 
-	dataRealtimePollTimerId = setInterval(poll, 3000);
+	dataRealtimePollTimerId = setInterval(poll, 10000);
 
 	document.addEventListener('visibilitychange', function() {
 		if (document.visibilityState === 'visible') {
@@ -510,6 +520,9 @@ function renderDataTableView(response) {
 	summary.className = 'data-pagination-summary';
 	summary.textContent = 'Showing ' + (pageStart + 1) + '-' + (pageStart + currentPagedItems.length) + ' of ' + currentFilteredItemCount;
 
+	const controlsWrap = document.createElement('div');
+	controlsWrap.className = 'data-pagination-controls-wrap';
+
 	const controls = document.createElement('div');
 	controls.className = 'data-pagination-controls';
 
@@ -556,8 +569,15 @@ function renderDataTableView(response) {
 	controls.appendChild(prevBtn);
 	controls.appendChild(pageLabel);
 	controls.appendChild(nextBtn);
+
+	const refreshStatus = document.createElement('div');
+	refreshStatus.className = 'data-refresh-status';
+	refreshStatus.textContent = 'Last refreshed ' + dataLastRefreshedTimeText;
+
+	controlsWrap.appendChild(controls);
+	controlsWrap.appendChild(refreshStatus);
 	pagination.appendChild(summary);
-	pagination.appendChild(controls);
+	pagination.appendChild(controlsWrap);
 	container.appendChild(pagination);
 
 	renderVirtualizedRows();

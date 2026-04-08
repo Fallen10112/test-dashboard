@@ -901,6 +901,19 @@ body {
     gap: 10px;
 }
 
+.data-pagination-controls-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+}
+
+.data-refresh-status,
+.audit-refresh-status {
+    font-size: 0.82em;
+    color: #6b7280;
+}
+
 .data-page-size-group {
     display: flex;
     align-items: center;
@@ -1455,6 +1468,11 @@ body.dark-mode .data-pagination-summary {
     color: #b0b0b0;
 }
 
+body.dark-mode .data-refresh-status,
+body.dark-mode .audit-refresh-status {
+    color: #9ca3af;
+}
+
 body.dark-mode .data-table-viewport {
     border: 1px solid #333;
 }
@@ -1720,6 +1738,11 @@ body.dark-mode .custom-toast-meta-item {
     .data-pagination-controls {
         width: 100%;
         flex-wrap: wrap;
+    }
+
+    .data-pagination-controls-wrap {
+        width: 100%;
+        align-items: flex-start;
     }
 
     .data-page-size-group {
