@@ -295,13 +295,30 @@ function createDevToolsUser(PDO $pdo, $email, $username, $displayName, $status) 
 		]);
 
 		$userId = (int)$pdo->lastInsertId();
-		ensureDefaultHeaderWidgetPreferencesForUser($pdo, $userId);
 		$pdo->commit();
+	} catch (PDOException $e) {
+		if ($pdo->inTransaction()) {
+			$pdo->rollBack();
+		}
+
+		$errorCode = (string)($e->getCode() ?? '');
+		if ($errorCode === '23000') {
+			return ['success' => false, 'message' => 'Failed to create user (email/username may already exist)'];
+		}
+
+		return ['success' => false, 'message' => 'Failed to create user'];
 	} catch (Throwable $e) {
 		if ($pdo->inTransaction()) {
 			$pdo->rollBack();
 		}
-		return ['success' => false, 'message' => 'Failed to create user (email/username may already exist)'];
+		return ['success' => false, 'message' => 'Failed to create user'];
+	}
+
+	try {
+		// Do not fail user creation if preferences already exist or setup temporarily fails.
+		ensureDefaultHeaderWidgetPreferencesForUser($pdo, $userId);
+	} catch (Throwable $e) {
+		// Non-critical: preferences are lazily ensured elsewhere when needed.
 	}
 
 	return [

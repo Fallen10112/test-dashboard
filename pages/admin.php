@@ -75,30 +75,35 @@
 									</div>
 									<p id="dev-users-update-detected" class="dev-tools-inline-result" hidden></p>
 
-									<div class="form-group">
-										<label for="dev-users-update-email">Email</label>
-										<input type="email" id="dev-users-update-email" maxlength="255" placeholder="user@example.com" disabled>
+									<div id="dev-users-update-fields" hidden>
+										<div class="form-group">
+											<label for="dev-users-update-email">Email</label>
+											<input type="email" id="dev-users-update-email" maxlength="255" placeholder="user@example.com" disabled>
+										</div>
+										<div class="form-group">
+											<label for="dev-users-update-username">Username</label>
+											<input type="text" id="dev-users-update-username" maxlength="100" placeholder="username" disabled>
+										</div>
+										<div class="form-group">
+											<label for="dev-users-update-display-name">Display Name</label>
+											<input type="text" id="dev-users-update-display-name" maxlength="150" placeholder="Display name" disabled>
+										</div>
+										<div class="form-group">
+											<label for="dev-users-update-status">Status</label>
+											<select id="dev-users-update-status" disabled>
+												<option value="active">active</option>
+												<option value="disabled">disabled</option>
+											</select>
+										</div>
+										<div class="form-group">
+											<label for="dev-users-update-reset-password">Reset Password</label>
+											<select id="dev-users-update-reset-password" disabled>
+												<option value="no" selected>No</option>
+												<option value="yes">Yes</option>
+											</select>
+										</div>
 									</div>
-									<div class="form-group">
-										<label for="dev-users-update-username">Username</label>
-										<input type="text" id="dev-users-update-username" maxlength="100" placeholder="username" disabled>
-									</div>
-									<div class="form-group">
-										<label for="dev-users-update-display-name">Display Name</label>
-										<input type="text" id="dev-users-update-display-name" maxlength="150" placeholder="Display name" disabled>
-									</div>
-									<div class="form-group">
-										<label for="dev-users-update-status">Status</label>
-										<select id="dev-users-update-status" disabled>
-											<option value="active">active</option>
-											<option value="disabled">disabled</option>
-										</select>
-									</div>
-									<div class="form-group">
-										<label for="dev-users-update-reset-password">Reset Password</label>
-										<input type="checkbox" id="dev-users-update-reset-password" disabled>
-									</div>
-									<div class="form-actions">
+									<div class="form-actions" id="dev-users-update-actions" hidden>
 										<button id="dev-users-update-btn" type="button" class="btn btn-primary" disabled>Update User</button>
 									</div>
 									<p id="dev-users-update-result" class="dev-tools-inline-result" hidden></p>

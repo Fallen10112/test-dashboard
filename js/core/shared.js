@@ -1307,6 +1307,22 @@ function setupDevToolsUserManagementHandlers() {
 
 	const setUpdateControlsEnabled = function(enabled) {
 		const canEdit = !!enabled;
+		const $updateFields = $('#dev-users-update-fields');
+		const $updateActions = $('#dev-users-update-actions');
+		if ($updateFields.length > 0) {
+			if (canEdit) {
+				$updateFields.removeAttr('hidden');
+			} else {
+				$updateFields.attr('hidden', 'hidden');
+			}
+		}
+		if ($updateActions.length > 0) {
+			if (canEdit) {
+				$updateActions.removeAttr('hidden');
+			} else {
+				$updateActions.attr('hidden', 'hidden');
+			}
+		}
 		$('#dev-users-update-email').prop('disabled', !canEdit);
 		$('#dev-users-update-username').prop('disabled', !canEdit);
 		$('#dev-users-update-display-name').prop('disabled', !canEdit);
@@ -1411,11 +1427,13 @@ function setupDevToolsUserManagementHandlers() {
 			$('#dev-users-update-username').val(String(user.username || ''));
 			$('#dev-users-update-display-name').val(String(user.display_name || ''));
 			$('#dev-users-update-status').val(String(user.status || 'active').toLowerCase());
+			$('#dev-users-update-reset-password').val('no');
 			setUpdateControlsEnabled(updateTargetUserId > 0);
 			setInlineResult('#dev-users-update-detected', updateDetectedLabel, false);
 		}, function(message) {
 			updateTargetUserId = 0;
 			updateDetectedLabel = '';
+			$('#dev-users-update-reset-password').val('no');
 			setUpdateControlsEnabled(false);
 			setInlineResult('#dev-users-update-detected', message, true);
 		});
@@ -1433,7 +1451,7 @@ function setupDevToolsUserManagementHandlers() {
 			username: String($('#dev-users-update-username').val() || '').trim(),
 			display_name: String($('#dev-users-update-display-name').val() || '').trim(),
 			status: String($('#dev-users-update-status').val() || 'active').toLowerCase(),
-			reset_password: $('#dev-users-update-reset-password').is(':checked')
+			reset_password: String($('#dev-users-update-reset-password').val() || 'no').toLowerCase() === 'yes'
 		}).done(function(response) {
 			if (!response || !response.success) {
 				setInlineResult('#dev-users-update-result', 'Failed to update user.', true);
@@ -1456,7 +1474,7 @@ function setupDevToolsUserManagementHandlers() {
 			setInlineResult('#dev-users-update-result', message, false);
 			updateDetectedLabel = userLabel(user);
 			setInlineResult('#dev-users-update-detected', updateDetectedLabel, false);
-			$('#dev-users-update-reset-password').prop('checked', false);
+			$('#dev-users-update-reset-password').val('no');
 		}).fail(function(xhr) {
 			const message = xhr && xhr.responseJSON && xhr.responseJSON.message
 				? xhr.responseJSON.message

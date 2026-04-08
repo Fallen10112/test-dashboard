@@ -291,6 +291,14 @@
     word-break: break-word;
 }
 
+#dev-users-update-detected {
+    margin-top: 14px;
+}
+
+#dev-users-update-actions[hidden] {
+    display: none !important;
+}
+
 .dev-tools-inline-result.is-success {
     background: #ecfdf3;
     color: #14532d;
