@@ -67,9 +67,6 @@ function requireSetting($settings, $key) {
 	return $settings[$key];
 }
 
-define('API_KEY', requireSetting($appSettings, 'api_key'));
-define('API_KEY_HEADER', 'X-API-Key');
-
 $appTimezone = requireSetting($appSettings, 'app_timezone');
 define('APP_TIMEZONE', $appTimezone);
 if (!@date_default_timezone_set(APP_TIMEZONE)) {

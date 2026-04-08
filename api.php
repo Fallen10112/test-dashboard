@@ -17,55 +17,6 @@ function respondJson($statusCode, $payload) {
 }
 
 
-function getHeaderValue($headerName) {
-	$serverKey = 'HTTP_' . strtoupper(str_replace('-', '_', $headerName));
-	if (isset($_SERVER[$serverKey])) {
-		return trim((string)$_SERVER[$serverKey]);
-	}
-
-	if (function_exists('getallheaders')) {
-		$headers = getallheaders();
-		if (is_array($headers)) {
-			foreach ($headers as $name => $value) {
-				if (strcasecmp($name, $headerName) === 0) {
-					return trim((string)$value);
-				}
-			}
-		}
-	}
-
-	return '';
-}
-
-
-function getProvidedApiKey() {
-	$headerApiKey = getHeaderValue(API_KEY_HEADER);
-	if ($headerApiKey !== '') {
-		return $headerApiKey;
-	}
-
-	$authorization = getHeaderValue('Authorization');
-	if (stripos($authorization, 'Bearer ') === 0) {
-		return trim(substr($authorization, 7));
-	}
-
-	return '';
-}
-
-
-function requireApiKeyAuthentication() {
-	$expectedApiKey = trim((string)API_KEY);
-	if ($expectedApiKey === '') {
-		respondJson(500, ['success' => false, 'message' => 'Server API key is not configured']);
-	}
-
-	$providedApiKey = getProvidedApiKey();
-	if ($providedApiKey === '' || !hash_equals($expectedApiKey, $providedApiKey)) {
-		respondJson(401, ['success' => false, 'message' => 'Unauthorized: valid API key required']);
-	}
-}
-
-
 function requireApiSessionAuthentication() {
 	startAuthSession();
 	$user = getAuthUser();
@@ -1074,7 +1025,6 @@ if ($method === 'OPTIONS') {
 	exit;
 }
 
-requireApiKeyAuthentication();
 requireApiSessionAuthentication();
 
 try {

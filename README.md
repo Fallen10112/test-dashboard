@@ -127,9 +127,6 @@ test-dashboard/
 - **Full Coverage**: Dark mode applies to all pages and components
 
 ### ⚙️ Environment Configuration
-- **API_KEY**: Shared secret required by `api.php` for GET and POST requests
-  - Send using `X-API-Key` header (preferred) or `Authorization: Bearer <key>`
-  - Default local value is for development only; change it before deployment
 - **APP_MODE**: Set to `demo` (default) or `production`
   - Demo mode: Auto-resets all data when `index.php` is loaded (fresh start for testing)
   - Production mode: Preserves all data across application restarts
@@ -279,9 +276,7 @@ test-dashboard/
 All responses are JSON.
 
 Authentication (required):
-- Header (recommended): `X-API-Key: <your_api_key>`
-- Bearer alternative: `Authorization: Bearer <your_api_key>`
-- Query fallback/testing: `?api_key=<your_api_key>`
+- Login-backed session cookie. Sign in at `pages/login.php` before calling endpoints from the browser.
 
 ##### GET Endpoints
 
@@ -294,10 +289,6 @@ Authentication (required):
 | `GET api.php?action=notifications` | User notification inbox + unread count | `limit` (optional, max 100) |
 | `GET api.php?action=widget_preferences` | Current user's header widget visibility preferences | none |
 | `GET api.php` | Full raw data payload | none |
-
-Auth usage pattern for every GET endpoint:
-- Header auth: append required endpoint params and send `X-API-Key` header
-- Query auth: append `&api_key=YOUR_API_KEY` (or `?api_key=` if no query exists)
 
 ##### POST Endpoints
 
@@ -328,15 +319,11 @@ All POST endpoints require `Content-Type: application/json` and JSON body contai
 | `reset_all` | Reset activity, audit, records, and notifications | `action` |
 | `reset_data` | Reset data/logs/audit to sample state | `action` |
 
-Auth usage pattern for every POST endpoint:
-- Header auth (recommended):
-  - URL: `POST /api.php`
-  - Headers: `X-API-Key: YOUR_API_KEY`, `Content-Type: application/json`
-  - Body: JSON with selected `action` + required fields
-- Query auth fallback:
-  - URL: `POST /api.php?api_key=YOUR_API_KEY`
-  - Header: `Content-Type: application/json`
-  - Body: JSON with selected `action` + required fields
+POST usage pattern:
+- URL: `POST /api.php`
+- Headers: `Content-Type: application/json`
+- Body: JSON with selected `action` + required fields
+- Requires active authenticated session cookie
 
 #### Frontend Assets
 - **css/style.css**:

@@ -181,15 +181,10 @@ function setupUserAvatarDropdown() {
 
 
 function configureApiAuthentication() {
-	const apiKey = String(window.DASHBOARD_API_KEY || '').trim();
-	if (apiKey === '') {
-		return;
-	}
-
 	$.ajaxSetup({
 		beforeSend: function(xhr, settings) {
 			if (settings && typeof settings.url === 'string' && settings.url.indexOf('api.php') !== -1) {
-				xhr.setRequestHeader('X-API-Key', apiKey);
+				xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
 			}
 		}
 	});
@@ -976,11 +971,6 @@ function setupSessionEnforcementPoller() {
 	if (sessionPollTimerId !== null) {
 		clearInterval(sessionPollTimerId);
 		sessionPollTimerId = null;
-	}
-
-	const apiKey = String(window.DASHBOARD_API_KEY || '').trim();
-	if (apiKey === '') {
-		return;
 	}
 
 	if (sessionPollFnRef !== null) {
