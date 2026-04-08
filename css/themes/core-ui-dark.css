@@ -101,22 +101,22 @@ body.dark-mode .audit-refresh-status {
 }
 body.dark-mode .data-table-viewport,
 body.dark-mode .audit-table-scroll,
-body.dark-mode #audit-container.audit-view-timeline {
+body.dark-mode .audit-timeline-scroll {
     scrollbar-color: #667eea #1f2937;
 }
 body.dark-mode .data-table-viewport::-webkit-scrollbar-track,
 body.dark-mode .audit-table-scroll::-webkit-scrollbar-track,
-body.dark-mode #audit-container.audit-view-timeline::-webkit-scrollbar-track {
+body.dark-mode .audit-timeline-scroll::-webkit-scrollbar-track {
     background: #1f2937;
 }
 body.dark-mode .data-table-viewport::-webkit-scrollbar-thumb,
 body.dark-mode .audit-table-scroll::-webkit-scrollbar-thumb,
-body.dark-mode #audit-container.audit-view-timeline::-webkit-scrollbar-thumb {
+body.dark-mode .audit-timeline-scroll::-webkit-scrollbar-thumb {
     background: #667eea;
 }
 body.dark-mode .data-table-viewport::-webkit-scrollbar-thumb:hover,
 body.dark-mode .audit-table-scroll::-webkit-scrollbar-thumb:hover,
-body.dark-mode #audit-container.audit-view-timeline::-webkit-scrollbar-thumb:hover {
+body.dark-mode .audit-timeline-scroll::-webkit-scrollbar-thumb:hover {
     background: #7c8ff1;
 }
 body.dark-mode .audit-view-toggle .btn.active {

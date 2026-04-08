@@ -234,7 +234,7 @@ function renderAuditTimeline(entries) {
 	}
 
 	timelineHTML += '</div>';
-	container.html(timelineHTML);
+	container.html('<div class="audit-timeline-scroll">' + timelineHTML + '</div>');
 }
 
 
