@@ -57,6 +57,15 @@ function setupDataPageHandlers() {
 		loadDataPage();
 	});
 
+	$('#data-container').on('change', '#data-page-jump', function() {
+		const totalPages = Math.max(1, $(this).find('option').length);
+		const requestedPage = window.DashboardPagination.normalizePageValue($(this).val(), totalPages, currentPage);
+		if (requestedPage !== currentPage) {
+			currentPage = requestedPage;
+			loadDataPage();
+		}
+	});
+
 	$('#data-container').on('click', '.sortable', function() {
 		const column = $(this).data('column');
 		if (currentSortColumn === column) {
@@ -565,10 +574,25 @@ function renderDataTableView(response) {
 	nextBtn.disabled = currentPage >= totalPages;
 	nextBtn.textContent = 'Next';
 
+	const pageJumpGroup = document.createElement('div');
+	pageJumpGroup.className = 'data-page-jump-group';
+	const pageJumpLabel = document.createElement('label');
+	pageJumpLabel.className = 'data-page-jump-label';
+	pageJumpLabel.htmlFor = 'data-page-jump';
+	pageJumpLabel.textContent = 'Jump to';
+	const pageJumpSelect = document.createElement('select');
+	pageJumpSelect.id = 'data-page-jump';
+	pageJumpSelect.className = 'data-page-size-select data-page-jump-select';
+	window.DashboardPagination.populateSelect(pageJumpSelect, totalPages, currentPage);
+	pageJumpSelect.disabled = totalPages <= 1;
+	pageJumpGroup.appendChild(pageJumpLabel);
+	pageJumpGroup.appendChild(pageJumpSelect);
+
 	controls.appendChild(pageSizeGroup);
 	controls.appendChild(prevBtn);
 	controls.appendChild(pageLabel);
 	controls.appendChild(nextBtn);
+	controls.appendChild(pageJumpGroup);
 
 	const refreshStatus = document.createElement('div');
 	refreshStatus.className = 'data-refresh-status';

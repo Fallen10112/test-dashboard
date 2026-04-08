@@ -207,6 +207,67 @@ function debounce(fn, delayMs) {
 }
 
 
+function normalizePaginationPageValue(value, totalPages, fallbackPage) {
+	const safeTotalPages = Math.max(1, parseInt(totalPages, 10) || 1);
+	const safeFallbackPage = Math.min(Math.max(1, parseInt(fallbackPage, 10) || 1), safeTotalPages);
+	const requestedPage = parseInt(value, 10);
+
+	if (Number.isNaN(requestedPage)) {
+		return safeFallbackPage;
+	}
+
+	return Math.min(Math.max(1, requestedPage), safeTotalPages);
+}
+
+
+function getPaginationPageOptions(totalPages, currentPage) {
+	const safeTotalPages = Math.max(1, parseInt(totalPages, 10) || 1);
+	const selectedPage = normalizePaginationPageValue(currentPage, safeTotalPages, 1);
+	const options = [];
+
+	for (let pageNumber = 1; pageNumber <= safeTotalPages; pageNumber += 1) {
+		options.push({
+			value: String(pageNumber),
+			label: String(pageNumber),
+			selected: pageNumber === selectedPage
+		});
+	}
+
+	return options;
+}
+
+
+function buildPaginationSelectOptionsHtml(totalPages, currentPage) {
+	return getPaginationPageOptions(totalPages, currentPage).map(function(option) {
+		return '<option value="' + option.value + '"' + (option.selected ? ' selected' : '') + '>' + option.label + '</option>';
+	}).join('');
+}
+
+
+function populatePaginationSelect(selectElement, totalPages, currentPage) {
+	if (!selectElement) {
+		return;
+	}
+
+	selectElement.innerHTML = '';
+	getPaginationPageOptions(totalPages, currentPage).forEach(function(optionConfig) {
+		const option = document.createElement('option');
+		option.value = optionConfig.value;
+		option.textContent = optionConfig.label;
+		option.selected = optionConfig.selected;
+		selectElement.appendChild(option);
+	});
+}
+
+
+window.DashboardPagination = {
+	normalizePageValue: normalizePaginationPageValue,
+	getPageOptions: getPaginationPageOptions,
+	buildOptionsHtml: buildPaginationSelectOptionsHtml,
+	populateSelect: populatePaginationSelect
+};
+
+
 function setMetricValue(metricId, value) {
 	$(metricId + ' .metric-value').text(value);
 }

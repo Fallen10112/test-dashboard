@@ -79,6 +79,7 @@ body.dark-mode .search-box:focus {
     box-shadow: 0 0 5px rgba(102, 126, 234, 0.5);
 }
 body.dark-mode .data-page-size-label,
+body.dark-mode .data-page-jump-label,
 body.dark-mode .data-page-label {
     color: #d0d0d0;
 }

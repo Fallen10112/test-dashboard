@@ -56,6 +56,11 @@
         width: 100%;
         justify-content: flex-start;
     }
+
+    .data-page-jump-group {
+        width: 100%;
+        justify-content: flex-start;
+    }
 }
 
 @media (max-width: 768px) {

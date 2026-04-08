@@ -1,9 +1,20 @@
 let currentAuditView = 'table';
 let auditCurrentPage = 1;
 let auditPageSize = 25;
+const auditPageSizeStorageKey = 'audit-page-size';
 let auditRealtimePollTimerId = null;
 let isAuditRealtimePollInFlight = false;
 let auditLastRefreshedTimeText = '--:--:--';
+
+
+function initializeAuditPagePreferences() {
+	const storedValue = localStorage.getItem(auditPageSizeStorageKey);
+	const parsed = parseInt(storedValue, 10);
+	const allowed = [10, 20, 25, 50, 100];
+	if (!Number.isNaN(parsed) && allowed.indexOf(parsed) !== -1) {
+		auditPageSize = parsed;
+	}
+}
 
 function updateAuditLastRefreshedTime() {
 	const now = new Date();
@@ -37,8 +48,17 @@ function setupAuditTrailPageHandlers() {
 		const requested = parseInt($(this).val(), 10);
 		const allowed = [10, 20, 25, 50, 100];
 		auditPageSize = !Number.isNaN(requested) && allowed.indexOf(requested) !== -1 ? requested : 25;
+		localStorage.setItem(auditPageSizeStorageKey, String(auditPageSize));
 		auditCurrentPage = 1;
 		filterAuditTrail();
+	});
+	$('#audit-container').on('change', '#audit-page-jump', function() {
+		const totalPages = Math.max(1, $(this).find('option').length);
+		const requestedPage = window.DashboardPagination.normalizePageValue($(this).val(), totalPages, auditCurrentPage);
+		if (requestedPage !== auditCurrentPage) {
+			auditCurrentPage = requestedPage;
+			filterAuditTrail();
+		}
 	});
 	$('#audit-container').on('click', '#audit-page-prev', function() {
 		if (auditCurrentPage > 1) {
@@ -157,6 +177,12 @@ function renderAuditTrail(entries, emptyMessage) {
 	paginationHTML += '<button type="button" id="audit-page-prev" class="btn btn-sm btn-secondary"' + (auditCurrentPage <= 1 ? ' disabled' : '') + '>Previous</button>';
 	paginationHTML += '<span class="data-page-label">Page ' + auditCurrentPage + ' of ' + totalPages + '</span>';
 	paginationHTML += '<button type="button" id="audit-page-next" class="btn btn-sm btn-secondary"' + (auditCurrentPage >= totalPages ? ' disabled' : '') + '>Next</button>';
+	paginationHTML += '<div class="data-page-jump-group">';
+	paginationHTML += '<label class="data-page-jump-label" for="audit-page-jump">Jump to</label>';
+	paginationHTML += '<select id="audit-page-jump" class="data-page-size-select data-page-jump-select"' + (totalPages <= 1 ? ' disabled' : '') + '>';
+	paginationHTML += window.DashboardPagination.buildOptionsHtml(totalPages, auditCurrentPage);
+	paginationHTML += '</select>';
+	paginationHTML += '</div>';
 	paginationHTML += '</div>';
 	paginationHTML += '<div class="audit-refresh-status">Last refreshed ' + auditLastRefreshedTimeText + '</div>';
 	paginationHTML += '</div>';

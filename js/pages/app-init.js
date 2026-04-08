@@ -40,6 +40,9 @@ $(document).ready(function() {
 	}
 
 	if ($('#audit-container').length > 0) {
+		if (typeof initializeAuditPagePreferences === 'function') {
+			initializeAuditPagePreferences();
+		}
 		if (typeof loadAuditTrail === 'function') {
 			loadAuditTrail();
 		}
