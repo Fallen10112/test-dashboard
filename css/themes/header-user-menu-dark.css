@@ -1,0 +1,145 @@
+/* Dark-mode overrides migrated from components/header-user-menu.css */
+
+body.dark-mode .notifications-btn {
+    background: rgba(0, 0, 0, 0.24);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+body.dark-mode .notifications-btn:hover {
+    background: rgba(0, 0, 0, 0.34);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+body.dark-mode .notifications-btn[aria-expanded="true"] {
+    background: rgba(0, 0, 0, 0.42);
+    border-color: rgba(255, 255, 255, 0.6);
+}
+body.dark-mode .notifications-dropdown {
+    background: #2a2a2a;
+    border-color: #3d3d3d;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+body.dark-mode .notifications-dropdown-title {
+    color: #e0e0e0;
+}
+body.dark-mode .notifications-mark-read-btn {
+    color: #a5b4fc;
+}
+body.dark-mode .notifications-mark-read-btn:hover {
+    color: #c7d2fe;
+}
+body.dark-mode .notifications-delete-all-btn {
+    color: #fca5a5;
+}
+body.dark-mode .notifications-delete-all-btn:hover {
+    color: #fecaca;
+}
+body.dark-mode .notifications-dropdown-divider {
+    background: #3d3d3d;
+}
+body.dark-mode .notifications-empty {
+    color: #9ca3af;
+}
+body.dark-mode .notification-item {
+    background: #252525;
+    border-color: #3d3d3d;
+}
+body.dark-mode .notification-item-type-info {
+    background: #252f42;
+    border-color: #3f5a89;
+}
+body.dark-mode .notification-item-type-info .notification-item-type-icon {
+    border-color: #60a5fa;
+    background: #1f3a63;
+    color: #bfdbfe;
+}
+body.dark-mode .notification-item-type-success {
+    background: #1f3328;
+    border-color: #2f6a46;
+}
+body.dark-mode .notification-item-type-success .notification-item-type-icon {
+    border-color: #4ade80;
+    background: #1d4b2f;
+    color: #bbf7d0;
+}
+body.dark-mode .notification-item-type-warning,
+body.dark-mode .notification-item-type-warn {
+    background: #3a2b1c;
+    border-color: #9a6132;
+}
+body.dark-mode .notification-item-type-warning .notification-item-type-icon,
+body.dark-mode .notification-item-type-warn .notification-item-type-icon {
+    border-radius: 50%;
+    border: none;
+    background: #ea580c;
+    color: #ffffff;
+}
+body.dark-mode .notification-item-type-error {
+    background: #3f1f24;
+    border-color: #9f3b47;
+}
+body.dark-mode .notification-item-type-error .notification-item-type-icon {
+    border-radius: 50%;
+    border: none;
+    background: #dc2626;
+    color: #ffffff;
+}
+body.dark-mode .notification-item-unread {
+    border-color: #4968a3;
+}
+body.dark-mode .notification-item-title {
+    color: #f3f4f6;
+}
+body.dark-mode .notification-item-mark-read-btn {
+    background: #2d3650;
+    border-color: #4b5f93;
+    color: #c7d2fe;
+}
+body.dark-mode .notification-item-mark-read-btn:hover {
+    background: #384465;
+    border-color: #7c91cc;
+}
+body.dark-mode .notification-item-delete-btn {
+    background: #3a1f24;
+    border-color: #7a3945;
+    color: #fecaca;
+}
+body.dark-mode .notification-item-delete-btn:hover {
+    background: #4a262d;
+    border-color: #a54a57;
+}
+body.dark-mode .notification-item-message {
+    color: #d1d5db;
+}
+body.dark-mode .notification-item-time {
+    color: #9ca3af;
+}
+body.dark-mode .notification-item-sender {
+    color: #b8c1d3;
+}
+body.dark-mode .user-dropdown {
+    background: #2a2a2a;
+    border-color: #3d3d3d;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+body.dark-mode .user-dropdown-name {
+    color: #e0e0e0;
+}
+body.dark-mode .user-dropdown-email {
+    color: #9ca3af;
+}
+body.dark-mode .user-dropdown-divider {
+    background: #3d3d3d;
+}
+body.dark-mode .user-dropdown-item {
+    color: #d1d5db;
+}
+body.dark-mode .user-dropdown-item:hover {
+    background: #333333;
+    color: #f9fafb;
+}
+body.dark-mode .user-dropdown-signout {
+    color: #f87171;
+}
+body.dark-mode .user-dropdown-signout:hover {
+    background: rgba(239, 68, 68, 0.12);
+    color: #fca5a5;
+}

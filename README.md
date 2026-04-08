@@ -25,8 +25,32 @@ test-dashboard/
 │   ├── .env	                	    # Local environment values (DB connection credentials)
 │   ├── .env.example	                # Template for .env keys
 │   └── config.php	                    # Loads env values + app settings from DB (mode, reset behavior, timezone)
-├── css/		                        # Stylesheets
-│   └── style.css	                    # Main UI styling (layout, components, dark mode, responsive rules)
+├── css/		                        # Stylesheets — 6-layer semantic architecture
+│   ├── style.css	                    # Manifest entry point; Section Map + layer @imports only (no rules)
+│   ├── base/		                    # 1) Base layer: resets and foundational styles
+│   │   ├── index.css
+│   │   └── foundation.css              # CSS reset, box-sizing, body declaration, --header-height variable
+│   ├── layout/		                    # 2) Layout layer: structural shell
+│   │   ├── index.css
+│   │   └── app-shell.css              # title-bar, sidebar, nav-menu, main-content, content-section
+│   ├── components/	                    # 3) Components layer: reusable UI patterns
+│   │   ├── index.css
+│   │   ├── prelude.css                 # Select dropdowns, audit controls, scrollbars, scroll-to-top
+│   │   ├── core-ui.css                 # Tables, buttons, modals, toasts, forms, reports, badges, keyframes
+│   │   └── header-user-menu.css        # Notifications bell + dropdown, user avatar + dropdown
+│   ├── pages/		                    # 4) Pages layer: page-scoped styles
+│   │   ├── index.css
+│   │   ├── login.css                   # Login page styles
+│   │   └── account-admin.css          # Account settings and admin/dev-tools page styles
+│   ├── themes/		                    # 5) Themes layer: centralized dark-mode overrides (body.dark-mode)
+│   │   ├── index.css
+│   │   ├── prelude-dark.css            # Dark overrides for select dropdowns, audit toggles, scroll-to-top
+│   │   ├── core-ui-dark.css            # Dark overrides for core UI components (tables, modals, forms, etc.)
+│   │   ├── header-user-menu-dark.css   # Dark overrides for notifications and user dropdown
+│   │   └── account-admin-dark.css      # Dark overrides for account/admin/dev-tools page elements
+│   └── responsive/	                    # 6) Responsive layer: all @media breakpoint rules
+│       ├── index.css
+│       └── core.css                    # max-width 900px and 768px breakpoints for layout and components
 ├── includes/		                    # Shared PHP includes used by multiple pages
 │   ├── auth.php		                # Session auth helpers (login/logout/requireAuth/CSRF/session invalidation)
 │   ├── footer.php                      # Shared script includes and page-aware JS module loading
