@@ -123,6 +123,9 @@ body.dark-mode .user-dropdown {
 body.dark-mode .user-dropdown-name {
     color: #e0e0e0;
 }
+body.dark-mode .user-dropdown-role {
+    color: #cbd5e1;
+}
 body.dark-mode .user-dropdown-email {
     color: #9ca3af;
 }

@@ -3,6 +3,12 @@
 <?php
 	$adminAuthUser = $GLOBALS['auth_user'] ?? null;
 	$adminCurrentUserId = (int)($adminAuthUser['id'] ?? 0);
+	$adminRoles = [];
+	try {
+		$adminRoles = getAvailableRoles(getDashboardPdo());
+	} catch (Throwable $e) {
+		$adminRoles = [];
+	}
 ?>
 
 	<main class="main-content">
@@ -45,6 +51,15 @@
 										<input type="text" id="dev-users-create-display-name" maxlength="150" placeholder="New User">
 									</div>
 									<div class="form-group">
+										<label for="dev-users-create-role">Role</label>
+										<select id="dev-users-create-role">
+											<option value="" selected disabled>Select role</option>
+											<?php foreach ($adminRoles as $adminRole): ?>
+												<option value="<?php echo (int)($adminRole['id'] ?? 0); ?>"><?php echo htmlspecialchars($adminRole['name'] ?? '', ENT_QUOTES, 'UTF-8'); ?></option>
+											<?php endforeach; ?>
+										</select>
+									</div>
+									<div class="form-group">
 										<label for="dev-users-create-status">Status</label>
 										<select id="dev-users-create-status">
 											<option value="active" selected>active</option>
@@ -67,7 +82,7 @@
 							<div class="admin-accordion-body" id="admin-accordion-body-update" hidden>
 								<div class="account-form" autocomplete="off">
 									<div class="form-group">
-										<label for="dev-users-update-lookup">Lookup (username or id)</label>
+										<label for="dev-users-update-lookup">Lookup (email, username or id)</label>
 										<input type="text" id="dev-users-update-lookup" maxlength="100" placeholder="e.g. 12 or johndoe">
 									</div>
 									<div class="form-actions">
@@ -87,6 +102,15 @@
 										<div class="form-group">
 											<label for="dev-users-update-display-name">Display Name</label>
 											<input type="text" id="dev-users-update-display-name" maxlength="150" placeholder="Display name" disabled>
+										</div>
+										<div class="form-group">
+											<label for="dev-users-update-role">Role</label>
+											<select id="dev-users-update-role" disabled>
+												<option value="" selected disabled>Select role</option>
+												<?php foreach ($adminRoles as $adminRole): ?>
+													<option value="<?php echo (int)($adminRole['id'] ?? 0); ?>"><?php echo htmlspecialchars($adminRole['name'] ?? '', ENT_QUOTES, 'UTF-8'); ?></option>
+												<?php endforeach; ?>
+											</select>
 										</div>
 										<div class="form-group">
 											<label for="dev-users-update-status">Status</label>

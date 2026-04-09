@@ -1363,7 +1363,12 @@ function setupDevToolsUserManagementHandlers() {
 		}
 		const id = String(user.id || '');
 		const displayName = String(user.display_name || '');
-		return 'Detected user ' + id + ', ' + (displayName !== '' ? displayName : '(no display name)');
+		const roleName = String(user.role_name || '');
+		let label = 'Detected user ' + id + ', ' + (displayName !== '' ? displayName : '(no display name)');
+		if (roleName !== '') {
+			label += ' (' + roleName + ')';
+		}
+		return label;
 	};
 
 	const setUpdateControlsEnabled = function(enabled) {
@@ -1387,6 +1392,7 @@ function setupDevToolsUserManagementHandlers() {
 		$('#dev-users-update-email').prop('disabled', !canEdit);
 		$('#dev-users-update-username').prop('disabled', !canEdit);
 		$('#dev-users-update-display-name').prop('disabled', !canEdit);
+		$('#dev-users-update-role').prop('disabled', !canEdit);
 		$('#dev-users-update-status').prop('disabled', !canEdit);
 		$('#dev-users-update-reset-password').prop('disabled', !canEdit);
 		$updateButton.prop('disabled', !canEdit);
@@ -1444,13 +1450,19 @@ function setupDevToolsUserManagementHandlers() {
 		const email = String($('#dev-users-create-email').val() || '').trim();
 		const username = String($('#dev-users-create-username').val() || '').trim();
 		const displayName = String($('#dev-users-create-display-name').val() || '').trim();
+		const roleId = parseInt($('#dev-users-create-role').val(), 10) || 0;
 		const status = String($('#dev-users-create-status').val() || 'active').toLowerCase();
+		if (roleId < 1) {
+			setInlineResult('#dev-users-create-result', 'Select a role before creating a user.', true);
+			return;
+		}
 
 		apiPost('admin_user_create', {
 			email: email,
 			username: username,
 			display_name: displayName,
-			status: status
+			status: status,
+			role_id: roleId
 		}).done(function(response) {
 			if (!response || !response.success) {
 				setInlineResult('#dev-users-create-result', 'Failed to create user.', true);
@@ -1487,6 +1499,7 @@ function setupDevToolsUserManagementHandlers() {
 			$('#dev-users-update-email').val(String(user.email || ''));
 			$('#dev-users-update-username').val(String(user.username || ''));
 			$('#dev-users-update-display-name').val(String(user.display_name || ''));
+			$('#dev-users-update-role').val(String(user.role_id || ''));
 			$('#dev-users-update-status').val(String(user.status || 'active').toLowerCase());
 			$('#dev-users-update-reset-password').val('no');
 			setUpdateControlsEnabled(updateTargetUserId > 0);
@@ -1511,6 +1524,7 @@ function setupDevToolsUserManagementHandlers() {
 			email: String($('#dev-users-update-email').val() || '').trim(),
 			username: String($('#dev-users-update-username').val() || '').trim(),
 			display_name: String($('#dev-users-update-display-name').val() || '').trim(),
+			role_id: parseInt($('#dev-users-update-role').val(), 10) || 0,
 			status: String($('#dev-users-update-status').val() || 'active').toLowerCase(),
 			reset_password: String($('#dev-users-update-reset-password').val() || 'no').toLowerCase() === 'yes'
 		}).done(function(response) {

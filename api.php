@@ -9,64 +9,66 @@ require_once __DIR__ . '/includes/auth.php';
 
 $action = isset($_GET['action']) ? trim((string)$_GET['action']) : '';
 
-
-function respondJson($statusCode, $payload) {
+function respondJson(int $statusCode, array $payload): void {
 	http_response_code($statusCode);
 	echo json_encode($payload);
 	exit;
 }
 
-
-function requireApiSessionAuthentication() {
+function requireApiSessionAuthentication(): void {
 	startAuthSession();
-	$user = getAuthUser();
-	if ($user !== null) {
-		$GLOBALS['auth_user'] = $user;
+	$authUser = getAuthUser();
+	if (!$authUser) {
+		respondJson(401, ['success' => false, 'message' => 'Authentication required.', 'reason' => 'unauthenticated']);
+	}
+	$GLOBALS['auth_user'] = $authUser;
+}
+
+function getApiAuthUserId(): int {
+	if (!isset($GLOBALS['auth_user']) || !is_array($GLOBALS['auth_user'])) {
+		$authUser = getAuthUser();
+		if (!$authUser) {
+			respondJson(401, ['success' => false, 'message' => 'Authentication required.', 'reason' => 'unauthenticated']);
+		}
+		$GLOBALS['auth_user'] = $authUser;
+	}
+
+	return (int)($GLOBALS['auth_user']['id'] ?? 0);
+}
+
+function enforceApiRateLimit(string $bucketKey, int $limit, int $windowSeconds): void {
+	startAuthSession();
+	$key = trim($bucketKey);
+	if ($key === '' || $limit < 1 || $windowSeconds < 1) {
 		return;
 	}
 
-	$reason = getAuthInvalidationReason();
-	if ($reason === 'replaced') {
-		$_SESSION['auth_flash_toast'] = [
-			'type' => 'warning',
-			'title' => 'Signed Out',
-			'message' => 'You were signed out because this account logged in on another device.',
-		];
-		clearAuthSessionState();
-		respondJson(401, [
-			'success' => false,
-			'message' => 'Session ended because this account was used to log in on another device.',
-			'reason' => 'session_replaced',
-		]);
+	if (!isset($_SESSION['_api_rate_limits']) || !is_array($_SESSION['_api_rate_limits'])) {
+		$_SESSION['_api_rate_limits'] = [];
 	}
 
-	if ($reason === 'expired') {
-		$_SESSION['auth_flash_toast'] = [
-			'type' => 'info',
-			'title' => 'Session Expired',
-			'message' => 'Your session expired. Please sign in again.',
-		];
-		clearAuthSessionState();
-		respondJson(401, [
-			'success' => false,
-			'message' => 'Session expired. Please sign in again.',
-			'reason' => 'session_expired',
-		]);
+	$now = time();
+	$state = $_SESSION['_api_rate_limits'][$key] ?? ['count' => 0, 'window_start' => $now];
+	if (!is_array($state)) {
+		$state = ['count' => 0, 'window_start' => $now];
 	}
 
-	clearAuthSessionState();
-	respondJson(401, [
-		'success' => false,
-		'message' => 'Authentication required.',
-		'reason' => 'unauthenticated',
-	]);
+	$windowStart = (int)($state['window_start'] ?? $now);
+	if ($windowStart <= 0 || ($windowStart + $windowSeconds) <= $now) {
+		$state = ['count' => 0, 'window_start' => $now];
+	}
+
+	$state['count'] = (int)($state['count'] ?? 0) + 1;
+	$_SESSION['_api_rate_limits'][$key] = $state;
+
+	if ($state['count'] > $limit) {
+		respondJson(429, ['success' => false, 'message' => 'Rate limit exceeded']);
+	}
 }
-
 
 function normalizeRecordText($value) {
 	return trim((string)$value);
 }
-
 
 function getNormalizedStringLength($value) {
 	$text = (string)$value;
@@ -76,30 +78,25 @@ function getNormalizedStringLength($value) {
 	return strlen($text);
 }
 
-
 function getValidatedPageSize($value) {
 	$pageSize = (int)$value;
 	$allowed = [10, 20, 25, 50, 100];
 	return in_array($pageSize, $allowed, true) ? $pageSize : 25;
 }
 
-
 function getValidatedPage($value) {
 	$page = (int)$value;
 	return $page > 0 ? $page : 1;
 }
-
 
 function getValidatedSortColumn($value) {
 	$allowed = ['id', 'title', 'description'];
 	return in_array($value, $allowed, true) ? $value : 'id';
 }
 
-
 function getValidatedSortOrder($value) {
 	return strtolower((string)$value) === 'desc' ? 'desc' : 'asc';
 }
-
 
 function getDataQueryParams() {
 	return [
@@ -110,7 +107,6 @@ function getDataQueryParams() {
 		'pageSize' => getValidatedPageSize($_GET['pageSize'] ?? 25)
 	];
 }
-
 
 function mapChangeTypeToAuditAction($changeType) {
 	$type = strtoupper(trim((string)$changeType));
@@ -131,7 +127,6 @@ function mapChangeTypeToAuditAction($changeType) {
 	}
 	return 'update';
 }
-
 
 function mapAuditActionToChangeType($action, $fieldName = '') {
 	$action = strtolower((string)$action);
@@ -155,350 +150,6 @@ function mapAuditActionToChangeType($action, $fieldName = '') {
 	}
 	return strtoupper((string)$action);
 }
-
-
-function getApiAuthUserId() {
-	$authUser = $GLOBALS['auth_user'] ?? null;
-	$userId = isset($authUser['id']) ? (int)$authUser['id'] : 0;
-	if ($userId < 1) {
-		respondJson(401, [
-			'success' => false,
-			'message' => 'Authentication required.',
-			'reason' => 'unauthenticated',
-		]);
-	}
-	return $userId;
-}
-
-
-function getApiAuthUserDisplayName() {
-	$authUser = $GLOBALS['auth_user'] ?? null;
-	if (!is_array($authUser)) {
-		return 'A user';
-	}
-
-	$displayName = trim((string)($authUser['display_name'] ?? ''));
-	if ($displayName !== '') {
-		return $displayName;
-	}
-
-	$username = trim((string)($authUser['username'] ?? ''));
-	if ($username !== '') {
-		return $username;
-	}
-
-	$email = trim((string)($authUser['email'] ?? ''));
-	if ($email !== '') {
-		return $email;
-	}
-
-	return 'A user';
-}
-
-
-function generateRandomPasswordPlaintext($length = 16) {
-	$targetLength = (int)$length;
-	if ($targetLength < 12) {
-		$targetLength = 12;
-	}
-	if ($targetLength > 64) {
-		$targetLength = 64;
-	}
-
-	$alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%^*()-_=+';
-	$maxIndex = strlen($alphabet) - 1;
-	$result = '';
-	for ($i = 0; $i < $targetLength; $i += 1) {
-		$randomIndex = random_int(0, $maxIndex);
-		$result .= $alphabet[$randomIndex];
-	}
-	return $result;
-}
-
-
-function normalizeDevToolsUserLookupQuery($value) {
-	return trim((string)$value);
-}
-
-
-function dashboardTableExists(PDO $pdo, $tableName) {
-	$table = trim((string)$tableName);
-	if ($table === '') {
-		return false;
-	}
-	$stmt = $pdo->prepare('SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = :table_name LIMIT 1');
-	$stmt->execute([':table_name' => $table]);
-	return (bool)$stmt->fetchColumn();
-}
-
-
-function getUserByIdOrUsername(PDO $pdo, $lookupQuery) {
-	$query = normalizeDevToolsUserLookupQuery($lookupQuery);
-	if ($query === '') {
-		return null;
-	}
-
-	$idCandidate = ctype_digit($query) ? (int)$query : 0;
-	$stmt = $pdo->prepare(
-		'SELECT id, email, username, display_name, status, DATE_FORMAT(created_at, "%Y-%m-%d %H:%i:%s") AS created_at
-		 FROM users
-		 WHERE deleted_at IS NULL
-		   AND (id = :id_candidate OR username = :username_candidate)
-		 LIMIT 1'
-	);
-	$stmt->execute([
-		':id_candidate' => $idCandidate,
-		':username_candidate' => $query,
-	]);
-	$row = $stmt->fetch();
-	if (!$row) {
-		return null;
-	}
-
-	return [
-		'id' => (int)$row['id'],
-		'email' => (string)($row['email'] ?? ''),
-		'username' => (string)($row['username'] ?? ''),
-		'display_name' => (string)($row['display_name'] ?? ''),
-		'status' => (string)($row['status'] ?? ''),
-		'created_at' => (string)($row['created_at'] ?? ''),
-	];
-}
-
-
-function createDevToolsUser(PDO $pdo, $email, $username, $displayName, $status) {
-	$normalizedEmail = trim((string)$email);
-	$normalizedUsername = trim((string)$username);
-	$normalizedDisplayName = trim((string)$displayName);
-	$normalizedStatus = strtolower(trim((string)$status));
-
-	if ($normalizedEmail === '' || !filter_var($normalizedEmail, FILTER_VALIDATE_EMAIL)) {
-		return ['success' => false, 'message' => 'A valid email is required'];
-	}
-	if ($normalizedUsername === '') {
-		return ['success' => false, 'message' => 'Username is required'];
-	}
-	if (!in_array($normalizedStatus, ['active', 'disabled'], true)) {
-		$normalizedStatus = 'active';
-	}
-
-	$passwordPlain = generateRandomPasswordPlaintext(16);
-	$passwordHash = password_hash($passwordPlain, PASSWORD_BCRYPT, ['cost' => 12]);
-	$now = getDashboardSqlTimestamp();
-	$userId = 0;
-
-	try {
-		$pdo->beginTransaction();
-		$stmt = $pdo->prepare(
-			'INSERT INTO users (email, username, password_hash, display_name, status, created_at, updated_at, deleted_at)
-			 VALUES (:email, :username, :password_hash, :display_name, :status, :created_at, :updated_at, NULL)'
-		);
-		$stmt->execute([
-			':email' => substr($normalizedEmail, 0, 255),
-			':username' => substr($normalizedUsername, 0, 100),
-			':password_hash' => $passwordHash,
-			':display_name' => $normalizedDisplayName !== '' ? substr($normalizedDisplayName, 0, 150) : null,
-			':status' => $normalizedStatus,
-			':created_at' => $now,
-			':updated_at' => $now,
-		]);
-
-		$userId = (int)$pdo->lastInsertId();
-		$pdo->commit();
-	} catch (PDOException $e) {
-		if ($pdo->inTransaction()) {
-			$pdo->rollBack();
-		}
-
-		$errorCode = (string)($e->getCode() ?? '');
-		if ($errorCode === '23000') {
-			return ['success' => false, 'message' => 'Failed to create user (email/username may already exist)'];
-		}
-
-		return ['success' => false, 'message' => 'Failed to create user'];
-	} catch (Throwable $e) {
-		if ($pdo->inTransaction()) {
-			$pdo->rollBack();
-		}
-		return ['success' => false, 'message' => 'Failed to create user'];
-	}
-
-	try {
-		// Do not fail user creation if preferences already exist or setup temporarily fails.
-		ensureDefaultHeaderWidgetPreferencesForUser($pdo, $userId);
-	} catch (Throwable $e) {
-		// Non-critical: preferences are lazily ensured elsewhere when needed.
-	}
-
-	return [
-		'success' => true,
-		'user_id' => $userId,
-		'generated_password' => $passwordPlain,
-	];
-}
-
-
-function updateDevToolsUser(PDO $pdo, $targetUserId, array $updates, $resetPassword) {
-	$userId = (int)$targetUserId;
-	if ($userId < 1) {
-		return ['success' => false, 'message' => 'A valid user id is required'];
-	}
-
-	$checkStmt = $pdo->prepare('SELECT id FROM users WHERE id = :id AND deleted_at IS NULL LIMIT 1');
-	$checkStmt->execute([':id' => $userId]);
-	if (!$checkStmt->fetch()) {
-		return ['success' => false, 'message' => 'User not found'];
-	}
-
-	$fields = [];
-	$params = [':id' => $userId, ':updated_at' => getDashboardSqlTimestamp()];
-
-	if (array_key_exists('email', $updates)) {
-		$email = trim((string)$updates['email']);
-		if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-			return ['success' => false, 'message' => 'A valid email is required'];
-		}
-		$fields[] = 'email = :email';
-		$params[':email'] = substr($email, 0, 255);
-	}
-
-	if (array_key_exists('username', $updates)) {
-		$username = trim((string)$updates['username']);
-		if ($username === '') {
-			return ['success' => false, 'message' => 'Username is required'];
-		}
-		$fields[] = 'username = :username';
-		$params[':username'] = substr($username, 0, 100);
-	}
-
-	if (array_key_exists('display_name', $updates)) {
-		$displayName = trim((string)$updates['display_name']);
-		$fields[] = 'display_name = :display_name';
-		$params[':display_name'] = $displayName !== '' ? substr($displayName, 0, 150) : null;
-	}
-
-	if (array_key_exists('status', $updates)) {
-		$status = strtolower(trim((string)$updates['status']));
-		if (!in_array($status, ['active', 'disabled'], true)) {
-			return ['success' => false, 'message' => 'Status must be active or disabled'];
-		}
-		$fields[] = 'status = :status';
-		$params[':status'] = $status;
-	}
-
-	$generatedPassword = null;
-	if ($resetPassword) {
-		$generatedPassword = generateRandomPasswordPlaintext(16);
-		$fields[] = 'password_hash = :password_hash';
-		$params[':password_hash'] = password_hash($generatedPassword, PASSWORD_BCRYPT, ['cost' => 12]);
-	}
-
-	if (empty($fields)) {
-		return ['success' => false, 'message' => 'No updates were provided'];
-	}
-
-	$fields[] = 'updated_at = :updated_at';
-	try {
-		$stmt = $pdo->prepare('UPDATE users SET ' . implode(', ', $fields) . ' WHERE id = :id');
-		$stmt->execute($params);
-	} catch (Throwable $e) {
-		return ['success' => false, 'message' => 'Failed to update user (email/username may already exist)'];
-	}
-
-	return [
-		'success' => true,
-		'generated_password' => $generatedPassword,
-	];
-}
-
-
-function forceDeleteUserHard(PDO $pdo, $targetUserId, $currentUserId) {
-	$userId = (int)$targetUserId;
-	$actorId = (int)$currentUserId;
-	if ($userId < 1) {
-		return ['success' => false, 'message' => 'A valid user id is required'];
-	}
-	if ($actorId > 0 && $userId === $actorId) {
-		return ['success' => false, 'message' => 'You cannot force delete your currently signed-in account'];
-	}
-
-	$userStmt = $pdo->prepare('SELECT id, username, email FROM users WHERE id = :id AND deleted_at IS NULL LIMIT 1');
-	$userStmt->execute([':id' => $userId]);
-	$target = $userStmt->fetch();
-	if (!$target) {
-		return ['success' => false, 'message' => 'User not found'];
-	}
-
-	try {
-		$pdo->beginTransaction();
-		if (dashboardTableExists($pdo, 'user_sessions')) {
-			$pdo->prepare('DELETE FROM user_sessions WHERE user_id = :id')->execute([':id' => $userId]);
-		}
-		if (dashboardTableExists($pdo, 'password_reset_tokens')) {
-			$pdo->prepare('DELETE FROM password_reset_tokens WHERE user_id = :id')->execute([':id' => $userId]);
-		}
-		if (dashboardTableExists($pdo, 'user_roles')) {
-			$pdo->prepare('DELETE FROM user_roles WHERE user_id = :id OR assigned_by_user_id = :id')->execute([':id' => $userId]);
-		}
-		if (dashboardTableExists($pdo, 'user_permissions')) {
-			$pdo->prepare('DELETE FROM user_permissions WHERE user_id = :id OR granted_by_user_id = :id')->execute([':id' => $userId]);
-		}
-		if (dashboardTableExists($pdo, 'user_widget_preferences')) {
-			$pdo->prepare('DELETE FROM user_widget_preferences WHERE user_id = :id')->execute([':id' => $userId]);
-		}
-		if (dashboardTableExists($pdo, 'notifications')) {
-			$pdo->prepare('UPDATE notifications SET sent_by_user_id = NULL WHERE sent_by_user_id = :id')->execute([':id' => $userId]);
-			$pdo->prepare('DELETE FROM notifications WHERE user_id = :id')->execute([':id' => $userId]);
-		}
-		$pdo->prepare('DELETE FROM users WHERE id = :id')->execute([':id' => $userId]);
-		$pdo->commit();
-	} catch (Throwable $e) {
-		if ($pdo->inTransaction()) {
-			$pdo->rollBack();
-		}
-		return ['success' => false, 'message' => 'Failed to force delete user'];
-	}
-
-	return [
-		'success' => true,
-		'deleted_user' => [
-			'id' => (int)$target['id'],
-			'username' => (string)($target['username'] ?? ''),
-			'email' => (string)($target['email'] ?? ''),
-		],
-	];
-}
-
-
-function enforceApiRateLimit(string $bucketKey, int $limit, int $windowSeconds) {
-	startAuthSession();
-	$now = time();
-	if (!isset($_SESSION['api_rate_limits']) || !is_array($_SESSION['api_rate_limits'])) {
-		$_SESSION['api_rate_limits'] = [];
-	}
-
-	$bucket = $_SESSION['api_rate_limits'][$bucketKey] ?? null;
-	if (!is_array($bucket) || !isset($bucket['count'], $bucket['window_start'])) {
-		$bucket = ['count' => 0, 'window_start' => $now];
-	}
-
-	if (($now - (int)$bucket['window_start']) >= $windowSeconds) {
-		$bucket['count'] = 0;
-		$bucket['window_start'] = $now;
-	}
-
-	$bucket['count'] = (int)$bucket['count'] + 1;
-	$_SESSION['api_rate_limits'][$bucketKey] = $bucket;
-
-	if ((int)$bucket['count'] > $limit) {
-		respondJson(429, [
-			'success' => false,
-			'message' => 'Too many requests. Please slow down and try again.',
-			'reason' => 'rate_limited',
-		]);
-	}
-}
-
 
 function ensureNotificationsTable(PDO $pdo) {
 	$pdo->exec(
@@ -1222,21 +873,46 @@ if ($method === 'POST') {
 			$data['email'] ?? '',
 			$data['username'] ?? '',
 			$data['display_name'] ?? '',
-			$data['status'] ?? 'active'
+			$data['status'] ?? 'active',
+			$data['role_id'] ?? 0,
+			$actorUserId
 		);
 
 		if (!$result['success']) {
 			respondJson(400, ['success' => false, 'message' => $result['message'] ?? 'Failed to create user']);
 		}
 
-		$createdUser = getUserByIdOrUsername($pdo, (string)($result['user_id'] ?? '0'));
-		writeAuditEvent($pdo, [
-			'record_type' => 'users',
-			'record_id' => (int)($result['user_id'] ?? 0),
-			'action' => 'create',
-			'details' => 'Dev tools created user #' . (int)($result['user_id'] ?? 0),
-			'source_user_id' => $actorUserId,
-		]);
+		$createdUser = null;
+		try {
+			$createdUser = getUserByIdOrUsername($pdo, (string)($result['user_id'] ?? '0'));
+		} catch (Throwable $e) {
+			$createdUser = null;
+		}
+		if (!$createdUser) {
+			$role = getRoleById($pdo, (int)($data['role_id'] ?? 0));
+			$createdUser = [
+				'id' => (int)($result['user_id'] ?? 0),
+				'email' => (string)($data['email'] ?? ''),
+				'username' => (string)($data['username'] ?? ''),
+				'display_name' => (string)($data['display_name'] ?? ''),
+				'status' => (string)($data['status'] ?? 'active'),
+				'created_at' => '',
+				'role_id' => isset($role['id']) ? (int)$role['id'] : null,
+				'role_name' => isset($role['name']) ? (string)$role['name'] : '',
+				'role_description' => isset($role['description']) ? (string)$role['description'] : '',
+			];
+		}
+		try {
+			writeAuditEvent($pdo, [
+				'record_type' => 'users',
+				'record_id' => (int)($result['user_id'] ?? 0),
+				'action' => 'create',
+				'details' => 'Dev tools created user #' . (int)($result['user_id'] ?? 0),
+				'source_user_id' => $actorUserId,
+			]);
+		} catch (Throwable $e) {
+			// Audit logging should not fail user creation.
+		}
 
 		respondJson(200, [
 			'success' => true,
@@ -1255,22 +931,46 @@ if ($method === 'POST') {
 			'username' => $data['username'] ?? '',
 			'display_name' => $data['display_name'] ?? '',
 			'status' => $data['status'] ?? 'active',
+			'role_id' => $data['role_id'] ?? 0,
 		];
 		$resetPassword = !empty($data['reset_password']);
 
-		$result = updateDevToolsUser($pdo, $targetId, $updates, $resetPassword);
+		$result = updateDevToolsUser($pdo, $targetId, $updates, $resetPassword, $actorUserId);
 		if (!$result['success']) {
 			respondJson(400, ['success' => false, 'message' => $result['message'] ?? 'Failed to update user']);
 		}
 
-		$updatedUser = getUserByIdOrUsername($pdo, (string)$targetId);
-		writeAuditEvent($pdo, [
-			'record_type' => 'users',
-			'record_id' => $targetId,
-			'action' => 'update',
-			'details' => 'Dev tools updated user #' . $targetId,
-			'source_user_id' => $actorUserId,
-		]);
+		$updatedUser = null;
+		try {
+			$updatedUser = getUserByIdOrUsername($pdo, (string)$targetId);
+		} catch (Throwable $e) {
+			$updatedUser = null;
+		}
+		if (!$updatedUser) {
+			$role = getRoleById($pdo, (int)($updates['role_id'] ?? 0));
+			$updatedUser = [
+				'id' => $targetId,
+				'email' => (string)($updates['email'] ?? ''),
+				'username' => (string)($updates['username'] ?? ''),
+				'display_name' => (string)($updates['display_name'] ?? ''),
+				'status' => (string)($updates['status'] ?? 'active'),
+				'created_at' => '',
+				'role_id' => isset($role['id']) ? (int)$role['id'] : null,
+				'role_name' => isset($role['name']) ? (string)$role['name'] : '',
+				'role_description' => isset($role['description']) ? (string)$role['description'] : '',
+			];
+		}
+		try {
+			writeAuditEvent($pdo, [
+				'record_type' => 'users',
+				'record_id' => $targetId,
+				'action' => 'update',
+				'details' => 'Dev tools updated user #' . $targetId,
+				'source_user_id' => $actorUserId,
+			]);
+		} catch (Throwable $e) {
+			// Audit logging should not fail user updates.
+		}
 
 		respondJson(200, [
 			'success' => true,

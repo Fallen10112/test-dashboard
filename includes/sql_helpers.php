@@ -31,6 +31,33 @@ function getDashboardSqlTimestamp() {
 	return (new DateTimeImmutable('now', new DateTimeZone(date_default_timezone_get())))->format('Y-m-d H:i:s');
 }
 
+function normalizeDevToolsUserLookupQuery($value) {
+	return trim((string)$value);
+}
+
+function generateRandomPasswordPlaintext($length = 16) {
+	$length = max(8, (int)$length);
+	$characters = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%&*-_';
+	$charactersLength = strlen($characters);
+	$password = '';
+
+	for ($index = 0; $index < $length; $index++) {
+		$password .= $characters[random_int(0, $charactersLength - 1)];
+	}
+
+	return $password;
+}
+
+function dashboardTableExists(PDO $pdo, $tableName) {
+	$table = trim((string)$tableName);
+	if ($table === '') {
+		return false;
+	}
+	$stmt = $pdo->prepare('SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = :table_name LIMIT 1');
+	$stmt->execute([':table_name' => $table]);
+	return (bool)$stmt->fetchColumn();
+}
+
 function getRequestIpAddress() {
 	$ip = isset($_SERVER['REMOTE_ADDR']) ? trim((string)$_SERVER['REMOTE_ADDR']) : '';
 	if ($ip === '') {
@@ -93,7 +120,6 @@ function ensureActivityLogSchema(PDO $pdo) {
 			PRIMARY KEY (id)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
 	);
-
 	if (!doesTableColumnExist($pdo, 'activity_log', 'source_user_id')) {
 		$pdo->exec('ALTER TABLE activity_log ADD COLUMN source_user_id BIGINT UNSIGNED NULL AFTER related_record_id');
 	}
@@ -107,6 +133,63 @@ function ensureActivityLogSchema(PDO $pdo) {
 	if (!doesTableIndexExist($pdo, 'activity_log', 'idx_activity_source')) {
 		$pdo->exec('ALTER TABLE activity_log ADD INDEX idx_activity_source (source_user_id)');
 	}
+}
+
+function forceDeleteUserHard(PDO $pdo, $targetUserId, $currentUserId) {
+	$userId = (int)$targetUserId;
+	$actorId = (int)$currentUserId;
+	if ($userId < 1) {
+		return ['success' => false, 'message' => 'A valid user id is required'];
+	}
+	if ($actorId > 0 && $userId === $actorId) {
+		return ['success' => false, 'message' => 'You cannot force delete your currently signed-in account'];
+	}
+
+	$userStmt = $pdo->prepare('SELECT id, username, email FROM users WHERE id = :id AND deleted_at IS NULL LIMIT 1');
+	$userStmt->execute([':id' => $userId]);
+	$target = $userStmt->fetch();
+	if (!$target) {
+		return ['success' => false, 'message' => 'User not found'];
+	}
+
+	try {
+		$pdo->beginTransaction();
+		if (dashboardTableExists($pdo, 'user_sessions')) {
+			$pdo->prepare('DELETE FROM user_sessions WHERE user_id = :id')->execute([':id' => $userId]);
+		}
+		if (dashboardTableExists($pdo, 'password_reset_tokens')) {
+			$pdo->prepare('DELETE FROM password_reset_tokens WHERE user_id = :id')->execute([':id' => $userId]);
+		}
+		if (dashboardTableExists($pdo, 'user_roles')) {
+			$pdo->prepare('DELETE FROM user_roles WHERE user_id = :id OR assigned_by_user_id = :id')->execute([':id' => $userId]);
+		}
+		if (dashboardTableExists($pdo, 'user_permissions')) {
+			$pdo->prepare('DELETE FROM user_permissions WHERE user_id = :id OR granted_by_user_id = :id')->execute([':id' => $userId]);
+		}
+		if (dashboardTableExists($pdo, 'user_widget_preferences')) {
+			$pdo->prepare('DELETE FROM user_widget_preferences WHERE user_id = :id')->execute([':id' => $userId]);
+		}
+		if (dashboardTableExists($pdo, 'notifications')) {
+			$pdo->prepare('UPDATE notifications SET sent_by_user_id = NULL WHERE sent_by_user_id = :id')->execute([':id' => $userId]);
+			$pdo->prepare('DELETE FROM notifications WHERE user_id = :id')->execute([':id' => $userId]);
+		}
+		$pdo->prepare('DELETE FROM users WHERE id = :id')->execute([':id' => $userId]);
+		$pdo->commit();
+	} catch (Throwable $e) {
+		if ($pdo->inTransaction()) {
+			$pdo->rollBack();
+		}
+		return ['success' => false, 'message' => 'Failed to force delete user'];
+	}
+
+	return [
+		'success' => true,
+		'deleted_user' => [
+			'id' => (int)$target['id'],
+			'username' => (string)($target['username'] ?? ''),
+			'email' => (string)($target['email'] ?? ''),
+		],
+	];
 }
 
 function ensureAuditLogSchema(PDO $pdo) {
@@ -130,15 +213,9 @@ function ensureAuditLogSchema(PDO $pdo) {
 	if (!doesTableColumnExist($pdo, 'audit_log', 'details')) {
 		$pdo->exec('ALTER TABLE audit_log ADD COLUMN details TEXT NULL AFTER action');
 	}
-
 	if (!doesTableColumnExist($pdo, 'audit_log', 'dataset')) {
 		$pdo->exec('ALTER TABLE audit_log ADD COLUMN dataset VARCHAR(100) NULL AFTER record_id');
 	}
-
-	if (doesTableColumnExist($pdo, 'audit_log', 'field_name')) {
-		$pdo->exec('ALTER TABLE audit_log DROP COLUMN field_name');
-	}
-
 	if (!doesTableColumnExist($pdo, 'audit_log', 'source_user_id')) {
 		$pdo->exec('ALTER TABLE audit_log ADD COLUMN source_user_id BIGINT UNSIGNED NULL AFTER details');
 	}
@@ -209,6 +286,340 @@ function ensureUserWidgetPreferencesSchema(PDO $pdo) {
 		$pdo->exec('ALTER TABLE ' . $tableName . ' ADD INDEX idx_widget_pref_user (user_id)');
 	}
 }
+
+function getAvailableRoles(PDO $pdo) {
+	if (!dashboardTableExists($pdo, 'roles')) {
+		return [];
+	}
+
+	try {
+		$stmt = $pdo->query('SELECT id, name, description FROM roles ORDER BY id ASC');
+		$rows = $stmt ? $stmt->fetchAll() : [];
+	} catch (Throwable $e) {
+		return [];
+	}
+
+	$roles = [];
+	foreach ($rows as $row) {
+		$roles[] = [
+			'id' => (int)($row['id'] ?? 0),
+			'name' => (string)($row['name'] ?? ''),
+			'description' => (string)($row['description'] ?? ''),
+		];
+	}
+
+	return $roles;
+}
+
+
+function getRoleById(PDO $pdo, $roleId) {
+	$normalizedRoleId = (int)$roleId;
+	if ($normalizedRoleId < 1 || !dashboardTableExists($pdo, 'roles')) {
+		return null;
+	}
+
+	$stmt = $pdo->prepare('SELECT id, name, description FROM roles WHERE id = :id LIMIT 1');
+	$stmt->execute([':id' => $normalizedRoleId]);
+	$row = $stmt->fetch();
+	if (!$row) {
+		return null;
+	}
+
+	return [
+		'id' => (int)($row['id'] ?? 0),
+		'name' => (string)($row['name'] ?? ''),
+		'description' => (string)($row['description'] ?? ''),
+	];
+}
+
+
+function getUserPrimaryRole(PDO $pdo, $userId) {
+	$normalizedUserId = (int)$userId;
+	if ($normalizedUserId < 1 || !dashboardTableExists($pdo, 'user_roles') || !dashboardTableExists($pdo, 'roles')) {
+		return null;
+	}
+
+	try {
+		$stmt = $pdo->prepare(
+			'SELECT r.id, r.name, r.description
+			 FROM user_roles ur
+			 JOIN roles r ON r.id = ur.role_id
+			 WHERE ur.user_id = :user_id
+			 ORDER BY ur.created_at ASC, ur.role_id ASC
+			 LIMIT 1'
+		);
+		$stmt->execute([':user_id' => $normalizedUserId]);
+		$row = $stmt->fetch();
+	} catch (Throwable $e) {
+		return null;
+	}
+
+	if (!$row) {
+		return null;
+	}
+
+	return [
+		'id' => (int)($row['id'] ?? 0),
+		'name' => (string)($row['name'] ?? ''),
+		'description' => (string)($row['description'] ?? ''),
+	];
+}
+
+
+function syncUserPrimaryRole(PDO $pdo, $userId, $roleId, $assignedByUserId = null) {
+	$normalizedUserId = (int)$userId;
+	$normalizedRoleId = (int)$roleId;
+	$normalizedAssignedByUserId = (int)$assignedByUserId;
+
+	if ($normalizedUserId < 1 || $normalizedRoleId < 1) {
+		return false;
+	}
+
+	if (!dashboardTableExists($pdo, 'user_roles') || !dashboardTableExists($pdo, 'roles')) {
+		return false;
+	}
+
+	if (getRoleById($pdo, $normalizedRoleId) === null) {
+		return false;
+	}
+
+	$columns = ['user_id', 'role_id'];
+	$placeholders = [':user_id', ':role_id'];
+	$params = [
+		':user_id' => $normalizedUserId,
+		':role_id' => $normalizedRoleId,
+	];
+
+	if (doesTableColumnExist($pdo, 'user_roles', 'assigned_by_user_id')) {
+		$columns[] = 'assigned_by_user_id';
+		$placeholders[] = ':assigned_by_user_id';
+		$params[':assigned_by_user_id'] = $normalizedAssignedByUserId > 0 ? $normalizedAssignedByUserId : null;
+	}
+	if (doesTableColumnExist($pdo, 'user_roles', 'created_at')) {
+		$columns[] = 'created_at';
+		$placeholders[] = ':created_at';
+		$params[':created_at'] = getDashboardSqlTimestamp();
+	}
+
+	$deleteStmt = $pdo->prepare('DELETE FROM user_roles WHERE user_id = :user_id');
+	$insertStmt = $pdo->prepare(
+		'INSERT INTO user_roles (' . implode(', ', $columns) . ')
+		 VALUES (' . implode(', ', $placeholders) . ')'
+	);
+
+	$deleteStmt->execute([':user_id' => $normalizedUserId]);
+	return $insertStmt->execute($params);
+}
+
+
+function getUserByIdOrUsername(PDO $pdo, $lookupQuery) {
+	$query = normalizeDevToolsUserLookupQuery($lookupQuery);
+	if ($query === '') {
+		return null;
+	}
+
+	$idCandidate = ctype_digit($query) ? (int)$query : 0;
+	$stmt = $pdo->prepare(
+		'SELECT id, email, username, display_name, status, DATE_FORMAT(created_at, "%Y-%m-%d %H:%i:%s") AS created_at
+		 FROM users
+		 WHERE deleted_at IS NULL
+		   AND (id = :id_candidate OR username = :username_candidate OR email = :email_candidate)
+		 LIMIT 1'
+	);
+	$stmt->execute([
+		':id_candidate' => $idCandidate,
+		':username_candidate' => $query,
+		':email_candidate' => $query,
+	]);
+	$row = $stmt->fetch();
+	if (!$row) {
+		return null;
+	}
+
+	$primaryRole = getUserPrimaryRole($pdo, (int)$row['id']);
+
+	return [
+		'id' => (int)$row['id'],
+		'email' => (string)($row['email'] ?? ''),
+		'username' => (string)($row['username'] ?? ''),
+		'display_name' => (string)($row['display_name'] ?? ''),
+		'status' => (string)($row['status'] ?? ''),
+		'created_at' => (string)($row['created_at'] ?? ''),
+		'role_id' => isset($primaryRole['id']) ? (int)$primaryRole['id'] : null,
+		'role_name' => isset($primaryRole['name']) ? (string)$primaryRole['name'] : '',
+		'role_description' => isset($primaryRole['description']) ? (string)$primaryRole['description'] : '',
+	];
+}
+
+
+function createDevToolsUser(PDO $pdo, $email, $username, $displayName, $status, $roleId, $assignedByUserId = null) {
+	$normalizedEmail = trim((string)$email);
+	$normalizedUsername = trim((string)$username);
+	$normalizedDisplayName = trim((string)$displayName);
+	$normalizedStatus = strtolower(trim((string)$status));
+	$normalizedRoleId = (int)$roleId;
+	$normalizedAssignedByUserId = (int)$assignedByUserId;
+
+	if ($normalizedEmail === '' || !filter_var($normalizedEmail, FILTER_VALIDATE_EMAIL)) {
+		return ['success' => false, 'message' => 'A valid email is required'];
+	}
+	if ($normalizedUsername === '') {
+		return ['success' => false, 'message' => 'Username is required'];
+	}
+	if (!in_array($normalizedStatus, ['active', 'disabled'], true)) {
+		$normalizedStatus = 'active';
+	}
+	if ($normalizedRoleId < 1 || getRoleById($pdo, $normalizedRoleId) === null) {
+		return ['success' => false, 'message' => 'A valid role is required'];
+	}
+
+	$passwordPlain = generateRandomPasswordPlaintext(16);
+	$passwordHash = password_hash($passwordPlain, PASSWORD_BCRYPT, ['cost' => 12]);
+	$now = getDashboardSqlTimestamp();
+	$userId = 0;
+
+	try {
+		$pdo->beginTransaction();
+		$stmt = $pdo->prepare(
+			'INSERT INTO users (email, username, password_hash, display_name, status, created_at, updated_at, deleted_at)
+			 VALUES (:email, :username, :password_hash, :display_name, :status, :created_at, :updated_at, NULL)'
+		);
+		$stmt->execute([
+			':email' => substr($normalizedEmail, 0, 255),
+			':username' => substr($normalizedUsername, 0, 100),
+			':password_hash' => $passwordHash,
+			':display_name' => $normalizedDisplayName !== '' ? substr($normalizedDisplayName, 0, 150) : null,
+			':status' => $normalizedStatus,
+			':created_at' => $now,
+			':updated_at' => $now,
+		]);
+
+		$userId = (int)$pdo->lastInsertId();
+		if (!syncUserPrimaryRole($pdo, $userId, $normalizedRoleId, $normalizedAssignedByUserId > 0 ? $normalizedAssignedByUserId : null)) {
+			throw new RuntimeException('Failed to assign role');
+		}
+		$pdo->commit();
+	} catch (PDOException $e) {
+		if ($pdo->inTransaction()) {
+			$pdo->rollBack();
+		}
+
+		$errorCode = (string)($e->getCode() ?? '');
+		if ($errorCode === '23000') {
+			return ['success' => false, 'message' => 'Failed to create user (email/username may already exist)'];
+		}
+
+		return ['success' => false, 'message' => 'Failed to create user'];
+	} catch (Throwable $e) {
+		if ($pdo->inTransaction()) {
+			$pdo->rollBack();
+		}
+		return ['success' => false, 'message' => 'Failed to create user'];
+	}
+
+	try {
+		// Do not fail user creation if preferences already exist or setup temporarily fails.
+		ensureDefaultHeaderWidgetPreferencesForUser($pdo, $userId);
+	} catch (Throwable $e) {
+		// Non-critical: preferences are lazily ensured elsewhere when needed.
+	}
+
+	return [
+		'success' => true,
+		'user_id' => $userId,
+		'generated_password' => $passwordPlain,
+	];
+}
+
+
+function updateDevToolsUser(PDO $pdo, $targetUserId, array $updates, $resetPassword, $assignedByUserId = null) {
+	$userId = (int)$targetUserId;
+	if ($userId < 1) {
+		return ['success' => false, 'message' => 'A valid user id is required'];
+	}
+
+	$checkStmt = $pdo->prepare('SELECT id FROM users WHERE id = :id AND deleted_at IS NULL LIMIT 1');
+	$checkStmt->execute([':id' => $userId]);
+	if (!$checkStmt->fetch()) {
+		return ['success' => false, 'message' => 'User not found'];
+	}
+
+	$fields = [];
+	$params = [':id' => $userId, ':updated_at' => getDashboardSqlTimestamp()];
+	$normalizedRoleId = null;
+	if (array_key_exists('role_id', $updates)) {
+		$normalizedRoleId = (int)$updates['role_id'];
+		if ($normalizedRoleId < 1 || getRoleById($pdo, $normalizedRoleId) === null) {
+			return ['success' => false, 'message' => 'A valid role is required'];
+		}
+	}
+
+	if (array_key_exists('email', $updates)) {
+		$email = trim((string)$updates['email']);
+		if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+			return ['success' => false, 'message' => 'A valid email is required'];
+		}
+		$fields[] = 'email = :email';
+		$params[':email'] = substr($email, 0, 255);
+	}
+
+	if (array_key_exists('username', $updates)) {
+		$username = trim((string)$updates['username']);
+		if ($username === '') {
+			return ['success' => false, 'message' => 'Username is required'];
+		}
+		$fields[] = 'username = :username';
+		$params[':username'] = substr($username, 0, 100);
+	}
+
+	if (array_key_exists('display_name', $updates)) {
+		$displayName = trim((string)$updates['display_name']);
+		$fields[] = 'display_name = :display_name';
+		$params[':display_name'] = $displayName !== '' ? substr($displayName, 0, 150) : null;
+	}
+
+	if (array_key_exists('status', $updates)) {
+		$status = strtolower(trim((string)$updates['status']));
+		if (!in_array($status, ['active', 'disabled'], true)) {
+			return ['success' => false, 'message' => 'Status must be active or disabled'];
+		}
+		$fields[] = 'status = :status';
+		$params[':status'] = $status;
+	}
+
+	$generatedPassword = null;
+	if ($resetPassword) {
+		$generatedPassword = generateRandomPasswordPlaintext(16);
+		$fields[] = 'password_hash = :password_hash';
+		$params[':password_hash'] = password_hash($generatedPassword, PASSWORD_BCRYPT, ['cost' => 12]);
+	}
+
+	if (empty($fields) && $normalizedRoleId === null) {
+		return ['success' => false, 'message' => 'No updates were provided'];
+	}
+
+	$fields[] = 'updated_at = :updated_at';
+	try {
+		$pdo->beginTransaction();
+		$stmt = $pdo->prepare('UPDATE users SET ' . implode(', ', $fields) . ' WHERE id = :id');
+		$stmt->execute($params);
+		if ($normalizedRoleId !== null && !syncUserPrimaryRole($pdo, $userId, $normalizedRoleId, (int)$assignedByUserId > 0 ? (int)$assignedByUserId : null)) {
+			throw new RuntimeException('Failed to assign role');
+		}
+		$pdo->commit();
+	} catch (Throwable $e) {
+		if ($pdo->inTransaction()) {
+			$pdo->rollBack();
+		}
+		return ['success' => false, 'message' => 'Failed to update user (email/username may already exist)'];
+	}
+
+	return [
+		'success' => true,
+		'generated_password' => $generatedPassword,
+	];
+}
+
 
 function resetAuditLogTable(PDO $pdo) {
 	$pdo->exec('DROP TABLE IF EXISTS audit_log');
@@ -347,6 +758,50 @@ function resetRecordsTableToSample(PDO $pdo) {
 	}
 }
 
+function resetDashboardSqlData(PDO $pdo) {
+	$sampleItems = [
+		['title' => 'Sample Entry 1', 'description' => 'This is a test entry to demonstrate the system.'],
+		['title' => 'Sample Entry 2', 'description' => 'Another test entry showing the data management features.'],
+		['title' => 'Sample Entry 3', 'description' => 'A third test entry to provide a complete example.'],
+	];
+
+	try {
+		$pdo->beginTransaction();
+		$pdo->exec('DELETE FROM audit_log');
+		$pdo->exec('DELETE FROM activity_log');
+		$pdo->exec('DELETE FROM records');
+		$pdo->commit();
+
+		// Reset counters while tables are empty, then insert deterministic sample IDs.
+		$pdo->exec('ALTER TABLE records AUTO_INCREMENT = 1');
+		$pdo->exec('ALTER TABLE activity_log AUTO_INCREMENT = 1');
+		$pdo->exec('ALTER TABLE audit_log AUTO_INCREMENT = 1');
+
+		$insertRecord = $pdo->prepare('INSERT INTO records (id, title, description, created_by_user_id, updated_by_user_id, created_at, updated_at) VALUES (:id, :title, :description, :created_by_user_id, :updated_by_user_id, :created_at, :updated_at)');
+		$now = getDashboardSqlTimestamp();
+		$seedId = 1;
+		foreach ($sampleItems as $item) {
+			$insertRecord->execute([
+				':id' => $seedId,
+				':title' => $item['title'],
+				':description' => $item['description'],
+				':created_by_user_id' => null,
+				':updated_by_user_id' => null,
+				':created_at' => $now,
+				':updated_at' => $now,
+			]);
+			$seedId++;
+		}
+
+		return true;
+	} catch (Throwable $e) {
+		if ($pdo->inTransaction()) {
+			$pdo->rollBack();
+		}
+		return false;
+	}
+}
+
 function writeAuditEvent(PDO $pdo, array $entry) {
 	ensureAuditLogSchema($pdo);
 
@@ -408,46 +863,3 @@ function writeAuditEvents(PDO $pdo, array $entries) {
 	return $allOk;
 }
 
-function resetDashboardSqlData(PDO $pdo) {
-	$sampleItems = [
-		['title' => 'Sample Entry 1', 'description' => 'This is a test entry to demonstrate the system.'],
-		['title' => 'Sample Entry 2', 'description' => 'Another test entry showing the data management features.'],
-		['title' => 'Sample Entry 3', 'description' => 'A third test entry to provide a complete example.'],
-	];
-
-	try {
-		$pdo->beginTransaction();
-		$pdo->exec('DELETE FROM audit_log');
-		$pdo->exec('DELETE FROM activity_log');
-		$pdo->exec('DELETE FROM records');
-		$pdo->commit();
-
-		// Reset counters while tables are empty, then insert deterministic sample IDs.
-		$pdo->exec('ALTER TABLE records AUTO_INCREMENT = 1');
-		$pdo->exec('ALTER TABLE activity_log AUTO_INCREMENT = 1');
-		$pdo->exec('ALTER TABLE audit_log AUTO_INCREMENT = 1');
-
-		$insertRecord = $pdo->prepare('INSERT INTO records (id, title, description, created_by_user_id, updated_by_user_id, created_at, updated_at) VALUES (:id, :title, :description, :created_by_user_id, :updated_by_user_id, :created_at, :updated_at)');
-		$now = getDashboardSqlTimestamp();
-		$seedId = 1;
-		foreach ($sampleItems as $item) {
-			$insertRecord->execute([
-				':id' => $seedId,
-				':title' => $item['title'],
-				':description' => $item['description'],
-				':created_by_user_id' => null,
-				':updated_by_user_id' => null,
-				':created_at' => $now,
-				':updated_at' => $now,
-			]);
-			$seedId++;
-		}
-
-		return true;
-	} catch (Throwable $e) {
-		if ($pdo->inTransaction()) {
-			$pdo->rollBack();
-		}
-		return false;
-	}
-}

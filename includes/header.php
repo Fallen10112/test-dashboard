@@ -20,6 +20,10 @@ $pageTitle = "Dashboard Showcase";
 	$_headerDisplay = ($_headerUser && $_headerUser['display_name'] !== null && $_headerUser['display_name'] !== '')
 		? $_headerUser['display_name']
 		: ($_headerUser['email'] ?? 'User');
+	$_headerRole = trim((string)($_headerUser['role_name'] ?? ''));
+	if ($_headerRole === '') {
+		$_headerRole = 'Unassigned';
+	}
 	$_headerEmail = htmlspecialchars($_headerUser['email'] ?? '', ENT_QUOTES, 'UTF-8');
 	$_words = preg_split('/\s+/', trim($_headerDisplay));
 	$_initials = '';
@@ -94,6 +98,7 @@ $pageTitle = "Dashboard Showcase";
 				<div class="user-dropdown" id="user-dropdown" hidden>
 					<div class="user-dropdown-info">
 						<span class="user-dropdown-name"><?php echo htmlspecialchars($_headerDisplay, ENT_QUOTES, 'UTF-8'); ?></span>
+						<span class="user-dropdown-role"><?php echo htmlspecialchars($_headerRole, ENT_QUOTES, 'UTF-8'); ?></span>
 						<span class="user-dropdown-email"><?php echo $_headerEmail; ?></span>
 					</div>
 					<div class="user-dropdown-divider"></div>

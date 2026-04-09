@@ -48,6 +48,8 @@ function getAuthUser(): ?array {
 			return null;
 		}
 
+		$primaryRole = getUserPrimaryRole($pdo, (int)$row['id']);
+
 		// Touch last_seen_at every request (suppress errors if it fails)
 		try {
 			$touch = $pdo->prepare('UPDATE user_sessions SET last_seen_at = NOW() WHERE id = :sid');
@@ -61,6 +63,8 @@ function getAuthUser(): ?array {
 			'email'        => $row['email'],
 			'username'     => $row['username'],
 			'display_name' => $row['display_name'],
+			'role_id'      => isset($primaryRole['id']) ? (int)$primaryRole['id'] : null,
+			'role_name'    => isset($primaryRole['name']) ? $primaryRole['name'] : '',
 		];
 	} catch (Throwable $e) {
 		return null;

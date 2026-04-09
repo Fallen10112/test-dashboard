@@ -425,6 +425,15 @@
     text-overflow: ellipsis;
 }
 
+.user-dropdown-role {
+    font-size: 0.76em;
+    font-weight: 600;
+    color: #4b5563;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .user-dropdown-email {
     font-size: 0.78em;
     color: #6b7280;

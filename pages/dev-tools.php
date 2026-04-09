@@ -268,7 +268,7 @@ try {
 					<h4>Force Delete User</h4>
 					<div class="account-form" autocomplete="off">
 						<div class="form-group">
-							<label for="dev-users-delete-lookup">Lookup (username or id)</label>
+										<label for="dev-users-delete-lookup">Lookup (email, username or id)</label>
 							<input type="text" id="dev-users-delete-lookup" maxlength="100" placeholder="e.g. 12 or johndoe">
 						</div>
 						<div class="form-actions">
@@ -286,7 +286,7 @@ try {
 					<h4>Reset Widget Preferences</h4>
 					<div class="account-form" autocomplete="off">
 						<div class="form-group">
-							<label for="dev-users-widget-reset-lookup">Lookup (username or id)</label>
+										<label for="dev-users-widget-reset-lookup">Lookup (email, username or id)</label>
 							<input type="text" id="dev-users-widget-reset-lookup" maxlength="100" placeholder="e.g. 12 or johndoe">
 						</div>
 						<div class="form-actions">
