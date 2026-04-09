@@ -1084,15 +1084,18 @@ function loadHeaderMetrics() {
 		const dataPayload = dataResponse[0] || {};
 		const auditPayload = auditResponse[0] || {};
 		const auditEntries = Array.isArray(auditPayload.entries) ? auditPayload.entries : [];
+		const recordAuditEntries = auditEntries.filter(function(entry) {
+			return isRecordAuditEntry(entry);
+		});
 
 		const totalEntries = Array.isArray(dataPayload.items) ? dataPayload.items.length : 0;
-		const totalEdits = auditEntries.length > 0
-			? auditEntries.filter(function(entry) {
+		const totalEdits = recordAuditEntries.length > 0
+			? recordAuditEntries.filter(function(entry) {
 				return String(entry.change_type || '').toUpperCase() === 'EDIT';
 			}).length
 			: 0;
-		const addsToday = countUniqueAuditRecordsForToday(auditEntries, 'ADD');
-		const deletesToday = countUniqueAuditRecordsForToday(auditEntries, 'DELETE');
+		const addsToday = countUniqueAuditRecordsForToday(recordAuditEntries, 'ADD');
+		const deletesToday = countUniqueAuditRecordsForToday(recordAuditEntries, 'DELETE');
 
 		setMetricValue('#metric-total-entries', totalEntries);
 		setMetricValue('#metric-total-edits', totalEdits);
@@ -1104,6 +1107,21 @@ function loadHeaderMetrics() {
 		setMetricValue('#metric-adds-today', '--');
 		setMetricValue('#metric-deletes-today', '--');
 	});
+}
+
+
+function isRecordAuditEntry(entry) {
+	if (!entry || typeof entry !== 'object') {
+		return false;
+	}
+
+	const recordType = String(entry.record_type || '').toLowerCase();
+	if (recordType === 'record') {
+		return true;
+	}
+
+	const dataset = String(entry.dataset || '').toLowerCase();
+	return dataset === 'records';
 }
 
 
