@@ -121,6 +121,7 @@ Application behavior settings are loaded from the `app_settings` table (not from
 - Server-side search, sort, pagination (`10/20/25/50/100`)
 - Virtualized table rendering for the current page
 - Add/Edit/Delete + bulk delete
+- Add New Record includes a "Save & add another record" action for rapid entry
 - Filtered export endpoint support for CSV/PDF flows
 - Realtime refresh every 10 seconds
 - Footer status text: `Last refreshed HH:MM:SS`
