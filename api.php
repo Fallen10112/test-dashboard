@@ -1067,7 +1067,7 @@ if ($method === 'POST') {
 				'record_type' => 'users',
 				'record_id' => (int)($result['user_id'] ?? 0),
 				'action' => 'create',
-				'details' => 'Dev tools created user #' . (int)($result['user_id'] ?? 0),
+				'details' => 'Created user ' . trim((string)($createdUser['username'] ?? '')) . ' / ' . trim((string)($createdUser['display_name'] ?? '')) . ' with ID ' . (int)($result['user_id'] ?? 0),
 				'source_user_id' => $actorUserId,
 			]);
 		} catch (Throwable $e) {
@@ -1086,6 +1086,12 @@ if ($method === 'POST') {
 		$actorUserId = getApiAuthUserId();
 		enforceApiRateLimit('admin_user_update_' . $actorUserId, 30, 60);
 		$targetId = isset($data['user_id']) ? (int)$data['user_id'] : 0;
+		$existingUser = null;
+		try {
+			$existingUser = getUserByIdOrUsername($pdo, (string)$targetId);
+		} catch (Throwable $e) {
+			$existingUser = null;
+		}
 		$updates = [
 			'email' => $data['email'] ?? '',
 			'username' => $data['username'] ?? '',
@@ -1120,12 +1126,43 @@ if ($method === 'POST') {
 				'role_description' => isset($role['description']) ? (string)$role['description'] : '',
 			];
 		}
+		$changeParts = [];
+		if (is_array($existingUser)) {
+			$trackedFields = [
+				'email' => 'Email',
+				'username' => 'Username',
+				'display_name' => 'Display Name',
+				'status' => 'Status',
+			];
+			foreach ($trackedFields as $fieldKey => $fieldLabel) {
+				$beforeValue = trim((string)($existingUser[$fieldKey] ?? ''));
+				$afterValue = trim((string)($updatedUser[$fieldKey] ?? $updates[$fieldKey] ?? ''));
+				if ($beforeValue !== $afterValue) {
+					$changeParts[] = $fieldLabel . ': ' . ($beforeValue !== '' ? $beforeValue : '(empty)') . ' -> ' . ($afterValue !== '' ? $afterValue : '(empty)');
+				}
+			}
+
+			$beforeRoleId = (int)($existingUser['role_id'] ?? 0);
+			$afterRoleId = (int)($updatedUser['role_id'] ?? ($updates['role_id'] ?? 0));
+			$beforeRoleName = trim((string)($existingUser['role_name'] ?? ''));
+			$afterRoleName = trim((string)($updatedUser['role_name'] ?? ''));
+			if ($beforeRoleId !== $afterRoleId || $beforeRoleName !== $afterRoleName) {
+				$beforeRoleLabel = $beforeRoleId > 0
+					? '#' . $beforeRoleId . ($beforeRoleName !== '' ? ' (' . $beforeRoleName . ')' : '')
+					: '(none)';
+				$afterRoleLabel = $afterRoleId > 0
+					? '#' . $afterRoleId . ($afterRoleName !== '' ? ' (' . $afterRoleName . ')' : '')
+					: '(none)';
+				$changeParts[] = 'Role: ' . $beforeRoleLabel . ' -> ' . $afterRoleLabel;
+			}
+		}
+		$changeParts[] = 'Password reset: ' . ($resetPassword ? 'Yes' : 'No');
 		try {
 			writeAuditEvent($pdo, [
 				'record_type' => 'users',
 				'record_id' => $targetId,
 				'action' => 'update',
-				'details' => 'Dev tools updated user #' . $targetId,
+				'details' => 'Updated user ID ' . $targetId . ' - ' . implode('; ', $changeParts),
 				'source_user_id' => $actorUserId,
 			]);
 		} catch (Throwable $e) {
