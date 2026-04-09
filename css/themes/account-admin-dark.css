@@ -80,3 +80,16 @@ body.dark-mode .account-card h3 {
 body.dark-mode .account-card p {
     color: #9ca3af;
 }
+body.dark-mode .admin-role-empty-row td {
+    color: #9ca3af;
+}
+body.dark-mode .role-delete-details {
+    background: #1f2940;
+    border-color: #3e4b66;
+}
+body.dark-mode .role-delete-details-title {
+    color: #e5e7eb;
+}
+body.dark-mode .role-delete-user-list {
+    color: #d1d5db;
+}

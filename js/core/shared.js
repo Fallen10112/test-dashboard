@@ -1707,6 +1707,503 @@ function setupDevToolsUserManagementHandlers() {
 }
 
 
+function setupAdminRoleManagementHandlers() {
+	const $createButton = $('#dev-roles-create-btn');
+	const $updateDetectButton = $('#dev-roles-update-detect-btn');
+	const $updateButton = $('#dev-roles-update-btn');
+	const $deleteSelect = $('#dev-roles-delete-role');
+	const $deleteButton = $('#dev-roles-delete-btn');
+
+	if ($createButton.length === 0 && $updateDetectButton.length === 0 && $deleteSelect.length === 0) {
+		return;
+	}
+
+	let currentRoles = Array.isArray(window.ADMIN_ROLE_MANAGEMENT_ROLES)
+		? window.ADMIN_ROLE_MANAGEMENT_ROLES.slice()
+		: [];
+	let updateTargetRoleId = 0;
+	let deleteTargetRoleId = parseInt($deleteSelect.val(), 10) || 0;
+	let updateDetectedLabel = '';
+	let deleteDetectedLabel = '';
+
+	const setInlineResult = function(selector, message, isError) {
+		const $target = $(selector);
+		if ($target.length === 0) {
+			return;
+		}
+
+		$target.removeClass('is-error is-success');
+		if (message && String(message).trim() !== '') {
+			$target.text(String(message));
+			$target.addClass(isError ? 'is-error' : 'is-success');
+			$target.removeAttr('hidden');
+		} else {
+			$target.text('');
+			$target.attr('hidden', 'hidden');
+		}
+	};
+
+	const apiPost = function(action, payload) {
+		const requestPayload = $.extend({ action: action }, payload || {});
+		return $.ajax({
+			url: '../api.php',
+			type: 'POST',
+			contentType: 'application/json',
+			dataType: 'json',
+			data: JSON.stringify(requestPayload)
+		});
+	};
+
+	const normalizeRole = function(role) {
+		if (!role || typeof role !== 'object') {
+			return null;
+		}
+
+		const id = parseInt(role.id, 10) || 0;
+		if (id < 1) {
+			return null;
+		}
+
+		return {
+			id: id,
+			name: String(role.name || ''),
+			description: String(role.description || '')
+		};
+	};
+
+	const roleLabel = function(role) {
+		if (!role || typeof role !== 'object') {
+			return '';
+		}
+		return String(role.id || '') + ': ' + String(role.name || '');
+	};
+
+	const roleLookupLabel = function(role) {
+		if (!role || typeof role !== 'object') {
+			return '';
+		}
+		return 'Role #' + String(role.id || '') + ' (' + String(role.name || '') + ')';
+	};
+
+	const userLabel = function(user) {
+		if (!user || typeof user !== 'object') {
+			return '';
+		}
+
+		const id = String(user.id || '');
+		const displayName = String(user.display_name || '').trim();
+		const username = String(user.username || '').trim();
+		const email = String(user.email || '').trim();
+		let label = '#' + id;
+		if (displayName !== '') {
+			label += ' ' + displayName;
+		} else if (username !== '') {
+			label += ' ' + username;
+		} else if (email !== '') {
+			label += ' ' + email;
+		}
+		return label;
+	};
+
+	const getRoleByIdFromState = function(roleId) {
+		const targetId = parseInt(roleId, 10) || 0;
+		if (targetId < 1) {
+			return null;
+		}
+		for (let index = 0; index < currentRoles.length; index += 1) {
+			if (parseInt(currentRoles[index].id, 10) === targetId) {
+				return currentRoles[index];
+			}
+		}
+		return null;
+	};
+
+	const getReassignmentRolePreview = function(roleId) {
+		const targetId = parseInt(roleId, 10) || 0;
+		if (targetId < 1) {
+			return null;
+		}
+		const lowerRoles = currentRoles.filter(function(role) {
+			return parseInt(role.id, 10) < targetId;
+		}).sort(function(left, right) {
+			return parseInt(right.id, 10) - parseInt(left.id, 10);
+		});
+		if (lowerRoles.length > 0) {
+			return lowerRoles[0];
+		}
+		const higherRoles = currentRoles.filter(function(role) {
+			return parseInt(role.id, 10) > targetId;
+		}).sort(function(left, right) {
+			return parseInt(left.id, 10) - parseInt(right.id, 10);
+		});
+		return higherRoles.length > 0 ? higherRoles[0] : null;
+	};
+
+	const renderRoleTable = function() {
+		const $tableBody = $('#admin-role-table-body');
+		if ($tableBody.length === 0) {
+			return;
+		}
+
+		$tableBody.empty();
+		if (!Array.isArray(currentRoles) || currentRoles.length === 0) {
+			const emptyRow = document.createElement('tr');
+			emptyRow.className = 'admin-role-empty-row';
+			const emptyCell = document.createElement('td');
+			emptyCell.colSpan = 3;
+			emptyCell.textContent = 'No roles found.';
+			emptyRow.appendChild(emptyCell);
+			$tableBody.append(emptyRow);
+			return;
+		}
+
+		currentRoles.forEach(function(role) {
+			const row = document.createElement('tr');
+			const idCell = document.createElement('td');
+			const nameCell = document.createElement('td');
+			const descriptionCell = document.createElement('td');
+			idCell.textContent = String(role.id || '');
+			nameCell.textContent = String(role.name || '');
+			descriptionCell.textContent = String(role.description || '');
+			row.appendChild(idCell);
+			row.appendChild(nameCell);
+			row.appendChild(descriptionCell);
+			$tableBody.append(row);
+		});
+	};
+
+	const populateRoleSelect = function($select, placeholderText, labelFormatter, selectedValue) {
+		if (!$select || $select.length === 0) {
+			return;
+		}
+
+		const preservedValue = selectedValue !== undefined && selectedValue !== null && String(selectedValue) !== ''
+			? String(selectedValue)
+			: String($select.val() || '');
+		$select.empty();
+
+		const placeholderOption = document.createElement('option');
+		placeholderOption.value = '';
+		placeholderOption.disabled = true;
+		placeholderOption.selected = true;
+		placeholderOption.textContent = placeholderText;
+		$select.append(placeholderOption);
+
+		currentRoles.forEach(function(role) {
+			const option = document.createElement('option');
+			option.value = String(role.id || '');
+			option.textContent = labelFormatter(role);
+			$select.append(option);
+		});
+
+		const hasSelectedValue = currentRoles.some(function(role) {
+			return String(role.id || '') === preservedValue;
+		});
+		$select.val(hasSelectedValue ? preservedValue : '');
+	};
+
+	const renderRoleSelects = function() {
+		populateRoleSelect($('#dev-users-create-role'), 'Select role', function(role) {
+			return String(role.name || '');
+		});
+		populateRoleSelect($('#dev-users-update-role'), 'Select role', function(role) {
+			return String(role.name || '');
+		}, $('#dev-users-update-role').val());
+		populateRoleSelect($('#dev-roles-delete-role'), 'Select role to delete', roleLabel, deleteTargetRoleId > 0 ? String(deleteTargetRoleId) : '');
+	};
+
+	const setRoleUpdateControlsEnabled = function(enabled) {
+		const canEdit = !!enabled;
+		const $updateFields = $('#dev-roles-update-fields');
+		const $updateActions = $('#dev-roles-update-actions');
+		if ($updateFields.length > 0) {
+			if (canEdit) {
+				$updateFields.removeAttr('hidden');
+			} else {
+				$updateFields.attr('hidden', 'hidden');
+			}
+		}
+		if ($updateActions.length > 0) {
+			if (canEdit) {
+				$updateActions.removeAttr('hidden');
+			} else {
+				$updateActions.attr('hidden', 'hidden');
+			}
+		}
+		$('#dev-roles-update-name').prop('disabled', !canEdit);
+		$('#dev-roles-update-description').prop('disabled', !canEdit);
+		$updateButton.prop('disabled', !canEdit);
+	};
+
+	const setRoleDeleteDetails = function(affectedUsers, replacementRole) {
+		const detailsEl = document.getElementById('dev-roles-delete-details');
+		if (!detailsEl) {
+			return;
+		}
+
+		detailsEl.innerHTML = '';
+		const users = Array.isArray(affectedUsers) ? affectedUsers : [];
+		if (users.length === 0) {
+			detailsEl.hidden = true;
+			return;
+		}
+
+		const title = document.createElement('p');
+		title.className = 'role-delete-details-title';
+		title.textContent = 'Affected users';
+		detailsEl.appendChild(title);
+
+		const list = document.createElement('ul');
+		list.className = 'role-delete-user-list';
+		users.forEach(function(user) {
+			const listItem = document.createElement('li');
+			listItem.textContent = userLabel(user) + ' -> ' + roleLabel(replacementRole);
+			list.appendChild(listItem);
+		});
+		detailsEl.appendChild(list);
+		detailsEl.hidden = false;
+	};
+
+	const setCurrentRoles = function(roles) {
+		currentRoles = Array.isArray(roles)
+			? roles.map(normalizeRole).filter(function(role) {
+				return role !== null;
+			}).sort(function(left, right) {
+				return left.id - right.id;
+			})
+			: [];
+		window.ADMIN_ROLE_MANAGEMENT_ROLES = currentRoles.slice();
+		renderRoleTable();
+		renderRoleSelects();
+		if (updateTargetRoleId > 0 && getRoleByIdFromState(updateTargetRoleId) === null) {
+			updateTargetRoleId = 0;
+			updateDetectedLabel = '';
+			setRoleUpdateControlsEnabled(false);
+			setInlineResult('#dev-roles-update-detected', '', false);
+			setInlineResult('#dev-roles-update-result', '', false);
+			$('#dev-roles-update-name').val('');
+			$('#dev-roles-update-description').val('');
+		}
+		if (deleteTargetRoleId > 0 && getRoleByIdFromState(deleteTargetRoleId) === null) {
+			deleteTargetRoleId = 0;
+			deleteDetectedLabel = '';
+			$deleteButton.prop('disabled', true);
+			setInlineResult('#dev-roles-delete-result', '', false);
+			setRoleDeleteDetails([], null);
+		}
+	};
+
+	const lookupRole = function(lookupValue, onSuccess, onError) {
+		const lookup = String(lookupValue || '').trim();
+		if (lookup === '') {
+			onError('Enter a role id or name first.');
+			return;
+		}
+
+		apiPost('admin_role_lookup', { lookup: lookup })
+			.done(function(response) {
+				if (response && response.success && response.role) {
+					onSuccess(response.role);
+					return;
+				}
+				onError('Role not found.');
+			})
+			.fail(function(xhr) {
+				const message = xhr && xhr.responseJSON && xhr.responseJSON.message
+					? xhr.responseJSON.message
+					: 'Role lookup failed.';
+				onError(message);
+			});
+	};
+
+	setCurrentRoles(currentRoles);
+	setRoleUpdateControlsEnabled(false);
+	$deleteButton.prop('disabled', deleteTargetRoleId < 1);
+
+	$('#dev-roles-create-name').on('input', function() {
+		setInlineResult('#dev-roles-create-result', '', false);
+	});
+	$('#dev-roles-create-description').on('input', function() {
+		setInlineResult('#dev-roles-create-result', '', false);
+	});
+
+	$('#dev-roles-update-lookup').on('input', function() {
+		updateTargetRoleId = 0;
+		updateDetectedLabel = '';
+		setRoleUpdateControlsEnabled(false);
+		setInlineResult('#dev-roles-update-detected', '', false);
+		setInlineResult('#dev-roles-update-result', '', false);
+		$('#dev-roles-update-name').val('');
+		$('#dev-roles-update-description').val('');
+	});
+
+	$deleteSelect.on('change', function() {
+		deleteTargetRoleId = parseInt($(this).val(), 10) || 0;
+		deleteDetectedLabel = deleteTargetRoleId > 0 ? roleLookupLabel(getRoleByIdFromState(deleteTargetRoleId)) : '';
+		$deleteButton.prop('disabled', deleteTargetRoleId < 1);
+		setInlineResult('#dev-roles-delete-detected', deleteDetectedLabel, false);
+		setInlineResult('#dev-roles-delete-result', '', false);
+		setRoleDeleteDetails([], null);
+	});
+
+	$createButton.on('click', function() {
+		setInlineResult('#dev-roles-create-result', '', false);
+		const name = String($('#dev-roles-create-name').val() || '').trim();
+		const description = String($('#dev-roles-create-description').val() || '').trim();
+		if (name === '') {
+			setInlineResult('#dev-roles-create-result', 'Enter a role name before creating a role.', true);
+			return;
+		}
+
+		apiPost('admin_role_create', {
+			name: name,
+			description: description
+		}).done(function(response) {
+			if (!response || !response.success) {
+				setInlineResult('#dev-roles-create-result', 'Failed to create role.', true);
+				return;
+			}
+
+			setCurrentRoles(response.roles || []);
+			$('#dev-roles-create-name').val('');
+			$('#dev-roles-create-description').val('');
+			const createdRole = response.role || {};
+			const message = 'Role created. ' + roleLookupLabel(createdRole);
+			setInlineResult('#dev-roles-create-result', message, false);
+			showToast({
+				type: 'success',
+				title: 'Role Created',
+				message: message,
+				showOkayButton: true,
+				autoCloseMs: 0
+			});
+		}).fail(function(xhr) {
+			const message = xhr && xhr.responseJSON && xhr.responseJSON.message
+				? xhr.responseJSON.message
+				: 'Failed to create role.';
+			setInlineResult('#dev-roles-create-result', message, true);
+		});
+	});
+
+	$updateDetectButton.on('click', function() {
+		setInlineResult('#dev-roles-update-result', '', false);
+		lookupRole($('#dev-roles-update-lookup').val(), function(role) {
+			updateTargetRoleId = parseInt(role.id, 10) || 0;
+			updateDetectedLabel = roleLookupLabel(role);
+			$('#dev-roles-update-name').val(String(role.name || ''));
+			$('#dev-roles-update-description').val(String(role.description || ''));
+			setRoleUpdateControlsEnabled(updateTargetRoleId > 0);
+			setInlineResult('#dev-roles-update-detected', updateDetectedLabel, false);
+		}, function(message) {
+			updateTargetRoleId = 0;
+			updateDetectedLabel = '';
+			setRoleUpdateControlsEnabled(false);
+			setInlineResult('#dev-roles-update-detected', message, true);
+		});
+	});
+
+	$updateButton.on('click', function() {
+		if (updateTargetRoleId < 1) {
+			setInlineResult('#dev-roles-update-result', 'Detect a role before updating.', true);
+			return;
+		}
+
+		apiPost('admin_role_update', {
+			role_id: updateTargetRoleId,
+			name: String($('#dev-roles-update-name').val() || '').trim(),
+			description: String($('#dev-roles-update-description').val() || '').trim()
+		}).done(function(response) {
+			if (!response || !response.success) {
+				setInlineResult('#dev-roles-update-result', 'Failed to update role.', true);
+				return;
+			}
+
+			setCurrentRoles(response.roles || []);
+			const role = response.role || {};
+			updateDetectedLabel = roleLookupLabel(role);
+			setInlineResult('#dev-roles-update-detected', updateDetectedLabel, false);
+			setInlineResult('#dev-roles-update-result', 'Role updated. ' + updateDetectedLabel, false);
+			showToast({
+				type: 'success',
+				title: 'Role Updated',
+				message: 'Role updated: ' + updateDetectedLabel,
+				showOkayButton: true,
+				autoCloseMs: 0
+			});
+		}).fail(function(xhr) {
+			const message = xhr && xhr.responseJSON && xhr.responseJSON.message
+				? xhr.responseJSON.message
+				: 'Failed to update role.';
+			setInlineResult('#dev-roles-update-result', message, true);
+		});
+	});
+
+	$deleteButton.on('click', function() {
+		if (deleteTargetRoleId < 1) {
+			setInlineResult('#dev-roles-delete-result', 'Select a role before deleting.', true);
+			return;
+		}
+
+		const selectedRole = getRoleByIdFromState(deleteTargetRoleId);
+		const previewRole = getReassignmentRolePreview(deleteTargetRoleId);
+		const deleteMessage = deleteDetectedLabel !== ''
+			? deleteDetectedLabel + '. '
+			: (selectedRole ? roleLookupLabel(selectedRole) + '. ' : '');
+		showToast({
+			type: 'warning',
+			title: 'Delete Role?',
+			message: deleteMessage + (previewRole ? ('Affected users will be reassigned to ' + roleLookupLabel(previewRole) + '.') : 'Affected users will be reassigned only if a replacement role exists.'),
+			autoCloseMs: 0,
+			buttons: [
+				{ label: 'Cancel', className: 'btn-secondary' },
+				{
+					label: 'Delete Role',
+					className: 'btn-danger',
+					onClick: function() {
+						apiPost('admin_role_delete', { role_id: deleteTargetRoleId })
+							.done(function(response) {
+								if (!response || !response.success) {
+									setInlineResult('#dev-roles-delete-result', 'Failed to delete role.', true);
+									return;
+								}
+
+								setCurrentRoles(response.roles || []);
+								const deletedRole = response.deleted_role || selectedRole || {};
+								const replacementRole = response.replacement_role || previewRole || null;
+								const affectedUsers = Array.isArray(response.affected_users) ? response.affected_users : [];
+								const summaryMessage = 'Deleted role #' + String(deletedRole.id || deleteTargetRoleId) + ' (' + String(deletedRole.name || '') + ')';
+								const reassignmentMessage = affectedUsers.length > 0 && replacementRole
+									? (' ' + String(affectedUsers.length) + ' user(s) reassigned to ' + roleLookupLabel(replacementRole) + '.')
+									: ' No users were affected.';
+								setInlineResult('#dev-roles-delete-result', summaryMessage + reassignmentMessage, false);
+								setRoleDeleteDetails(affectedUsers, replacementRole);
+								setInlineResult('#dev-roles-delete-detected', '', false);
+								deleteTargetRoleId = 0;
+								deleteDetectedLabel = '';
+								$deleteSelect.val('');
+								$deleteButton.prop('disabled', true);
+								showToast({
+									type: 'success',
+									title: 'Role Deleted',
+									message: summaryMessage,
+									showOkayButton: true,
+									autoCloseMs: 0
+								});
+							})
+							.fail(function(xhr) {
+								const message = xhr && xhr.responseJSON && xhr.responseJSON.message
+									? xhr.responseJSON.message
+									: 'Failed to delete role.';
+								setInlineResult('#dev-roles-delete-result', message, true);
+							});
+					}
+				}
+			]
+		});
+	});
+}
+
+
 function setupDevToolsCategorySelector() {
 	const $selector = $('#dev-tools-system-selector');
 	if ($selector.length === 0) {

@@ -865,6 +865,166 @@ if ($method === 'POST') {
 		]);
 	}
 
+	if ($postAction === 'admin_role_list') {
+		respondJson(200, [
+			'success' => true,
+			'message' => 'Roles loaded',
+			'roles' => getAvailableRoles($pdo),
+		]);
+	}
+
+	if ($postAction === 'admin_role_lookup') {
+		$actorUserId = getApiAuthUserId();
+		enforceApiRateLimit('admin_role_lookup_' . $actorUserId, 120, 60);
+		$lookup = $data['lookup'] ?? '';
+		$role = getRoleByLookup($pdo, $lookup);
+		if (!$role) {
+			respondJson(404, ['success' => false, 'message' => 'Role not found']);
+		}
+
+		respondJson(200, [
+			'success' => true,
+			'message' => 'Role found',
+			'role' => $role,
+		]);
+	}
+
+	if ($postAction === 'admin_role_create') {
+		$actorUserId = getApiAuthUserId();
+		enforceApiRateLimit('admin_role_create_' . $actorUserId, 20, 60);
+		$result = createAdminRole(
+			$pdo,
+			$data['name'] ?? '',
+			$data['description'] ?? ''
+		);
+
+		if (!$result['success']) {
+			respondJson(400, ['success' => false, 'message' => $result['message'] ?? 'Failed to create role']);
+		}
+
+		$createdRole = $result['role'] ?? null;
+		if ($createdRole) {
+			try {
+				writeAuditEvent($pdo, [
+					'record_type' => 'role',
+					'record_id' => (int)($createdRole['id'] ?? 0),
+					'action' => 'create',
+					'details' => 'Created role #' . (int)($createdRole['id'] ?? 0) . ' (' . (string)($createdRole['name'] ?? '') . ')',
+					'source_user_id' => $actorUserId,
+				]);
+			} catch (Throwable $e) {
+				// Audit logging should not fail role creation.
+			}
+		}
+
+		respondJson(200, [
+			'success' => true,
+			'message' => 'Role created successfully',
+			'role' => $createdRole,
+			'roles' => $result['roles'] ?? getAvailableRoles($pdo),
+		]);
+	}
+
+	if ($postAction === 'admin_role_update') {
+		$actorUserId = getApiAuthUserId();
+		enforceApiRateLimit('admin_role_update_' . $actorUserId, 30, 60);
+		$targetId = isset($data['role_id']) ? (int)$data['role_id'] : 0;
+		$existingRole = getRoleById($pdo, $targetId);
+		$result = updateAdminRole(
+			$pdo,
+			$targetId,
+			[
+				'name' => $data['name'] ?? '',
+				'description' => $data['description'] ?? '',
+			]
+		);
+
+		if (!$result['success']) {
+			respondJson(400, ['success' => false, 'message' => $result['message'] ?? 'Failed to update role']);
+		}
+
+		$updatedRole = $result['role'] ?? null;
+		if ($updatedRole) {
+			try {
+				writeAuditEvent($pdo, [
+					'record_type' => 'role',
+					'record_id' => $targetId,
+					'action' => 'update',
+					'details' => 'Updated role #' . $targetId
+						. ' name: ' . (string)($existingRole['name'] ?? '') . ' -> ' . (string)($updatedRole['name'] ?? '')
+						. '; description: ' . (string)($existingRole['description'] ?? '') . ' -> ' . (string)($updatedRole['description'] ?? ''),
+					'source_user_id' => $actorUserId,
+				]);
+			} catch (Throwable $e) {
+				// Audit logging should not fail role updates.
+			}
+		}
+
+		respondJson(200, [
+			'success' => true,
+			'message' => 'Role updated successfully',
+			'role' => $updatedRole,
+			'roles' => $result['roles'] ?? getAvailableRoles($pdo),
+		]);
+	}
+
+	if ($postAction === 'admin_role_delete') {
+		$actorUserId = getApiAuthUserId();
+		enforceApiRateLimit('admin_role_delete_' . $actorUserId, 12, 60);
+		$targetId = isset($data['role_id']) ? (int)$data['role_id'] : 0;
+		$deletedRole = getRoleById($pdo, $targetId);
+		$result = deleteAdminRole($pdo, $targetId);
+		if (!$result['success']) {
+			respondJson(400, ['success' => false, 'message' => $result['message'] ?? 'Failed to delete role']);
+		}
+
+		$replacementRole = $result['replacement_role'] ?? null;
+		$affectedUsers = is_array($result['affected_users'] ?? null) ? $result['affected_users'] : [];
+		try {
+			$deleteDetails = 'Deleted role #' . $targetId . ' (' . (string)($deletedRole['name'] ?? '') . ')';
+			if (!empty($affectedUsers) && $replacementRole) {
+				$deleteDetails .= '; reassigned ' . count($affectedUsers) . ' user(s) to #' . (int)($replacementRole['id'] ?? 0) . ' (' . (string)($replacementRole['name'] ?? '') . ')';
+			} elseif (empty($affectedUsers)) {
+				$deleteDetails .= '; no users were assigned to this role';
+			}
+			writeAuditEvent($pdo, [
+				'record_type' => 'role',
+				'record_id' => $targetId,
+				'action' => 'delete',
+				'details' => $deleteDetails,
+				'source_user_id' => $actorUserId,
+			]);
+
+			if (!empty($affectedUsers) && $replacementRole) {
+				foreach ($affectedUsers as $affectedUser) {
+					$affectedUserId = (int)($affectedUser['id'] ?? 0);
+					if ($affectedUserId < 1) {
+						continue;
+					}
+					writeAuditEvent($pdo, [
+						'record_type' => 'users',
+						'record_id' => $affectedUserId,
+						'action' => 'update',
+						'details' => 'Role reassigned from #' . $targetId . ' (' . (string)($deletedRole['name'] ?? '') . ') to #' . (int)($replacementRole['id'] ?? 0) . ' (' . (string)($replacementRole['name'] ?? '') . ')',
+						'source_user_id' => $actorUserId,
+						'target_user_id' => $affectedUserId,
+					]);
+				}
+			}
+		} catch (Throwable $e) {
+			// Audit logging should not fail role deletes.
+		}
+
+		respondJson(200, [
+			'success' => true,
+			'message' => 'Role deleted successfully',
+			'deleted_role' => $result['deleted_role'] ?? $deletedRole,
+			'replacement_role' => $replacementRole,
+			'affected_users' => $affectedUsers,
+			'roles' => $result['roles'] ?? getAvailableRoles($pdo),
+		]);
+	}
+
 	if ($postAction === 'admin_user_create') {
 		$actorUserId = getApiAuthUserId();
 		enforceApiRateLimit('admin_user_create_' . $actorUserId, 20, 60);

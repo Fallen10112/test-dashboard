@@ -312,6 +312,338 @@ function getAvailableRoles(PDO $pdo) {
 }
 
 
+function getRoleByLookup(PDO $pdo, $lookup) {
+	$query = trim((string)$lookup);
+	if ($query === '' || !dashboardTableExists($pdo, 'roles')) {
+		return null;
+	}
+
+	$idCandidate = ctype_digit($query) ? (int)$query : 0;
+
+	try {
+		$stmt = $pdo->prepare(
+			'SELECT id, name, description
+			 FROM roles
+			 WHERE id = :id_candidate OR name = :name_candidate
+			 LIMIT 1'
+		);
+		$stmt->execute([
+			':id_candidate' => $idCandidate,
+			':name_candidate' => $query,
+		]);
+		$row = $stmt->fetch();
+	} catch (Throwable $e) {
+		return null;
+	}
+
+	if (!$row) {
+		return null;
+	}
+
+	return [
+		'id' => (int)($row['id'] ?? 0),
+		'name' => (string)($row['name'] ?? ''),
+		'description' => (string)($row['description'] ?? ''),
+	];
+}
+
+
+function getRoleReplacementForDeletion(PDO $pdo, $deletedRoleId) {
+	$normalizedRoleId = (int)$deletedRoleId;
+	if ($normalizedRoleId < 1 || !dashboardTableExists($pdo, 'roles')) {
+		return null;
+	}
+
+	try {
+		$stmt = $pdo->prepare(
+			'SELECT id, name, description
+			 FROM roles
+			 WHERE id < :id
+			 ORDER BY id DESC
+			 LIMIT 1'
+		);
+		$stmt->execute([':id' => $normalizedRoleId]);
+		$row = $stmt->fetch();
+		if (!$row) {
+			$stmt = $pdo->prepare(
+				'SELECT id, name, description
+				 FROM roles
+				 WHERE id > :id
+				 ORDER BY id ASC
+				 LIMIT 1'
+			);
+			$stmt->execute([':id' => $normalizedRoleId]);
+			$row = $stmt->fetch();
+		}
+	} catch (Throwable $e) {
+		return null;
+	}
+
+	if (!$row) {
+		return null;
+	}
+
+	return [
+		'id' => (int)($row['id'] ?? 0),
+		'name' => (string)($row['name'] ?? ''),
+		'description' => (string)($row['description'] ?? ''),
+	];
+}
+
+
+function createAdminRole(PDO $pdo, $name, $description) {
+	$normalizedName = trim((string)$name);
+	$normalizedDescription = trim((string)$description);
+
+	if ($normalizedName === '') {
+		return ['success' => false, 'message' => 'Role name is required'];
+	}
+	if (strlen($normalizedName) > 50) {
+		return ['success' => false, 'message' => 'Role name must not exceed 50 characters'];
+	}
+	if (strlen($normalizedDescription) > 255) {
+		return ['success' => false, 'message' => 'Role description must not exceed 255 characters'];
+	}
+	if (!dashboardTableExists($pdo, 'roles')) {
+		return ['success' => false, 'message' => 'Roles table is not available'];
+	}
+
+	$columns = ['name'];
+	$placeholders = [':name'];
+	$params = [
+		':name' => substr($normalizedName, 0, 50),
+	];
+
+	if (doesTableColumnExist($pdo, 'roles', 'description')) {
+		$columns[] = 'description';
+		$placeholders[] = ':description';
+		$params[':description'] = $normalizedDescription !== '' ? substr($normalizedDescription, 0, 255) : null;
+	}
+	if (doesTableColumnExist($pdo, 'roles', 'created_at')) {
+		$columns[] = 'created_at';
+		$placeholders[] = ':created_at';
+		$params[':created_at'] = getDashboardSqlTimestamp();
+	}
+
+	try {
+		$pdo->beginTransaction();
+		$stmt = $pdo->prepare(
+			'INSERT INTO roles (' . implode(', ', $columns) . ')
+			 VALUES (' . implode(', ', $placeholders) . ')'
+		);
+		$stmt->execute($params);
+		$roleId = (int)$pdo->lastInsertId();
+		$pdo->commit();
+	} catch (PDOException $e) {
+		if ($pdo->inTransaction()) {
+			$pdo->rollBack();
+		}
+		if ((string)$e->getCode() === '23000') {
+			return ['success' => false, 'message' => 'A role with that name already exists'];
+		}
+		return ['success' => false, 'message' => 'Failed to create role'];
+	} catch (Throwable $e) {
+		if ($pdo->inTransaction()) {
+			$pdo->rollBack();
+		}
+		return ['success' => false, 'message' => 'Failed to create role'];
+	}
+
+	return [
+		'success' => true,
+		'role' => getRoleById($pdo, $roleId),
+		'roles' => getAvailableRoles($pdo),
+	];
+}
+
+
+function updateAdminRole(PDO $pdo, $targetRoleId, array $updates) {
+	$roleId = (int)$targetRoleId;
+	if ($roleId < 1) {
+		return ['success' => false, 'message' => 'A valid role id is required'];
+	}
+	if (!dashboardTableExists($pdo, 'roles')) {
+		return ['success' => false, 'message' => 'Roles table is not available'];
+	}
+
+	$existingRole = getRoleById($pdo, $roleId);
+	if (!$existingRole) {
+		return ['success' => false, 'message' => 'Role not found'];
+	}
+
+	$fields = [];
+	$params = [':id' => $roleId];
+
+	if (array_key_exists('name', $updates)) {
+		$normalizedName = trim((string)$updates['name']);
+		if ($normalizedName === '') {
+			return ['success' => false, 'message' => 'Role name is required'];
+		}
+		if (strlen($normalizedName) > 50) {
+			return ['success' => false, 'message' => 'Role name must not exceed 50 characters'];
+		}
+		$fields[] = 'name = :name';
+		$params[':name'] = substr($normalizedName, 0, 50);
+	}
+
+	if (array_key_exists('description', $updates)) {
+		$normalizedDescription = trim((string)$updates['description']);
+		if (strlen($normalizedDescription) > 255) {
+			return ['success' => false, 'message' => 'Role description must not exceed 255 characters'];
+		}
+		if (doesTableColumnExist($pdo, 'roles', 'description')) {
+			$fields[] = 'description = :description';
+			$params[':description'] = $normalizedDescription !== '' ? substr($normalizedDescription, 0, 255) : null;
+		}
+	}
+
+	if (empty($fields)) {
+		return ['success' => false, 'message' => 'No updates were provided'];
+	}
+
+	try {
+		$pdo->beginTransaction();
+		$stmt = $pdo->prepare('UPDATE roles SET ' . implode(', ', $fields) . ' WHERE id = :id');
+		$stmt->execute($params);
+		$pdo->commit();
+	} catch (PDOException $e) {
+		if ($pdo->inTransaction()) {
+			$pdo->rollBack();
+		}
+		if ((string)$e->getCode() === '23000') {
+			return ['success' => false, 'message' => 'A role with that name already exists'];
+		}
+		return ['success' => false, 'message' => 'Failed to update role'];
+	} catch (Throwable $e) {
+		if ($pdo->inTransaction()) {
+			$pdo->rollBack();
+		}
+		return ['success' => false, 'message' => 'Failed to update role'];
+	}
+
+	return [
+		'success' => true,
+		'role' => getRoleById($pdo, $roleId),
+		'roles' => getAvailableRoles($pdo),
+	];
+}
+
+
+function deleteAdminRole(PDO $pdo, $targetRoleId) {
+	$roleId = (int)$targetRoleId;
+	if ($roleId < 1) {
+		return ['success' => false, 'message' => 'A valid role id is required'];
+	}
+	if (!dashboardTableExists($pdo, 'roles')) {
+		return ['success' => false, 'message' => 'Roles table is not available'];
+	}
+
+	$deletedRole = getRoleById($pdo, $roleId);
+	if (!$deletedRole) {
+		return ['success' => false, 'message' => 'Role not found'];
+	}
+
+	$affectedUsers = [];
+	if (dashboardTableExists($pdo, 'user_roles')) {
+		try {
+			$affectedStmt = $pdo->prepare(
+				'SELECT DISTINCT user_id
+				 FROM user_roles
+				 WHERE role_id = :role_id
+				 ORDER BY user_id ASC'
+			);
+			$affectedStmt->execute([':role_id' => $roleId]);
+			$affectedUsers = array_map(static function($row) {
+				return (int)($row['user_id'] ?? 0);
+			}, $affectedStmt->fetchAll());
+		} catch (Throwable $e) {
+			$affectedUsers = [];
+		}
+	}
+
+	$replacementRole = null;
+	if (!empty($affectedUsers)) {
+		$replacementRole = getRoleReplacementForDeletion($pdo, $roleId);
+		if ($replacementRole === null) {
+			return ['success' => false, 'message' => 'Unable to delete this role because no replacement role exists for reassignment'];
+		}
+	}
+
+	$affectedUserRows = [];
+	foreach ($affectedUsers as $affectedUserId) {
+		$userRow = getUserByIdOrUsername($pdo, (string)$affectedUserId);
+		if ($userRow) {
+			$affectedUserRows[] = $userRow;
+		} else {
+			$affectedUserRows[] = [
+				'id' => $affectedUserId,
+				'email' => '',
+				'username' => '',
+				'display_name' => '',
+				'role_id' => null,
+				'role_name' => '',
+				'role_description' => '',
+			];
+		}
+	}
+
+	try {
+		$pdo->beginTransaction();
+
+		if (dashboardTableExists($pdo, 'role_permissions')) {
+			$pdo->prepare('DELETE FROM role_permissions WHERE role_id = :role_id')->execute([':role_id' => $roleId]);
+		}
+
+		if (!empty($affectedUsers) && dashboardTableExists($pdo, 'user_roles')) {
+			$deleteAssignmentStmt = $pdo->prepare('DELETE FROM user_roles WHERE user_id = :user_id AND role_id = :role_id');
+			$insertColumns = ['user_id', 'role_id'];
+			$insertPlaceholders = [':user_id', ':role_id'];
+			$insertParams = [
+				':role_id' => (int)($replacementRole['id'] ?? 0),
+			];
+			if (doesTableColumnExist($pdo, 'user_roles', 'assigned_by_user_id')) {
+				$insertColumns[] = 'assigned_by_user_id';
+				$insertPlaceholders[] = ':assigned_by_user_id';
+				$insertParams[':assigned_by_user_id'] = null;
+			}
+			if (doesTableColumnExist($pdo, 'user_roles', 'created_at')) {
+				$insertColumns[] = 'created_at';
+				$insertPlaceholders[] = ':created_at';
+				$insertParams[':created_at'] = getDashboardSqlTimestamp();
+			}
+			$insertStmt = $pdo->prepare(
+				'INSERT IGNORE INTO user_roles (' . implode(', ', $insertColumns) . ')
+				 VALUES (' . implode(', ', $insertPlaceholders) . ')'
+			);
+
+			foreach ($affectedUsers as $affectedUserId) {
+				$deleteAssignmentStmt->execute([
+					':user_id' => $affectedUserId,
+					':role_id' => $roleId,
+				]);
+				$insertStmt->execute(array_merge($insertParams, [':user_id' => $affectedUserId]));
+			}
+		}
+
+		$pdo->prepare('DELETE FROM roles WHERE id = :id')->execute([':id' => $roleId]);
+		$pdo->commit();
+	} catch (Throwable $e) {
+		if ($pdo->inTransaction()) {
+			$pdo->rollBack();
+		}
+		return ['success' => false, 'message' => 'Failed to delete role'];
+	}
+
+	return [
+		'success' => true,
+		'deleted_role' => $deletedRole,
+		'replacement_role' => $replacementRole,
+		'affected_users' => $affectedUserRows,
+		'roles' => getAvailableRoles($pdo),
+	];
+}
+
+
 function getRoleById(PDO $pdo, $roleId) {
 	$normalizedRoleId = (int)$roleId;
 	if ($normalizedRoleId < 1 || !dashboardTableExists($pdo, 'roles')) {
@@ -824,6 +1156,8 @@ function writeAuditEvent(PDO $pdo, array $entry) {
 			$dataset = 'notifications';
 		} elseif ($typeKey === 'users' || $typeKey === 'user') {
 			$dataset = 'users';
+		} elseif ($typeKey === 'role' || $typeKey === 'roles') {
+			$dataset = 'roles';
 		} elseif ($typeKey === 'auth') {
 			$dataset = 'user_sessions';
 		}
