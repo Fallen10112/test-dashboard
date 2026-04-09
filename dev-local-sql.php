@@ -6,6 +6,92 @@ function isLocalRequest() {
     return $ip === '127.0.0.1' || $ip === '::1';
 }
 
+    function splitSqlStatements($sql) {
+        $statements = [];
+        $buffer = '';
+        $length = strlen($sql);
+        $inSingleQuote = false;
+        $inDoubleQuote = false;
+        $inBacktick = false;
+        $inLineComment = false;
+        $inBlockComment = false;
+
+        for ($index = 0; $index < $length; $index++) {
+            $char = $sql[$index];
+            $next = $index + 1 < $length ? $sql[$index + 1] : '';
+
+            if ($inLineComment) {
+                if ($char === "\n") {
+                    $inLineComment = false;
+                }
+                continue;
+            }
+
+            if ($inBlockComment) {
+                if ($char === '*' && $next === '/') {
+                    $inBlockComment = false;
+                    $index++;
+                }
+                continue;
+            }
+
+            if (!$inSingleQuote && !$inDoubleQuote && !$inBacktick) {
+                if ($char === '-' && $next === '-') {
+                    $previous = $index > 0 ? $sql[$index - 1] : '';
+                    if ($previous === '' || ctype_space($previous)) {
+                        $inLineComment = true;
+                        $index++;
+                        continue;
+                    }
+                }
+                if ($char === '#') {
+                    $inLineComment = true;
+                    continue;
+                }
+                if ($char === '/' && $next === '*') {
+                    $inBlockComment = true;
+                    $index++;
+                    continue;
+                }
+            }
+
+            if ($char === "'" && !$inDoubleQuote && !$inBacktick) {
+                $escaped = $index > 0 && $sql[$index - 1] === '\\';
+                if (!$escaped) {
+                    $inSingleQuote = !$inSingleQuote;
+                }
+            } elseif ($char === '"' && !$inSingleQuote && !$inBacktick) {
+                $escaped = $index > 0 && $sql[$index - 1] === '\\';
+                if (!$escaped) {
+                    $inDoubleQuote = !$inDoubleQuote;
+                }
+            } elseif ($char === '`' && !$inSingleQuote && !$inDoubleQuote) {
+                $inBacktick = !$inBacktick;
+            }
+
+            if ($char === ';' && !$inSingleQuote && !$inDoubleQuote && !$inBacktick) {
+                $statement = trim($buffer);
+                if ($statement !== '') {
+                    $statements[] = $statement;
+                }
+                $buffer = '';
+                continue;
+            }
+
+            $buffer .= $char;
+        }
+
+        $statement = trim($buffer);
+        if ($statement !== '') {
+            $statements[] = $statement;
+        }
+
+        return $statements;
+    }
+
+    function isAllowedDevSqlStatement($statement) {
+        return (bool) preg_match('/^(INSERT|UPDATE|DELETE|TRUNCATE|ALTER|CREATE|DROP|SET)\b/i', $statement);
+    }
 if (!isLocalRequest()) {
     http_response_code(403);
     header('Content-Type: text/plain; charset=utf-8');
@@ -36,14 +122,25 @@ if ($connectionOk && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($sql === '') {
             $error = 'SQL query cannot be empty.';
-        } elseif (strpos($normalized, ';') !== false) {
-            $error = 'Only one SQL statement is allowed.';
-        } elseif (!preg_match('/^(INSERT|UPDATE|DELETE|TRUNCATE|ALTER|CREATE|DROP)\b/i', $normalized)) {
-            $error = 'Only non-SELECT write/DDL statements are allowed in this tool.';
         } else {
             try {
-                $affected = $pdo->exec($sql);
-                $feedback = 'SQL executed successfully. Affected rows: ' . (int)$affected;
+                    $statements = splitSqlStatements($sql);
+
+                    if (count($statements) === 0) {
+                        $error = 'SQL query cannot be empty.';
+                    } else {
+                        $affectedTotal = 0;
+                        foreach ($statements as $statement) {
+                            if (!isAllowedDevSqlStatement($statement)) {
+                                throw new RuntimeException('Only non-SELECT write/DDL statements are allowed in this tool.');
+                            }
+                            $affected = $pdo->exec($statement);
+                            if ($affected !== false) {
+                                $affectedTotal += (int)$affected;
+                            }
+                        }
+                        $feedback = 'SQL executed successfully. Statements run: ' . count($statements) . '; affected rows: ' . $affectedTotal;
+                    }
             } catch (Throwable $e) {
                 $error = 'SQL execution failed: ' . $e->getMessage();
             }
@@ -89,13 +186,14 @@ if ($connectionOk && $_SERVER['REQUEST_METHOD'] === 'POST') {
     <?php endif; ?>
 
     <div class="card">
-        <h2>Run Custom SQL (single non-SELECT statement)</h2>
-        <p>Allowed starts: <code>INSERT</code>, <code>UPDATE</code>, <code>DELETE</code>, <code>TRUNCATE</code>, <code>ALTER</code>, <code>CREATE</code>, <code>DROP</code></p>
+        <h2>Run Custom SQL (write/DDL statements only)</h2>
+        <p>Allowed starts: <code>INSERT</code>, <code>UPDATE</code>, <code>DELETE</code>, <code>TRUNCATE</code>, <code>ALTER</code>, <code>CREATE</code>, <code>DROP</code>, <code>SET</code></p>
+        <p>You can paste multiple statements separated by semicolons. Use <code>SET FOREIGN_KEY_CHECKS=0</code> and <code>SET FOREIGN_KEY_CHECKS=1</code> for reset scripts when needed.</p>
         <form method="post">
             <input type="hidden" name="action" value="run_sql">
             <label>
                 SQL Query
-                <textarea name="sql_query" placeholder="INSERT INTO records (title, description, created_by_user_id, updated_by_user_id, created_at, updated_at) VALUES ('Sample', 'From dev tool', NULL, NULL, NOW(), NOW());"></textarea>
+                <textarea name="sql_query" placeholder="SET FOREIGN_KEY_CHECKS=0; TRUNCATE TABLE users; SET FOREIGN_KEY_CHECKS=1;"></textarea>
             </label>
             <button type="submit">Run SQL</button>
         </form>
