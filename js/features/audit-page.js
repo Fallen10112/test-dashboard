@@ -24,6 +24,20 @@ function updateAuditLastRefreshedTime() {
 	auditLastRefreshedTimeText = hours + ':' + minutes + ':' + seconds;
 }
 
+
+function getAuditScrollTop() {
+	const scrollContainer = document.querySelector('#audit-container .audit-table-scroll, #audit-container .audit-timeline-scroll');
+	return scrollContainer ? scrollContainer.scrollTop : 0;
+}
+
+
+function restoreAuditScrollTop(scrollTop) {
+	const scrollContainer = document.querySelector('#audit-container .audit-table-scroll, #audit-container .audit-timeline-scroll');
+	if (scrollContainer) {
+		scrollContainer.scrollTop = scrollTop;
+	}
+}
+
 function setupAuditTrailPageHandlers() {
 	const debouncedAuditFilter = debounce(filterAuditTrail, 180);
 	$('#search-input').on('keyup', function() {
@@ -120,11 +134,13 @@ function startAuditTrailRealtimeSync() {
 			return;
 		}
 
+		const scrollTop = getAuditScrollTop();
 		isAuditRealtimePollInFlight = true;
 		loadAuditTrail(function() {
 			if (typeof loadHeaderMetrics === 'function') {
 				loadHeaderMetrics();
 			}
+			restoreAuditScrollTop(scrollTop);
 			isAuditRealtimePollInFlight = false;
 		});
 	};

@@ -28,6 +28,20 @@ function updateDataLastRefreshedTime() {
 }
 
 
+function getDataTableScrollTop() {
+	const viewport = document.getElementById('data-table-viewport');
+	return viewport ? viewport.scrollTop : 0;
+}
+
+
+function restoreDataTableScrollTop(scrollTop) {
+	const viewport = document.getElementById('data-table-viewport');
+	if (viewport) {
+		viewport.scrollTop = scrollTop;
+	}
+}
+
+
 function isAnyDataModalOpen() {
 	return ($('#record-modal').length > 0 && !$('#record-modal').hasClass('hidden')) || ($('#csv-import-modal').length > 0 && !$('#csv-import-modal').hasClass('hidden'));
 }
@@ -268,12 +282,14 @@ function startDataPageRealtimeSync() {
 			return;
 		}
 
+		const scrollTop = getDataTableScrollTop();
 		isDataRealtimePollInFlight = true;
 		loadDataPage(function() {
 			if (typeof loadHeaderMetrics === 'function') {
 				loadHeaderMetrics();
 			}
 		}, function() {
+			restoreDataTableScrollTop(scrollTop);
 			isDataRealtimePollInFlight = false;
 		});
 	};
