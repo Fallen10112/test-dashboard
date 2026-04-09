@@ -32,6 +32,7 @@
 						</div>
 						<div class="form-actions">
 							<button type="submit" class="btn btn-primary">Save Record</button>
+							<button type="button" class="btn btn-success" id="save-and-add-another-btn">Save & add another record</button>
 							<button type="button" class="btn btn-secondary" id="modal-cancel">Cancel</button>
 						</div>
 					</form>

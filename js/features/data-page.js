@@ -21,6 +21,19 @@ function updateDataLastRefreshedTime() {
 }
 
 
+function resetRecordFormFields() {
+	$('#record-form').attr('data-record-id', '');
+	$('#record-form').attr('data-edit-mode', 'false');
+	$('#record-title').val('');
+	$('#record-description').val('');
+}
+
+
+function updateRecordModalActionButtons(isEditMode) {
+	$('#save-and-add-another-btn').toggle(!isEditMode);
+}
+
+
 function setupDataPageHandlers() {
 	const debouncedFilter = debounce(loadDataPage, 180);
 
@@ -126,6 +139,9 @@ function setupDataPageHandlers() {
 
 	$('.modal-close').on('click', closeModal);
 	$('#modal-cancel').on('click', closeModal);
+	$('#save-and-add-another-btn').on('click', function() {
+		saveRecord({ keepOpen: true });
+	});
 	$('#record-form').on('submit', function(e) {
 		e.preventDefault();
 		saveRecord();
@@ -745,11 +761,12 @@ function fetchFilteredItemsForExport(callback) {
 
 function openAddModal() {
 	$('#modal-title').text('Add New Record');
-	$('#record-form').attr('data-record-id', '');
-	$('#record-form').attr('data-edit-mode', 'false');
-	$('#record-title').val('');
-	$('#record-description').val('');
+	resetRecordFormFields();
+	updateRecordModalActionButtons(false);
 	$('#record-modal').removeClass('hidden');
+	setTimeout(function() {
+		$('#record-title').trigger('focus');
+	}, 0);
 }
 
 
@@ -763,6 +780,7 @@ function openEditModal(id) {
 		$('#record-form').attr('data-edit-mode', 'true');
 		$('#record-title').val(item.title);
 		$('#record-description').val(item.description);
+		updateRecordModalActionButtons(true);
 		$('#record-modal').removeClass('hidden');
 	}
 }
@@ -773,11 +791,13 @@ function closeModal() {
 }
 
 
-function saveRecord() {
+function saveRecord(options) {
+	const keepOpen = options && options.keepOpen === true;
 	const id = $('#record-form').attr('data-record-id');
 	const title = $('#record-title').val().trim();
 	const description = $('#record-description').val().trim();
 	const editMode = $('#record-form').attr('data-edit-mode') === 'true';
+	const shouldKeepOpen = keepOpen && !editMode;
 	if (title.length < 1 || description.length < 1) {
 		alert('Title and description are required (minimum 1 character)');
 		return;
@@ -800,10 +820,24 @@ function saveRecord() {
 	performDataMutation(
 		{ action: 'data_create', title: title, description: description },
 		function() {
-			closeModal();
+			if (shouldKeepOpen) {
+				resetRecordFormFields();
+				updateRecordModalActionButtons(false);
+				setTimeout(function() {
+					$('#record-title').trigger('focus');
+				}, 0);
+			} else {
+				closeModal();
+			}
 			loadDataPage();
 			loadHeaderMetrics();
-			showToast({ type: 'success', title: 'Record Added', message: 'The new record has been added successfully.', showOkayButton: true, autoCloseMs: 3000 });
+			showToast({
+				type: 'success',
+				title: 'Record Added',
+				message: shouldKeepOpen ? 'The new record has been added. You can enter another one now.' : 'The new record has been added successfully.',
+				showOkayButton: true,
+				autoCloseMs: 3000
+			});
 		},
 		'Error creating record.'
 	);
