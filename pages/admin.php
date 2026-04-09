@@ -150,38 +150,38 @@
 					<h4>Role Management</h4>
 					<p>Create, update, and remove roles. Deleting a role will reassign affected users to the next lower role ID, or the next higher role ID if nothing exists below the deleted role.</p>
 
+					<div class="admin-role-table-wrap">
+						<table class="data-table admin-role-table" id="admin-role-table">
+							<thead>
+								<tr>
+									<th>ID</th>
+									<th>Name</th>
+									<th>Description</th>
+								</tr>
+							</thead>
+							<tbody id="admin-role-table-body">
+								<?php if (empty($adminRoles)): ?>
+									<tr class="admin-role-empty-row"><td colspan="3">No roles found.</td></tr>
+								<?php else: ?>
+									<?php foreach ($adminRoles as $adminRole): ?>
+										<tr>
+											<td><?php echo (int)($adminRole['id'] ?? 0); ?></td>
+											<td><?php echo htmlspecialchars($adminRole['name'] ?? '', ENT_QUOTES, 'UTF-8'); ?></td>
+											<td><?php echo htmlspecialchars($adminRole['description'] ?? '', ENT_QUOTES, 'UTF-8'); ?></td>
+										</tr>
+									<?php endforeach; ?>
+								<?php endif; ?>
+							</tbody>
+						</table>
+					</div>
+
 					<div class="admin-accordion">
 						<div class="admin-accordion-section">
 							<button type="button" class="admin-accordion-header" aria-expanded="false" aria-controls="admin-accordion-body-role-create">
-								<span>Current Roles and Add New Role</span>
+								<span>Add New Role</span>
 								<svg class="admin-accordion-chevron" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
 							</button>
 							<div class="admin-accordion-body" id="admin-accordion-body-role-create" hidden>
-								<div class="admin-role-table-wrap">
-									<table class="data-table admin-role-table" id="admin-role-table">
-										<thead>
-											<tr>
-												<th>ID</th>
-												<th>Name</th>
-												<th>Description</th>
-											</tr>
-										</thead>
-										<tbody id="admin-role-table-body">
-											<?php if (empty($adminRoles)): ?>
-												<tr class="admin-role-empty-row"><td colspan="3">No roles found.</td></tr>
-											<?php else: ?>
-												<?php foreach ($adminRoles as $adminRole): ?>
-													<tr>
-														<td><?php echo (int)($adminRole['id'] ?? 0); ?></td>
-														<td><?php echo htmlspecialchars($adminRole['name'] ?? '', ENT_QUOTES, 'UTF-8'); ?></td>
-														<td><?php echo htmlspecialchars($adminRole['description'] ?? '', ENT_QUOTES, 'UTF-8'); ?></td>
-													</tr>
-												<?php endforeach; ?>
-											<?php endif; ?>
-										</tbody>
-									</table>
-								</div>
-
 								<div class="account-form" autocomplete="off">
 									<div class="form-group">
 										<label for="dev-roles-create-name">Name</label>
