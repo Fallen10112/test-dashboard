@@ -68,6 +68,15 @@ function normalizeRecordText($value) {
 }
 
 
+function getNormalizedStringLength($value) {
+	$text = (string)$value;
+	if (function_exists('mb_strlen')) {
+		return mb_strlen($text, 'UTF-8');
+	}
+	return strlen($text);
+}
+
+
 function getValidatedPageSize($value) {
 	$pageSize = (int)$value;
 	$allowed = [10, 20, 25, 50, 100];
@@ -1641,6 +1650,122 @@ if ($method === 'POST') {
 		addLog($pdo, 'A new entry has been added; ID ' . $newId . ' with title: "' . $title . '", and description: "' . $description . '"', 'record_created', 'record', $newId);
 
 		respondJson(200, ['success' => true, 'message' => 'Record created successfully', 'item' => $newItem]);
+	}
+
+	if ($postAction === 'data_bulk_create') {
+		$actorUserId = getApiAuthUserId();
+		$items = isset($data['items']) && is_array($data['items']) ? $data['items'] : [];
+		$maxRows = 200;
+
+		if (empty($items)) {
+			respondJson(400, ['success' => false, 'message' => 'At least one valid record is required']);
+		}
+
+		if (count($items) > $maxRows) {
+			respondJson(400, ['success' => false, 'message' => 'Bulk import supports up to ' . $maxRows . ' records at a time']);
+		}
+
+		$normalizedItems = [];
+		$validationErrors = [];
+		foreach ($items as $index => $item) {
+			$rowNumber = (int)$index + 1;
+			if (!is_array($item)) {
+				$validationErrors[] = ['row' => $rowNumber, 'message' => 'Each row must include a title and description'];
+				continue;
+			}
+
+			$title = normalizeRecordText($item['title'] ?? '');
+			$description = normalizeRecordText($item['description'] ?? '');
+
+			if ($title === '' || $description === '') {
+				$validationErrors[] = ['row' => $rowNumber, 'message' => 'Title and description are required'];
+				continue;
+			}
+
+			if (getNormalizedStringLength($title) > 255) {
+				$validationErrors[] = ['row' => $rowNumber, 'message' => 'Title must be 255 characters or fewer'];
+				continue;
+			}
+
+			$normalizedItems[] = [
+				'title' => $title,
+				'description' => $description,
+			];
+		}
+
+		if (empty($normalizedItems)) {
+			respondJson(400, ['success' => false, 'message' => 'No valid rows were provided', 'errors' => $validationErrors]);
+		}
+
+		if (!empty($validationErrors)) {
+			respondJson(400, ['success' => false, 'message' => 'Fix the invalid rows before importing', 'errors' => $validationErrors]);
+		}
+
+		$timestamp = getDashboardSqlTimestamp();
+		$createdItems = [];
+		$auditEntries = [];
+
+		try {
+			$pdo->beginTransaction();
+			$stmt = $pdo->prepare('INSERT INTO records (title, description, created_by_user_id, updated_by_user_id, created_at, updated_at) VALUES (:title, :description, :created_by_user_id, :updated_by_user_id, :created_at, :updated_at)');
+
+			foreach ($normalizedItems as $row) {
+				$ok = $stmt->execute([
+					':title' => $row['title'],
+					':description' => $row['description'],
+					':created_by_user_id' => $actorUserId,
+					':updated_by_user_id' => $actorUserId,
+					':created_at' => $timestamp,
+					':updated_at' => $timestamp,
+				]);
+
+				if (!$ok) {
+					throw new RuntimeException('Failed to save data');
+				}
+
+				$newId = (int)$pdo->lastInsertId();
+				$createdItems[] = ['id' => $newId, 'title' => $row['title'], 'description' => $row['description']];
+				$auditEntries[] = [
+					'changeType' => 'ADD',
+					'recordId' => $newId,
+					'details' => 'Title:  -> ' . $row['title'] . ', Description:  -> ' . $row['description']
+				];
+			}
+			$pdo->commit();
+		} catch (PDOException $e) {
+			if ($pdo->inTransaction()) {
+				$pdo->rollBack();
+			}
+
+			$errorCode = (string)($e->getCode() ?? '');
+			if ($errorCode === '23000') {
+				respondJson(409, ['success' => false, 'message' => 'One of the rows could not be saved because it conflicts with an existing record']);
+			}
+
+			respondJson(500, ['success' => false, 'message' => 'Failed to save data']);
+		} catch (Throwable $e) {
+			if ($pdo->inTransaction()) {
+				$pdo->rollBack();
+			}
+			respondJson(500, ['success' => false, 'message' => 'Failed to save data']);
+		}
+
+		try {
+			if (!empty($auditEntries)) {
+				addAuditEntries($pdo, $auditEntries);
+			}
+			addLog($pdo, 'Bulk CSV import completed for ' . count($createdItems) . ' records', 'record_bulk_created', 'record', null);
+		} catch (Throwable $e) {
+			// The rows were already committed successfully. Keep the import result successful
+			// even if audit/log persistence is temporarily unavailable.
+		}
+
+		respondJson(200, [
+			'success' => true,
+			'message' => 'Bulk records created successfully',
+			'createdCount' => count($createdItems),
+			'createdItems' => $createdItems,
+		]);
 	}
 
 	if ($postAction === 'data_update') {

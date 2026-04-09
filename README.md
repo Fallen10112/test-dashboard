@@ -122,6 +122,7 @@ Application behavior settings are loaded from the `app_settings` table (not from
 - Virtualized table rendering for the current page
 - Add/Edit/Delete + bulk delete
 - Add New Record includes a "Save & add another record" action for rapid entry
+- Import CSV via a modal with a downloadable template and bulk database upload
 - Filtered export endpoint support for CSV/PDF flows
 - Realtime refresh every 10 seconds
 - Footer status text: `Last refreshed HH:MM:SS`
@@ -183,7 +184,7 @@ GET actions:
 
 POST actions (`Content-Type: application/json`):
 
-- Data: `data_create`, `data_update`, `data_delete`, `data_bulk_delete`
+- Data: `data_create`, `data_update`, `data_delete`, `data_bulk_delete`, `data_bulk_create`
 - Audit write helpers: `add_audit_entry`, `add_audit_entries`
 - Notifications: `notification_create`, `notification_mark_read`, `notifications_mark_all_read`, `notification_delete`, `notifications_delete_all`
 - Widget preferences: `widget_preferences_update`

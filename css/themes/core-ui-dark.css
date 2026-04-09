@@ -53,6 +53,57 @@ body.dark-mode .modal-content {
 body.dark-mode .modal-content h3 {
     color: #e0e0e0;
 }
+body.dark-mode .csv-import-help {
+    color: #b0b0b0;
+}
+body.dark-mode .csv-import-summary {
+    background: #1f2937;
+    color: #d1d5db;
+}
+body.dark-mode .csv-import-preview-shell {
+    background: #2a2a2a;
+    border-color: #3a3a3a;
+}
+body.dark-mode .csv-import-preview-empty {
+    background: #222;
+    color: #b0b0b0;
+}
+body.dark-mode .csv-import-table {
+    background: #2a2a2a;
+}
+body.dark-mode .csv-import-table thead {
+    background: #667eea;
+}
+body.dark-mode .csv-import-table td {
+    border-bottom-color: #3b3b3b;
+    color: #e0e0e0;
+}
+body.dark-mode .csv-import-table tbody tr.is-valid {
+    background: #20332a;
+}
+body.dark-mode .csv-import-table tbody tr.is-invalid {
+    background: #402626;
+}
+body.dark-mode .csv-import-status-valid {
+    color: #81e1aa;
+}
+body.dark-mode .csv-import-status-invalid {
+    color: #ff9f9f;
+}
+body.dark-mode .csv-import-file-input {
+    background: #333;
+    border-color: #444;
+    color: #e0e0e0;
+}
+body.dark-mode .csv-import-file-input::file-selector-button,
+body.dark-mode .csv-import-file-input::-webkit-file-upload-button {
+	background: #3498db;
+	color: #ffffff;
+}
+body.dark-mode .csv-import-file-input::file-selector-button:hover,
+body.dark-mode .csv-import-file-input::-webkit-file-upload-button:hover {
+	background: #2980b9;
+}
 body.dark-mode .form-group label {
     color: #e0e0e0;
 }
