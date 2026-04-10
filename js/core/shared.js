@@ -30,6 +30,24 @@ function getDefaultHeaderWidgetPreferences() {
 }
 
 
+function getHeaderWidgetPermissionState() {
+	const hasPermissionState = typeof window.DASHBOARD_WIDGET_PERMISSIONS !== 'undefined';
+	const permissions = hasPermissionState && window.DASHBOARD_WIDGET_PERMISSIONS && typeof window.DASHBOARD_WIDGET_PERMISSIONS === 'object'
+		? window.DASHBOARD_WIDGET_PERMISSIONS
+		: {};
+	const allowedKeys = Array.isArray(permissions.allowed_keys)
+		? permissions.allowed_keys.filter(function(widgetKey) {
+			return SUPPORTED_HEADER_WIDGET_KEYS.indexOf(widgetKey) !== -1;
+		})
+		: (hasPermissionState ? [] : SUPPORTED_HEADER_WIDGET_KEYS.slice());
+	return {
+		canView: permissions.can_view === true,
+		canCustomize: permissions.can_customize === true,
+		allowedKeys: allowedKeys
+	};
+}
+
+
 function formatLocalTimeHHMM(dateObj) {
 	const d = dateObj instanceof Date ? dateObj : new Date();
 	const hours = String(d.getHours()).padStart(2, '0');
@@ -58,6 +76,11 @@ function normalizeHeaderWidgetPreferences(rawPreferences) {
 	const defaults = getDefaultHeaderWidgetPreferences();
 	const source = (rawPreferences && typeof rawPreferences === 'object') ? rawPreferences : {};
 	const normalized = {};
+	const permissionState = getHeaderWidgetPermissionState();
+	const allowedLookup = {};
+	(permissionState.allowedKeys.length > 0 ? permissionState.allowedKeys : []).forEach(function(widgetKey) {
+		allowedLookup[widgetKey] = true;
+	});
 
 	function normalizePreferenceFlag(value, fallbackValue) {
 		if (typeof value === 'boolean') {
@@ -79,6 +102,10 @@ function normalizeHeaderWidgetPreferences(rawPreferences) {
 	}
 
 	SUPPORTED_HEADER_WIDGET_KEYS.forEach(function(widgetKey) {
+		if (!allowedLookup[widgetKey]) {
+			normalized[widgetKey] = false;
+			return;
+		}
 		normalized[widgetKey] = source[widgetKey] !== undefined
 			? normalizePreferenceFlag(source[widgetKey], defaults[widgetKey])
 			: defaults[widgetKey];
@@ -95,10 +122,20 @@ function applyHeaderWidgetPreferences(preferences) {
 		return normalized;
 	}
 
+	const permissionState = getHeaderWidgetPermissionState();
+	const allowedLookup = {};
+	(permissionState.allowedKeys.length > 0 ? permissionState.allowedKeys : []).forEach(function(widgetKey) {
+		allowedLookup[widgetKey] = true;
+	});
+
 	let visibleCount = 0;
 	SUPPORTED_HEADER_WIDGET_KEYS.forEach(function(widgetKey) {
 		const el = container.querySelector('[data-widget-key="' + widgetKey + '"]');
 		if (!el) {
+			return;
+		}
+		if (!allowedLookup[widgetKey]) {
+			el.hidden = true;
 			return;
 		}
 
@@ -110,6 +147,7 @@ function applyHeaderWidgetPreferences(preferences) {
 	});
 
 	container.hidden = visibleCount === 0;
+	container.classList.remove('header-metrics--loading');
 	return normalized;
 }
 
@@ -128,6 +166,11 @@ function loadHeaderWidgetPreferences() {
 		applyHeaderWidgetPreferences(preferences);
 	}).fail(function() {
 		applyHeaderWidgetPreferences(getDefaultHeaderWidgetPreferences());
+	}).always(function() {
+		const container = document.querySelector('.header-metrics');
+		if (container) {
+			container.classList.remove('header-metrics--loading');
+		}
 	});
 }
 
@@ -565,10 +608,8 @@ function renderHeaderNotifications() {
 		bodyEl.appendChild(contentEl);
 		itemEl.appendChild(bodyEl);
 
-		// Make notification item clickable to show full details
 		itemEl.style.cursor = 'pointer';
 		itemEl.addEventListener('click', function(e) {
-			// Don't trigger on button clicks
 			const clickedButton = e.target.closest('.notification-item-mark-read-btn, .notification-item-delete-btn');
 			if (clickedButton) {
 				return;
@@ -623,7 +664,6 @@ function showNotificationDetailsToast(notification) {
 		$content.append($('<p class="custom-toast-message"></p>').text(settings.message));
 	}
 
-	// Add meta information
 	const $meta = $('<div class="custom-toast-meta"></div>');
 	if (settings.timestamp) {
 		$meta.append($('<div class="custom-toast-meta-item"></div>').text('Date: ' + settings.timestamp));
@@ -639,7 +679,6 @@ function showNotificationDetailsToast(notification) {
 
 	const $actions = $('<div class="custom-toast-actions"></div>');
 
-	// Mark as read button (if not already read)
 	if (!settings.isRead && settings.id > 0) {
 		const $markReadBtn = $('<button type="button" class="btn btn-sm btn-secondary">Mark as Read</button>');
 		$markReadBtn.on('click', function() {
@@ -649,7 +688,6 @@ function showNotificationDetailsToast(notification) {
 		$actions.append($markReadBtn);
 	}
 
-	// Delete button
 	if (settings.id > 0) {
 		const $deleteBtn = $('<button type="button" class="btn btn-sm btn-danger">Delete</button>');
 		$deleteBtn.on('click', function() {
@@ -659,7 +697,6 @@ function showNotificationDetailsToast(notification) {
 		$actions.append($deleteBtn);
 	}
 
-	// Close button
 	const $closeBtn = $('<button type="button" class="btn btn-sm btn-secondary">Close</button>');
 	$closeBtn.on('click', function() {
 		closeToast($toast);
@@ -771,7 +808,6 @@ function loadHeaderNotificationsFromServer() {
 function createNotificationOnServer(item) {
 	const title = String((item && item.title) || 'Notification');
 	
-	// Validate title length
 	if (title.length > 64) {
 		showToast({
 			type: 'error',
@@ -1069,38 +1105,16 @@ function setupSessionEnforcementPoller() {
 
 
 function loadHeaderMetrics() {
-	$.when(
-		$.ajax({
-			url: '../api.php',
-			type: 'GET',
-			dataType: 'json'
-		}),
-		$.ajax({
-			url: '../api.php?action=audit_trail',
-			type: 'GET',
-			dataType: 'json'
-		})
-	).done(function(dataResponse, auditResponse) {
-		const dataPayload = dataResponse[0] || {};
-		const auditPayload = auditResponse[0] || {};
-		const auditEntries = Array.isArray(auditPayload.entries) ? auditPayload.entries : [];
-		const recordAuditEntries = auditEntries.filter(function(entry) {
-			return isRecordAuditEntry(entry);
-		});
-
-		const totalEntries = Array.isArray(dataPayload.items) ? dataPayload.items.length : 0;
-		const totalEdits = recordAuditEntries.length > 0
-			? recordAuditEntries.filter(function(entry) {
-				return String(entry.change_type || '').toUpperCase() === 'EDIT';
-			}).length
-			: 0;
-		const addsToday = countUniqueAuditRecordsForToday(recordAuditEntries, 'ADD');
-		const deletesToday = countUniqueAuditRecordsForToday(recordAuditEntries, 'DELETE');
-
-		setMetricValue('#metric-total-entries', totalEntries);
-		setMetricValue('#metric-total-edits', totalEdits);
-		setMetricValue('#metric-adds-today', addsToday);
-		setMetricValue('#metric-deletes-today', deletesToday);
+	$.ajax({
+		url: '../api.php?action=header_metrics',
+		type: 'GET',
+		dataType: 'json'
+	}).done(function(response) {
+		const metrics = response && typeof response === 'object' ? response : {};
+		setMetricValue('#metric-total-entries', typeof metrics.total_entries === 'number' ? metrics.total_entries : '--');
+		setMetricValue('#metric-total-edits', typeof metrics.total_edits === 'number' ? metrics.total_edits : '--');
+		setMetricValue('#metric-adds-today', typeof metrics.adds_today === 'number' ? metrics.adds_today : '--');
+		setMetricValue('#metric-deletes-today', typeof metrics.deletes_today === 'number' ? metrics.deletes_today : '--');
 	}).fail(function() {
 		setMetricValue('#metric-total-entries', '--');
 		setMetricValue('#metric-total-edits', '--');

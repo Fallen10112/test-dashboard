@@ -1,3 +1,10 @@
+<?php
+require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/sql_helpers.php';
+startAuthSession();
+requireAuth();
+requirePagePermission('widgets', 'customize');
+?>
 <?php include '../includes/header.php'; ?>
 <?php include '../includes/navigation.php'; ?>
 

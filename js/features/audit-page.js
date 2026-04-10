@@ -176,62 +176,72 @@ function renderAuditTrail(entries, emptyMessage) {
 		renderAuditTable(pagedEntries);
 	}
 
-	const pageEnd = pageStart + pagedEntries.length;
-	let paginationHTML = '<div class="data-pagination">';
-	paginationHTML += '<span class="data-pagination-summary">Showing ' + (pageStart + 1) + '-' + pageEnd + ' of ' + totalEntries + '</span>';
-	paginationHTML += '<div class="data-pagination-controls-wrap">';
-	paginationHTML += '<div class="data-pagination-controls">';
-	paginationHTML += '<div class="data-page-size-group">';
-	paginationHTML += '<label class="data-page-size-label" for="audit-page-size">Rows per page</label>';
-	paginationHTML += '<select id="audit-page-size" class="data-page-size-select">';
-	paginationHTML += '<option value="10"' + (auditPageSize === 10 ? ' selected' : '') + '>10</option>';
-	paginationHTML += '<option value="20"' + (auditPageSize === 20 ? ' selected' : '') + '>20</option>';
-	paginationHTML += '<option value="25"' + (auditPageSize === 25 ? ' selected' : '') + '>25</option>';
-	paginationHTML += '<option value="50"' + (auditPageSize === 50 ? ' selected' : '') + '>50</option>';
-	paginationHTML += '<option value="100"' + (auditPageSize === 100 ? ' selected' : '') + '>100</option>';
-	paginationHTML += '</select>';
-	paginationHTML += '</div>';
-	paginationHTML += '<button type="button" id="audit-page-prev" class="btn btn-sm btn-secondary"' + (auditCurrentPage <= 1 ? ' disabled' : '') + '>Previous</button>';
-	paginationHTML += '<span class="data-page-label">Page ' + auditCurrentPage + ' of ' + totalPages + '</span>';
-	paginationHTML += '<button type="button" id="audit-page-next" class="btn btn-sm btn-secondary"' + (auditCurrentPage >= totalPages ? ' disabled' : '') + '>Next</button>';
-	paginationHTML += '<div class="data-page-jump-group">';
-	paginationHTML += '<label class="data-page-jump-label" for="audit-page-jump">Jump to</label>';
-	paginationHTML += '<select id="audit-page-jump" class="data-page-size-select data-page-jump-select"' + (totalPages <= 1 ? ' disabled' : '') + '>';
-	paginationHTML += window.DashboardPagination.buildOptionsHtml(totalPages, auditCurrentPage);
-	paginationHTML += '</select>';
-	paginationHTML += '</div>';
-	paginationHTML += '</div>';
-	paginationHTML += '<div class="audit-refresh-status">Last refreshed ' + auditLastRefreshedTimeText + '</div>';
-	paginationHTML += '</div>';
-	paginationHTML += '</div>';
-
-	container.append(paginationHTML);
+	container.append(buildAuditPaginationHtml(totalEntries, pageStart, pagedEntries.length, totalPages));
 }
 
 
 function renderAuditTable(entries) {
-	const container = $('#audit-container');
-	let tableHTML = '<table class="data-table audit-table-wide"><thead><tr><th>ID</th><th>Date</th><th>Time</th><th>Type</th><th>Action</th><th>Source</th><th>IP</th><th>Dataset</th><th class="col-record-id">Record ID</th><th class="col-details">Details</th></tr></thead><tbody>';
-	entries.forEach(function(entry) {
-		const detailsMarkup = buildDetailsMarkup(entry);
-		const datasetDisplay = String(entry.dataset_display_name || entry.dataset || '');
-		tableHTML += '<tr><td>' + entry.id + '</td><td>' + entry.date + '</td><td>' + entry.time + '</td><td>' + (entry.record_type || '') + '</td><td>' + getActionBadgeHtml(entry.action) + '</td><td>' + (entry.source_display_name || 'System') + '</td><td>' + (entry.ip_address || '') + '</td><td>' + escapeHtml(datasetDisplay) + '</td><td>' + escapeHtml(String(entry.record_id == null ? '' : entry.record_id)) + '</td><td>' + detailsMarkup + '</td></tr>';
-	});
-	tableHTML += '</tbody></table>';
-	container.html('<div class="audit-table-scroll">' + tableHTML + '</div>');
+	$('#audit-container').html('<div class="audit-table-scroll">' + buildAuditTableHtml(entries) + '</div>');
 }
 
 
 function renderAuditTimeline(entries) {
-	const container = $('#audit-container');
 	const sortedEntries = entries.slice().sort(function(a, b) {
 		return Number(b.id || 0) - Number(a.id || 0);
 	});
+	$('#audit-container').html('<div class="audit-timeline-scroll">' + buildAuditTimelineHtml(sortedEntries) + '</div>');
+}
 
+
+function buildAuditPaginationHtml(totalEntries, pageStart, pageCount, totalPages) {
+	const pageEnd = pageStart + pageCount;
+	return [
+		'<div class="data-pagination">',
+			'<span class="data-pagination-summary">Showing ' + (pageStart + 1) + '-' + pageEnd + ' of ' + totalEntries + '</span>',
+			'<div class="data-pagination-controls-wrap">',
+				'<div class="data-pagination-controls">',
+					'<div class="data-page-size-group">',
+						'<label class="data-page-size-label" for="audit-page-size">Rows per page</label>',
+						'<select id="audit-page-size" class="data-page-size-select">',
+							'<option value="10"' + (auditPageSize === 10 ? ' selected' : '') + '>10</option>',
+							'<option value="20"' + (auditPageSize === 20 ? ' selected' : '') + '>20</option>',
+							'<option value="25"' + (auditPageSize === 25 ? ' selected' : '') + '>25</option>',
+							'<option value="50"' + (auditPageSize === 50 ? ' selected' : '') + '>50</option>',
+							'<option value="100"' + (auditPageSize === 100 ? ' selected' : '') + '>100</option>',
+						'</select>',
+					'</div>',
+					'<button type="button" id="audit-page-prev" class="btn btn-sm btn-secondary"' + (auditCurrentPage <= 1 ? ' disabled' : '') + '>Previous</button>',
+					'<span class="data-page-label">Page ' + auditCurrentPage + ' of ' + totalPages + '</span>',
+					'<button type="button" id="audit-page-next" class="btn btn-sm btn-secondary"' + (auditCurrentPage >= totalPages ? ' disabled' : '') + '>Next</button>',
+					'<div class="data-page-jump-group">',
+						'<label class="data-page-jump-label" for="audit-page-jump">Jump to</label>',
+						'<select id="audit-page-jump" class="data-page-size-select data-page-jump-select"' + (totalPages <= 1 ? ' disabled' : '') + '>',
+							window.DashboardPagination.buildOptionsHtml(totalPages, auditCurrentPage),
+						'</select>',
+					'</div>',
+				'</div>',
+				'<div class="audit-refresh-status">Last refreshed ' + auditLastRefreshedTimeText + '</div>',
+			'</div>',
+		'</div>'
+	].join('');
+}
+
+
+function buildAuditTableHtml(entries) {
+	const rows = entries.map(function(entry) {
+		const detailsMarkup = buildDetailsMarkup(entry);
+		const datasetDisplay = String(entry.dataset_display_name || entry.dataset || '');
+		return '<tr><td>' + entry.id + '</td><td>' + entry.date + '</td><td>' + entry.time + '</td><td>' + (entry.record_type || '') + '</td><td>' + getActionBadgeHtml(entry.action) + '</td><td>' + (entry.source_display_name || 'System') + '</td><td>' + (entry.ip_address || '') + '</td><td>' + escapeHtml(datasetDisplay) + '</td><td>' + escapeHtml(String(entry.record_id == null ? '' : entry.record_id)) + '</td><td>' + detailsMarkup + '</td></tr>';
+	}).join('');
+	return '<table class="data-table audit-table-wide"><thead><tr><th>ID</th><th>Date</th><th>Time</th><th>Type</th><th>Action</th><th>Source</th><th>IP</th><th>Dataset</th><th class="col-record-id">Record ID</th><th class="col-details">Details</th></tr></thead><tbody>' + rows + '</tbody></table>';
+}
+
+
+function buildAuditTimelineHtml(entries) {
 	let timelineHTML = '<div class="audit-timeline">';
 	let currentDate = '';
 
-	sortedEntries.forEach(function(entry) {
+	entries.forEach(function(entry) {
 		if (entry.date !== currentDate) {
 			if (currentDate !== '') {
 				timelineHTML += '</div>';
@@ -250,7 +260,7 @@ function renderAuditTimeline(entries) {
 	}
 
 	timelineHTML += '</div>';
-	container.html('<div class="audit-timeline-scroll">' + timelineHTML + '</div>');
+	return timelineHTML;
 }
 
 

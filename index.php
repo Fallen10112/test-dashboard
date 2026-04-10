@@ -14,7 +14,6 @@ if (APP_MODE === 'demo' && RESET_ON_INDEX_VISIT) {
 		$pdo = getDashboardPdo();
 		resetDashboardSqlData($pdo);
 	} catch (Throwable $e) {
-		// Keep redirect behavior stable even if reset fails.
 	}
 }
 

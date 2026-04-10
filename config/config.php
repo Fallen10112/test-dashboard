@@ -1,6 +1,5 @@
 <?php
 
-// Load only DB connection settings from .env
 $envFile = __DIR__ . '/.env';
 if (file_exists($envFile)) {
 	$lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
@@ -24,7 +23,6 @@ define('DB_USERNAME', getenv('DB_USERNAME') ?: 'root');
 define('DB_PASSWORD', getenv('DB_PASSWORD') ?: '');
 define('DB_CHARSET', getenv('DB_CHARSET') ?: 'utf8mb4');
 
-// Connect to DB and fetch app settings
 function getAppSettingsFromDb() {
 	try {
 		$dsn = sprintf(
@@ -40,7 +38,6 @@ function getAppSettingsFromDb() {
 			PDO::ATTR_EMULATE_PREPARES => false,
 		];
 		$pdo = new PDO($dsn, DB_USERNAME, DB_PASSWORD, $options);
-		// Use correct column names for your schema
 		$stmt = $pdo->query('SELECT setting_key AS `key`, setting_value AS `value` FROM app_settings');
 		$settings = [];
 		foreach ($stmt as $row) {
@@ -57,9 +54,6 @@ $appSettings = getAppSettingsFromDb();
 function getSetting($settings, $key, $default = null) {
 	return isset($settings[$key]) ? $settings[$key] : $default;
 }
-
-
-// Helper to require a setting from the DB
 function requireSetting($settings, $key) {
 	if (!isset($settings[$key]) || $settings[$key] === '' || $settings[$key] === null) {
 		die("FATAL: Required app setting '$key' missing from app_settings table.");

@@ -6,6 +6,14 @@ function setupUiCustomizationPageHandlers() {
 
 	const $status = $('#ui-customization-status');
 	const $saveBtn = $('#ui-customization-save-btn');
+	const widgetPermissions = window.DASHBOARD_WIDGET_PERMISSIONS && typeof window.DASHBOARD_WIDGET_PERMISSIONS === 'object'
+		? window.DASHBOARD_WIDGET_PERMISSIONS
+		: {};
+	const allowedKeys = Array.isArray(widgetPermissions.allowed_keys)
+		? widgetPermissions.allowed_keys
+		: [];
+	const canCustomizeWidgets = widgetPermissions.can_customize === true;
+	const widgetKeys = ['total_entries', 'total_edits', 'adds_today', 'deletes_today', 'local_time'];
 
 	function setStatus(message, isError) {
 		if (!$status.length) {
@@ -20,19 +28,28 @@ function setupUiCustomizationPageHandlers() {
 	}
 
 	function getWidgetsPayloadFromForm() {
-		return {
-			total_entries: $('#widget-total-entries').is(':checked'),
-			total_edits: $('#widget-total-edits').is(':checked'),
-			adds_today: $('#widget-adds-today').is(':checked'),
-			deletes_today: $('#widget-deletes-today').is(':checked'),
-			local_time: $('#widget-local-time').is(':checked')
-		};
+		const payload = {};
+		widgetKeys.forEach(function(widgetKey) {
+			if (allowedKeys.length > 0 && allowedKeys.indexOf(widgetKey) === -1) {
+				return;
+			}
+			payload[widgetKey] = $('#widget-' + widgetKey.replace(/_/g, '-')).is(':checked');
+		});
+		return payload;
 	}
 
 	function applyFormFromPreferences(preferences) {
 		const normalized = (window.DashboardHeaderWidgets && typeof window.DashboardHeaderWidgets.normalize === 'function')
 			? window.DashboardHeaderWidgets.normalize(preferences)
 			: preferences;
+
+		widgetKeys.forEach(function(widgetKey) {
+			const widgetId = '#widget-' + widgetKey.replace(/_/g, '-');
+			const $input = $(widgetId);
+			const isAllowed = allowedKeys.length === 0 || allowedKeys.indexOf(widgetKey) !== -1;
+			$input.prop('disabled', !isAllowed);
+			$input.closest('.widget-option-item').toggle(isAllowed);
+		});
 
 		$('#widget-total-entries').prop('checked', !!normalized.total_entries);
 		$('#widget-total-edits').prop('checked', !!normalized.total_edits);
@@ -43,6 +60,18 @@ function setupUiCustomizationPageHandlers() {
 
 	function loadPreferences() {
 		setStatus('', false);
+		if (!canCustomizeWidgets) {
+			setStatus('You do not have permission to customize widget visibility.', true);
+			$saveBtn.prop('disabled', true).text('Save Preferences');
+			$form.find('input[type="checkbox"]').prop('disabled', true);
+			return;
+		}
+		if (allowedKeys.length === 0) {
+			setStatus('No widget options are available for your role.', true);
+			$saveBtn.prop('disabled', true).text('Save Preferences');
+			$form.find('input[type="checkbox"]').prop('disabled', true);
+			return;
+		}
 		$saveBtn.prop('disabled', true).text('Loading...');
 		$.ajax({
 			url: '../api.php?action=widget_preferences',
@@ -66,6 +95,10 @@ function setupUiCustomizationPageHandlers() {
 
 	$form.on('submit', function(e) {
 		e.preventDefault();
+		if (!canCustomizeWidgets) {
+			setStatus('You do not have permission to customize widget visibility.', true);
+			return;
+		}
 		setStatus('', false);
 		$saveBtn.prop('disabled', true).text('Saving...');
 

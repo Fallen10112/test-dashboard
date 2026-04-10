@@ -17,6 +17,7 @@ requirePagePermission('admin', 'read');
 		'resources' => [],
 		'permissions' => [],
 		'role_permissions' => [],
+		'allowed_permissions_by_resource' => [],
 	];
 	$adminPermissionEditScope = [
 		'mode' => 'none',

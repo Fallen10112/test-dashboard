@@ -25,7 +25,6 @@ $error = '';
 $success = '';
 $users = [];
 
-// Check for session messages from redirect
 if (isset($_SESSION['test_notif_success'])) {
 	$success = $_SESSION['test_notif_success'];
 	unset($_SESSION['test_notif_success']);
@@ -85,7 +84,6 @@ try {
 					$sentByUserId = $currentUserId > 0 ? $currentUserId : null;
 				}
 
-				// Validate title length
 				$titleForValidation = $title !== '' ? $title : 'Notification';
 				if (mb_strlen($titleForValidation, 'UTF-8') > 64) {
 					$postError = 'Notification title must not exceed 64 characters';
@@ -123,7 +121,6 @@ try {
 		}
 		}
 
-		// Store message in session and redirect to prevent resubmission
 		if ($postSuccess !== '') {
 			$_SESSION['test_notif_success'] = $postSuccess;
 		}

@@ -2,15 +2,12 @@
 require_once __DIR__ . '/../includes/auth.php';
 
 startAuthSession();
-
-// Handle logout
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'logout') {
 	logoutUser();
 	header('Location: login.php');
 	exit();
 }
 
-// Already logged in
 if (getAuthUser() !== null) {
 	header('Location: home.php');
 	exit();

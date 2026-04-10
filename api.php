@@ -260,7 +260,6 @@ function createNotification(PDO $pdo, $userId, $title, $message, $type = 'info',
 		$normalizedType = 'info';
 	}
 
-	// Validate title length (max 64 characters)
 	if (mb_strlen($normalizedTitle, 'UTF-8') > 64) {
 		return ['success' => false, 'message' => 'Notification title must not exceed 64 characters'];
 	}
@@ -362,6 +361,7 @@ function ensureDefaultHeaderWidgetPreferencesForUser(PDO $pdo, $userId) {
 
 function getHeaderWidgetPreferencesPayload(PDO $pdo, $userId) {
 	ensureDefaultHeaderWidgetPreferencesForUser($pdo, $userId);
+	$permissionState = getHeaderWidgetPermissionState($pdo, $userId);
 	$tableName = getHeaderWidgetPreferencesTableName();
 
 	$stmt = $pdo->prepare(
@@ -372,22 +372,36 @@ function getHeaderWidgetPreferencesPayload(PDO $pdo, $userId) {
 	$stmt->execute([':user_id' => (int)$userId]);
 	$row = $stmt->fetch();
 	$preferences = decodeHeaderWidgetPreferencesJson((string)($row['widgets_json'] ?? ''));
+	$allowedKeys = isset($permissionState['allowed_keys']) && is_array($permissionState['allowed_keys']) ? $permissionState['allowed_keys'] : [];
+	$preferences = normalizeHeaderWidgetPreferencesInput($preferences, $allowedKeys);
 
 	return [
 		'success' => true,
 		'widgets' => $preferences,
+		'can_customize' => (bool)($permissionState['can_customize'] ?? false),
+		'allowed_keys' => $allowedKeys,
 	];
 }
 
 
-function normalizeHeaderWidgetPreferencesInput($rawInput) {
+function normalizeHeaderWidgetPreferencesInput($rawInput, array $allowedKeys = []) {
 	$defaults = getDefaultHeaderWidgetPreferences();
 	if (!is_array($rawInput)) {
 		return $defaults;
 	}
 
 	$normalized = $defaults;
+	$allowedLookup = [];
+	if (!empty($allowedKeys)) {
+		foreach ($allowedKeys as $allowedKey) {
+			$allowedLookup[(string)$allowedKey] = true;
+		}
+	}
 	foreach ($defaults as $key => $defaultValue) {
+		if (!empty($allowedLookup) && !isset($allowedLookup[$key])) {
+			$normalized[$key] = false;
+			continue;
+		}
 		$normalized[$key] = !empty($rawInput[$key]);
 	}
 
@@ -396,7 +410,11 @@ function normalizeHeaderWidgetPreferencesInput($rawInput) {
 
 
 function updateHeaderWidgetPreferences(PDO $pdo, $userId, $rawInput) {
-	$preferences = normalizeHeaderWidgetPreferencesInput($rawInput);
+	$permissionState = getHeaderWidgetPermissionState($pdo, $userId);
+	$allowedKeys = isset($permissionState['allowed_keys']) && is_array($permissionState['allowed_keys']) ? $permissionState['allowed_keys'] : [];
+	$existingPreferences = getHeaderWidgetPreferencesPayload($pdo, $userId)['widgets'] ?? getDefaultHeaderWidgetPreferences();
+	$mergedInput = is_array($rawInput) ? array_merge($existingPreferences, $rawInput) : $existingPreferences;
+	$preferences = normalizeHeaderWidgetPreferencesInput($mergedInput, $allowedKeys);
 	ensureUserWidgetPreferencesSchema($pdo);
 	$tableName = getHeaderWidgetPreferencesTableName();
 
@@ -545,6 +563,54 @@ function getAuditPayload(PDO $pdo) {
 	}
 
 	return ['entries' => $entries];
+}
+
+
+function getHeaderMetricsPayload(PDO $pdo) {
+	ensureAuditLogSchema($pdo);
+
+	$totalEntriesStmt = $pdo->query('SELECT COUNT(*) FROM records WHERE deleted_at IS NULL');
+	$totalEntries = (int)$totalEntriesStmt->fetchColumn();
+
+	$today = substr(getDashboardSqlTimestamp(), 0, 10);
+	$totalEditsStmt = $pdo->query('SELECT COUNT(*) FROM audit_log WHERE record_type = "record" AND action = "update"');
+	$totalEdits = (int)$totalEditsStmt->fetchColumn();
+
+	$addsTodayStmt = $pdo->prepare(
+		'SELECT COUNT(DISTINCT record_id)
+		 FROM audit_log
+		 WHERE record_type = :record_type
+		   AND action = "create"
+		   AND record_id IS NOT NULL
+		   AND DATE(created_at) = :today'
+	);
+	$addsTodayStmt->execute([
+		':record_type' => 'record',
+		':today' => $today,
+	]);
+	$addsToday = (int)$addsTodayStmt->fetchColumn();
+
+	$deletesTodayStmt = $pdo->prepare(
+		'SELECT COUNT(DISTINCT record_id)
+		 FROM audit_log
+		 WHERE record_type = :record_type
+		   AND action = "delete"
+		   AND record_id IS NOT NULL
+		   AND DATE(created_at) = :today'
+	);
+	$deletesTodayStmt->execute([
+		':record_type' => 'record',
+		':today' => $today,
+	]);
+	$deletesToday = (int)$deletesTodayStmt->fetchColumn();
+
+	return [
+		'success' => true,
+		'total_entries' => $totalEntries,
+		'total_edits' => $totalEdits,
+		'adds_today' => $addsToday,
+		'deletes_today' => $deletesToday,
+	];
 }
 
 
@@ -949,9 +1015,8 @@ if ($method === 'POST') {
 				'details' => 'Updated permissions for role #' . $targetId . ' (' . (string)($role['name'] ?? '') . ')',
 				'source_user_id' => $actorUserId,
 			]);
-		} catch (Throwable $e) {
-			// Permission audit should not block saving.
-		}
+			} catch (Throwable $e) {
+			}
 
 		respondJson(200, [
 			'success' => true,
@@ -1003,7 +1068,6 @@ if ($method === 'POST') {
 					'source_user_id' => $actorUserId,
 				]);
 			} catch (Throwable $e) {
-				// Audit logging should not fail role creation.
 			}
 		}
 
@@ -1047,7 +1111,6 @@ if ($method === 'POST') {
 					'source_user_id' => $actorUserId,
 				]);
 			} catch (Throwable $e) {
-				// Audit logging should not fail role updates.
 			}
 		}
 
@@ -1104,7 +1167,6 @@ if ($method === 'POST') {
 				}
 			}
 		} catch (Throwable $e) {
-			// Audit logging should not fail role deletes.
 		}
 
 		respondJson(200, [
@@ -1164,7 +1226,6 @@ if ($method === 'POST') {
 				'source_user_id' => $actorUserId,
 			]);
 		} catch (Throwable $e) {
-			// Audit logging should not fail user creation.
 		}
 
 		respondJson(200, [
@@ -1260,7 +1321,6 @@ if ($method === 'POST') {
 				'source_user_id' => $actorUserId,
 			]);
 		} catch (Throwable $e) {
-			// Audit logging should not fail user updates.
 		}
 
 		respondJson(200, [
@@ -1591,6 +1651,7 @@ if ($method === 'POST') {
 
 	if ($postAction === 'widget_preferences_update') {
 		$userId = getApiAuthUserId();
+		requireApiPermission('widgets', 'customize');
 		enforceApiRateLimit('widget_preferences_update_' . $userId, 40, 60);
 		$updated = updateHeaderWidgetPreferences($pdo, $userId, $data['widgets'] ?? []);
 
@@ -1751,8 +1812,6 @@ if ($method === 'POST') {
 			}
 			addLog($pdo, 'Bulk CSV import completed for ' . count($createdItems) . ' records', 'record_bulk_created', 'record', null);
 		} catch (Throwable $e) {
-			// The rows were already committed successfully. Keep the import result successful
-			// even if audit/log persistence is temporarily unavailable.
 		}
 
 		respondJson(200, [
@@ -1907,7 +1966,6 @@ if ($method === 'POST') {
 		$eventType = ($action === 'report_downloaded') ? 'report_downloaded' : (($action === 'report_generated') ? 'report_generated' : 'event');
 		$logSuccess = addLog($pdo, $eventMessage, $eventType, null, null);
 
-		// --- AUDIT LOGGING FOR REPORT EVENTS ---
 		$dataset = strtolower(trim((string)($data['dataset'] ?? '')));
 		$auditDataset = '';
 		if ($dataset === 'data') {
@@ -2004,6 +2062,12 @@ if ($method === 'GET') {
 	if ($action === 'audit_trail') {
 		requireApiPermission('audit_log', 'read');
 		echo json_encode(getAuditPayload($pdo));
+		exit;
+	}
+
+	if ($action === 'header_metrics') {
+		requireApiPermission('records', 'read');
+		echo json_encode(getHeaderMetricsPayload($pdo));
 		exit;
 	}
 

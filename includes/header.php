@@ -26,6 +26,12 @@ $pageTitle = "Dashboard Showcase";
 	}
 	$_headerCanViewDevTools = false;
 	$_headerCanViewAdmin = false;
+	$_headerCanCustomizeWidgets = false;
+	$_headerWidgetPermissions = [
+		'can_view' => false,
+		'can_customize' => false,
+		'allowed_keys' => [],
+	];
 	try {
 		$_headerUserId = (int)($_headerUser['id'] ?? 0);
 		if ($_headerUserId > 0) {
@@ -33,10 +39,22 @@ $pageTitle = "Dashboard Showcase";
 			ensurePermissionsSchema($_headerPdo);
 			$_headerCanViewDevTools = userHasPermission($_headerPdo, $_headerUserId, 'dev_tools', 'read');
 			$_headerCanViewAdmin = userHasPermission($_headerPdo, $_headerUserId, 'admin', 'read');
+			$_headerWidgetPermissions = getHeaderWidgetPermissionState($_headerPdo, $_headerUserId);
+			$_headerCanCustomizeWidgets = (bool)($_headerWidgetPermissions['can_customize'] ?? false);
 		}
 	} catch (Throwable $e) {
 		$_headerCanViewDevTools = false;
 		$_headerCanViewAdmin = false;
+		$_headerCanCustomizeWidgets = false;
+		$_headerWidgetPermissions = [
+			'can_view' => false,
+			'can_customize' => false,
+			'allowed_keys' => [],
+		];
+	}
+	$_headerWidgetPermissionsJson = json_encode($_headerWidgetPermissions, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+	if (!is_string($_headerWidgetPermissionsJson) || $_headerWidgetPermissionsJson === '') {
+		$_headerWidgetPermissionsJson = '{"can_view":false,"can_customize":false,"allowed_keys":[]}';
 	}
 	$_headerEmail = htmlspecialchars($_headerUser['email'] ?? '', ENT_QUOTES, 'UTF-8');
 	$_words = preg_split('/\s+/', trim($_headerDisplay));
@@ -47,9 +65,12 @@ $pageTitle = "Dashboard Showcase";
 	if ($_initials === '') $_initials = 'U';
 	?>
 	<header class="title-bar">
+		<script>
+			window.DASHBOARD_WIDGET_PERMISSIONS = <?php echo $_headerWidgetPermissionsJson; ?>;
+		</script>
 		<h1><?php echo $pageTitle; ?></h1>
 		<div class="title-bar-right">
-			<div class="header-metrics" aria-label="Dashboard analytics">
+			<div class="header-metrics header-metrics--loading" aria-label="Dashboard analytics">
 				<div class="metric-pill" id="metric-total-entries" data-widget-key="total_entries">
 					<span class="metric-label">Entries</span>
 					<span class="metric-value">--</span>
@@ -117,7 +138,7 @@ $pageTitle = "Dashboard Showcase";
 					</div>
 					<div class="user-dropdown-divider"></div>
 					<a href="user.php" class="user-dropdown-item">Account Settings</a>
-					<a href="ui-customization.php" class="user-dropdown-item">UI Customization</a>
+					<?php if ($_headerCanCustomizeWidgets): ?><a href="ui-customization.php" class="user-dropdown-item">UI Customization</a><?php endif; ?>
 					<?php if ($_headerCanViewDevTools): ?><a href="dev-tools.php" class="user-dropdown-item">Dev Tools</a><?php endif; ?>
 					<?php if ($_headerCanViewAdmin): ?><a href="admin.php" class="user-dropdown-item">Admin</a><?php endif; ?>
 					<form method="POST" action="login.php">

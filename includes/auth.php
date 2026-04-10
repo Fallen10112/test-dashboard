@@ -3,7 +3,7 @@
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/sql_helpers.php';
 
-define('AUTH_SESSION_LIFETIME', 28800); // 8 hours in seconds
+define('AUTH_SESSION_LIFETIME', 28800);
 define('AUTH_SESSION_NAME', 'dashboard_session');
 
 function startAuthSession(): void {
@@ -50,12 +50,10 @@ function getAuthUser(): ?array {
 
 		$primaryRole = getUserPrimaryRole($pdo, (int)$row['id']);
 
-		// Touch last_seen_at every request (suppress errors if it fails)
 		try {
 			$touch = $pdo->prepare('UPDATE user_sessions SET last_seen_at = NOW() WHERE id = :sid');
 			$touch->execute([':sid' => $row['session_id']]);
 		} catch (Throwable $e) {
-			// non-critical
 		}
 
 		return [
@@ -175,7 +173,6 @@ function loginUser(string $identifier, string $password): bool {
 		$user = $stmt->fetch();
 
 		if (!$user) {
-			// constant-time no-match to prevent user enumeration
 			password_verify($password, '$2y$12$fakehashtopreventtimingattack.......');
 			return false;
 		}
@@ -188,7 +185,6 @@ function loginUser(string $identifier, string $password): bool {
 			return false;
 		}
 
-		// Rehash if cost factor changed
 		if (password_needs_rehash($user['password_hash'], PASSWORD_BCRYPT, ['cost' => 12])) {
 			$newHash = password_hash($password, PASSWORD_BCRYPT, ['cost' => 12]);
 			$pdo->prepare('UPDATE users SET password_hash = :h, updated_at = NOW() WHERE id = :id')
@@ -201,7 +197,6 @@ function loginUser(string $identifier, string $password): bool {
 		$ip        = isset($_SERVER['REMOTE_ADDR']) ? substr($_SERVER['REMOTE_ADDR'], 0, 45) : null;
 		$ua        = isset($_SERVER['HTTP_USER_AGENT']) ? substr($_SERVER['HTTP_USER_AGENT'], 0, 255) : null;
 
-		// Single-device policy: revoke all other active sessions before creating a new one.
 		$pdo->prepare(
 			'UPDATE user_sessions
 			    SET revoked_at = NOW()
@@ -261,7 +256,6 @@ function logoutUser(): void {
 				]);
 			}
 		} catch (Throwable $e) {
-			// non-critical
 		}
 	}
 	$_SESSION = [];

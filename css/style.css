@@ -15,3 +15,7 @@ Section Map
 @import url("themes/index.css");
 @import url("responsive/index.css");
 
+.header-metrics--loading {
+	visibility: hidden;
+}
+
