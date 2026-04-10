@@ -58,6 +58,10 @@ function setupAdminPermissionManagementHandlers() {
 	var rolePermissions = editorData.role_permissions && typeof editorData.role_permissions === 'object'
 		? editorData.role_permissions
 		: {};
+	var permissionEditScope = window.ADMIN_PERMISSION_EDIT_SCOPE || {};
+	var allowedPermissionsByResource = editorData.allowed_permissions_by_resource && typeof editorData.allowed_permissions_by_resource === 'object'
+		? editorData.allowed_permissions_by_resource
+		: {};
 	var permissionOrder = {
 		'read': 10,
 		'create': 20,
@@ -84,14 +88,6 @@ function setupAdminPermissionManagementHandlers() {
 		'admin': 50,
 		'dev_tools': 60
 	};
-	var resourcePermissionMap = {
-		'home': ['read'],
-		'records': ['read', 'create', 'update', 'delete', 'export'],
-		'reports': ['read', 'export'],
-		'audit_log': ['read'],
-		'admin': ['read', 'manage_users', 'manage_permissions', 'admin_user_management', 'admin_role_management', 'admin_role_create', 'admin_role_update', 'admin_role_delete', 'admin_database_management', 'admin_application_management', 'admin_notifications_management', 'admin_permissions_management'],
-		'dev_tools': ['read']
-	};
 	var resourceGroups = [
 		{
 			title: 'Core access',
@@ -114,8 +110,14 @@ function setupAdminPermissionManagementHandlers() {
 		return;
 	}
 
-	if (roles.length === 0 || resources.length === 0 || permissions.length === 0) {
+	if (roles.length === 0 || permissions.length === 0) {
 		matrixContainer.innerHTML = '<p>No permission metadata is available yet.</p>';
+		saveButton.disabled = true;
+		return;
+	}
+
+	if (resources.length === 0) {
+		matrixContainer.innerHTML = '<div class="permissions-editor-empty"><p>No resources are currently available within your edit scope.</p><p class="permissions-editor-empty-note">Current scope: ' + escapeHtml(String(permissionEditScope.label || 'No editable roles')) + '.</p></div>';
 		saveButton.disabled = true;
 		return;
 	}
@@ -159,22 +161,16 @@ function setupAdminPermissionManagementHandlers() {
 	}
 
 	function getResourcePermissionList(resourceKey) {
-		var allowedKeys = resourcePermissionMap[resourceKey] || [];
+		var allowedKeys = Array.isArray(allowedPermissionsByResource[resourceKey])
+			? allowedPermissionsByResource[resourceKey]
+			: [];
+		if (allowedKeys.length === 0) {
+			return [];
+		}
 		var filteredPermissions = permissions.filter(function(permission) {
 			return allowedKeys.indexOf(permission.key) !== -1;
 		});
-		if (filteredPermissions.length > 0) {
-			return filteredPermissions.sort(function(left, right) {
-				var leftOrder = Object.prototype.hasOwnProperty.call(permissionOrder, left.key) ? permissionOrder[left.key] : 999;
-				var rightOrder = Object.prototype.hasOwnProperty.call(permissionOrder, right.key) ? permissionOrder[right.key] : 999;
-				if (leftOrder !== rightOrder) {
-					return leftOrder - rightOrder;
-				}
-				return String(left.display_name || left.key || '').localeCompare(String(right.display_name || right.key || ''));
-			});
-		}
-
-		return permissions.slice().sort(function(left, right) {
+		return filteredPermissions.sort(function(left, right) {
 			var leftOrder = Object.prototype.hasOwnProperty.call(permissionOrder, left.key) ? permissionOrder[left.key] : 999;
 			var rightOrder = Object.prototype.hasOwnProperty.call(permissionOrder, right.key) ? permissionOrder[right.key] : 999;
 			if (leftOrder !== rightOrder) {
@@ -211,7 +207,9 @@ function setupAdminPermissionManagementHandlers() {
 	function renderMatrix() {
 		var selectedRoleId = getSelectedRoleId();
 		if (selectedRoleId < 1) {
-			matrixContainer.innerHTML = '<div class="permissions-editor-empty"><p>Select a role to view and edit permissions.</p><p class="permissions-editor-empty-note">Permissions are grouped by feature so access is easier to scan than a single wide matrix.</p></div>';
+			var scopeLabel = String(permissionEditScope.label || 'No editable roles');
+			var hasEditableRoles = roleSelect.options.length > 1;
+			matrixContainer.innerHTML = '<div class="permissions-editor-empty"><p>' + (hasEditableRoles ? 'Select a role to view and edit permissions.' : 'No roles are currently editable with your permission scope.') + '</p><p class="permissions-editor-empty-note">Permissions are grouped by feature so access is easier to scan than a single wide matrix.</p><p class="permissions-editor-empty-note">Current scope: ' + escapeHtml(scopeLabel) + '.</p></div>';
 			saveButton.disabled = true;
 			return;
 		}
@@ -230,6 +228,21 @@ function setupAdminPermissionManagementHandlers() {
 			}
 			return String(left.display_name || left.key || '').localeCompare(String(right.display_name || right.key || ''));
 		});
+		var visibleGrantCount = 0;
+		var visibleAvailableCount = 0;
+		sortedResources.forEach(function(resource) {
+			var permissionList = getResourcePermissionList(resource.key);
+			if (permissionList.length === 0) {
+				return;
+			}
+			visibleAvailableCount += permissionList.length;
+			var resourcePermissions = currentPermissions[resource.key] || {};
+			permissionList.forEach(function(permission) {
+				if (resourcePermissions[permission.key]) {
+					visibleGrantCount++;
+				}
+			});
+		});
 		var usedKeys = {};
 		var groupedCards = resourceGroups.map(function(group) {
 			var cards = sortedResources.filter(function(resource) {
@@ -238,6 +251,9 @@ function setupAdminPermissionManagementHandlers() {
 				usedKeys[resource.key] = true;
 				return renderResourceCard(resource, currentPermissions);
 			}).join('');
+			if (cards === '') {
+				return '';
+			}
 			return '<section class="permission-group"><div class="permission-group-heading"><h5>' + escapeHtml(group.title) + '</h5><p>' + escapeHtml(group.description) + '</p></div><div class="permission-group-grid">' + cards + '</div></section>';
 		}).join('');
 		var remainingCards = sortedResources.filter(function(resource) {
@@ -245,9 +261,7 @@ function setupAdminPermissionManagementHandlers() {
 		}).map(function(resource) {
 			return renderResourceCard(resource, currentPermissions);
 		}).join('');
-		var knownGrantCount = countCurrentGrants(currentPermissions);
-
-		matrixContainer.innerHTML = '<div class="permission-editor-header"><div><strong>' + escapeHtml(selectedRoleName) + '</strong><span>permissions</span></div><div class="permission-editor-metrics"><div><strong>' + String(knownGrantCount) + '</strong><span>current grants</span></div></div></div>' + (selectedRoleDescription ? '<p class="permission-editor-role-description">' + escapeHtml(selectedRoleDescription) + '</p>' : '') + groupedCards + (remainingCards ? '<section class="permission-group"><div class="permission-group-heading"><h5>Other resources</h5><p>Resources not covered by the main groups above.</p></div><div class="permission-group-grid">' + remainingCards + '</div></section>' : '');
+		matrixContainer.innerHTML = '<div class="permission-editor-header"><div><strong>' + escapeHtml(selectedRoleName) + '</strong><span>permissions</span></div><div class="permission-editor-metrics"><div><strong>' + String(visibleGrantCount) + '</strong><span>visible grants</span></div><div><strong>' + String(visibleAvailableCount) + '</strong><span>visible slots</span></div></div></div><p class="permission-editor-role-description">Current scope: ' + escapeHtml(String(permissionEditScope.label || 'No editable roles')) + '.</p>' + (selectedRoleDescription ? '<p class="permission-editor-role-description">' + escapeHtml(selectedRoleDescription) + '</p>' : '') + groupedCards + (remainingCards ? '<section class="permission-group"><div class="permission-group-heading"><h5>Other resources</h5><p>Resources not covered by the main groups above.</p></div><div class="permission-group-grid">' + remainingCards + '</div></section>' : '');
 		saveButton.disabled = false;
 	}
 

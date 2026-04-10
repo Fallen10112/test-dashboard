@@ -165,6 +165,8 @@ Application behavior settings are loaded from the `app_settings` table (not from
 - The Admin page now includes a role permission editor so grants can be changed over time without relying on a fixed role ID.
 - The Admin page tabs are permissioned separately; role 5 can stop short of Database and Application Management, while role 6/7 can include them.
 - The Role Management tab is also split into create/update/delete, so role 5/6 can add and edit roles without being able to delete and reassign users.
+- Permission editing now has a separate scope layer: below your role, through your role, or all roles. The permissions editor only shows roles inside the current user’s scope.
+- The permissions editor also only shows resources the current user can already access, so sections like Dev Tools stay hidden from users who do not have them.
 - The default role templates are based on the current role names, but they are editable and should be treated as long-term configuration rather than hard-coded behavior.
 
 ### UI and Personalization

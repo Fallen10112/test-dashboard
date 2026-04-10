@@ -17,6 +17,13 @@ requirePagePermission('admin', 'read');
 		'permissions' => [],
 		'role_permissions' => [],
 	];
+	$adminPermissionEditScope = [
+		'mode' => 'none',
+		'label' => 'No editable roles',
+		'current_role_id' => null,
+		'max_role_id' => 0,
+	];
+	$adminEditableRoles = [];
 	$adminTabPermissionFlags = [
 		'user_management' => false,
 		'role_management' => false,
@@ -29,8 +36,10 @@ requirePagePermission('admin', 'read');
 		$adminPdo = getDashboardPdo();
 		ensurePermissionsSchema($adminPdo);
 		$adminRoles = getAvailableRoles($adminPdo);
-		$adminPermissionEditorPayload = getRolePermissionsEditorPayload($adminPdo);
+		$adminPermissionEditorPayload = getRolePermissionsEditorPayload($adminPdo, $adminCurrentUserId);
 		if ($adminCurrentUserId > 0) {
+			$adminPermissionEditScope = getUserPermissionEditScope($adminPdo, $adminCurrentUserId);
+			$adminEditableRoles = getEditableRolesForPermissionScope($adminRoles, $adminPermissionEditScope);
 			$adminTabPermissionFlags = [
 				'user_management' => userHasPermission($adminPdo, $adminCurrentUserId, 'admin', 'admin_user_management'),
 				'role_management' => userHasPermission($adminPdo, $adminCurrentUserId, 'admin', 'admin_role_management'),
@@ -65,9 +74,17 @@ requirePagePermission('admin', 'read');
 	if (!is_string($adminRolesJson) || $adminRolesJson === '') {
 		$adminRolesJson = '[]';
 	}
+	$adminEditableRolesJson = json_encode($adminEditableRoles, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+	if (!is_string($adminEditableRolesJson) || $adminEditableRolesJson === '') {
+		$adminEditableRolesJson = '[]';
+	}
 	$adminPermissionEditorJson = json_encode($adminPermissionEditorPayload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 	if (!is_string($adminPermissionEditorJson) || $adminPermissionEditorJson === '') {
 		$adminPermissionEditorJson = '{"roles":[],"resources":[],"permissions":[],"role_permissions":[]}';
+	}
+	$adminPermissionEditScopeJson = json_encode($adminPermissionEditScope, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+	if (!is_string($adminPermissionEditScopeJson) || $adminPermissionEditScopeJson === '') {
+		$adminPermissionEditScopeJson = '{"mode":"none","label":"No editable roles","current_role_id":null,"max_role_id":0}';
 	}
 	$adminTabPermissionJson = json_encode($adminTabPermissionFlags, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 	if (!is_string($adminTabPermissionJson) || $adminTabPermissionJson === '') {
@@ -81,7 +98,9 @@ requirePagePermission('admin', 'read');
 
 <script>
 	window.ADMIN_ROLE_MANAGEMENT_ROLES = <?php echo $adminRolesJson; ?>;
+	window.ADMIN_EDITABLE_ROLES = <?php echo $adminEditableRolesJson; ?>;
 	window.ADMIN_ROLE_PERMISSION_EDITOR = <?php echo $adminPermissionEditorJson; ?>;
+	window.ADMIN_PERMISSION_EDIT_SCOPE = <?php echo $adminPermissionEditScopeJson; ?>;
 	window.ADMIN_PAGE_PERMISSIONS = <?php echo $adminTabPermissionJson; ?>;
 	window.ADMIN_ROLE_MANAGEMENT_FLAGS = <?php echo $adminRoleManagementJson; ?>;
 </script>
@@ -365,6 +384,7 @@ requirePagePermission('admin', 'read');
 				<?php if ($adminTabPermissionFlags['permissions']): ?><div class="admin-tab-panel" id="admin-tab-panel-6" role="tabpanel" aria-labelledby="admin-tab-btn-6" hidden>
 						<h4>Role Permissions</h4>
 						<p>Choose a role, then adjust access by section. The editor is grouped by feature so it is easier to reason about page access, admin tools, and special actions at a glance.</p>
+						<p class="permissions-editor-scope-note">Current edit scope: <strong><?php echo htmlspecialchars($adminPermissionEditScope['label'] ?? 'No editable roles', ENT_QUOTES, 'UTF-8'); ?></strong>.</p>
 
 						<div class="permissions-editor-shell">
 							<div class="permissions-editor-summary">
@@ -379,7 +399,7 @@ requirePagePermission('admin', 'read');
 										<label for="admin-permissions-role-select">Role</label>
 										<select id="admin-permissions-role-select">
 											<option value="" selected disabled>Select role</option>
-											<?php foreach ($adminRoles as $adminRole): ?>
+											<?php foreach ($adminEditableRoles as $adminRole): ?>
 												<option value="<?php echo (int)($adminRole['id'] ?? 0); ?>"><?php echo (int)($adminRole['id'] ?? 0); ?>: <?php echo htmlspecialchars($adminRole['name'] ?? '', ENT_QUOTES, 'UTF-8'); ?></option>
 											<?php endforeach; ?>
 										</select>

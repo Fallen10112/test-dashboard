@@ -310,6 +310,9 @@ function getPermissionActionDefinitions() {
 		'admin_role_create' => ['display_name' => 'Admin Role Create', 'description' => 'Add new roles'],
 		'admin_role_update' => ['display_name' => 'Admin Role Update', 'description' => 'Edit existing roles'],
 		'admin_role_delete' => ['display_name' => 'Admin Role Delete', 'description' => 'Delete roles and reassign users'],
+		'admin_permissions_edit_lower' => ['display_name' => 'Edit Permissions Below Your Role', 'description' => 'Edit permissions for roles below your own role'],
+		'admin_permissions_edit_self' => ['display_name' => 'Edit Permissions Through Your Role', 'description' => 'Edit permissions for roles up to and including your own role'],
+		'admin_permissions_edit_all' => ['display_name' => 'Edit Permissions For All Roles', 'description' => 'Edit permissions for every role'],
 		'admin_user_management' => ['display_name' => 'Admin User Management', 'description' => 'Open the user management tab'],
 		'admin_role_management' => ['display_name' => 'Admin Role Management', 'description' => 'Open the role management tab'],
 		'admin_database_management' => ['display_name' => 'Admin Database Management', 'description' => 'Open the database management tab'],
@@ -579,10 +582,152 @@ function getDefaultRolePermissionTemplates() {
 		'Administrator' => ['home' => ['read'], 'records' => ['read', 'create', 'update']],
 		'Coordinator' => ['home' => ['read'], 'records' => ['read', 'create', 'update', 'delete']],
 		'Team Leader' => ['home' => ['read'], 'records' => ['read', 'create', 'update', 'delete', 'export'], 'reports' => ['read', 'export']],
-		'Manager' => ['home' => ['read'], 'records' => ['read', 'create', 'update', 'delete', 'export'], 'reports' => ['read', 'export'], 'audit_log' => ['read'], 'admin' => ['read', 'manage_users', 'manage_permissions', 'admin_user_management', 'admin_role_management', 'admin_notifications_management', 'admin_permissions_management', 'admin_role_create', 'admin_role_update']],
-		'Director' => ['home' => ['read'], 'records' => ['read', 'create', 'update', 'delete', 'export'], 'reports' => ['read', 'export'], 'audit_log' => ['read'], 'admin' => ['read', 'manage_users', 'manage_permissions', 'admin_user_management', 'admin_role_management', 'admin_database_management', 'admin_application_management', 'admin_notifications_management', 'admin_permissions_management', 'admin_role_create', 'admin_role_update']],
+		'Manager' => ['home' => ['read'], 'records' => ['read', 'create', 'update', 'delete', 'export'], 'reports' => ['read', 'export'], 'audit_log' => ['read'], 'admin' => ['read', 'manage_users', 'manage_permissions', 'admin_user_management', 'admin_role_management', 'admin_notifications_management', 'admin_permissions_management', 'admin_role_create', 'admin_role_update', 'admin_permissions_edit_lower']],
+		'Director' => ['home' => ['read'], 'records' => ['read', 'create', 'update', 'delete', 'export'], 'reports' => ['read', 'export'], 'audit_log' => ['read'], 'admin' => ['read', 'manage_users', 'manage_permissions', 'admin_user_management', 'admin_role_management', 'admin_database_management', 'admin_application_management', 'admin_notifications_management', 'admin_permissions_management', 'admin_role_create', 'admin_role_update', 'admin_permissions_edit_self']],
 		'Full Access' => ['__all__' => ['__all__']],
 	];
+}
+
+function getPermissionEditScopeDefinitions() {
+	return [
+		'admin_permissions_edit_lower' => ['mode' => 'lower', 'label' => 'Below your role'],
+		'admin_permissions_edit_self' => ['mode' => 'self', 'label' => 'Through your role'],
+		'admin_permissions_edit_all' => ['mode' => 'all', 'label' => 'All roles'],
+	];
+}
+
+
+function getPermissionEditorResourceActionMap() {
+	return [
+		'home' => ['read'],
+		'records' => ['read', 'create', 'update', 'delete', 'export'],
+		'reports' => ['read', 'export'],
+		'audit_log' => ['read'],
+		'admin' => ['read', 'manage_users', 'manage_permissions', 'admin_user_management', 'admin_role_management', 'admin_role_create', 'admin_role_update', 'admin_role_delete', 'admin_database_management', 'admin_application_management', 'admin_notifications_management', 'admin_permissions_management'],
+		'dev_tools' => ['read'],
+	];
+}
+
+function getPermissionEditorVisibleResources(PDO $pdo, $userId) {
+	$normalizedUserId = (int)$userId;
+	$resourceDefinitions = getPermissionResourceDefinitions();
+	$resources = getAllPermissionResources($pdo);
+	$visibleResources = [];
+
+	foreach ($resources as $resource) {
+		$resourceKey = (string)($resource['key'] ?? '');
+		if ($resourceKey === '') {
+			continue;
+		}
+
+		if ($normalizedUserId > 0 && !userHasPermission($pdo, $normalizedUserId, $resourceKey, 'read')) {
+			continue;
+		}
+
+		$visibleResources[] = [
+			'key' => $resourceKey,
+			'display_name' => (string)($resourceDefinitions[$resourceKey]['display_name'] ?? $resourceKey),
+			'description' => (string)($resourceDefinitions[$resourceKey]['description'] ?? ''),
+		];
+	}
+
+	return $visibleResources;
+}
+
+function getUserPermissionEditScope(PDO $pdo, $userId) {
+	$normalizedUserId = (int)$userId;
+	$primaryRole = getUserPrimaryRole($pdo, $normalizedUserId);
+	$primaryRoleId = (int)($primaryRole['id'] ?? 0);
+	$defaultScope = [
+		'mode' => 'none',
+		'label' => 'No editable roles',
+		'current_role_id' => $primaryRoleId > 0 ? $primaryRoleId : null,
+		'max_role_id' => 0,
+	];
+
+	if ($normalizedUserId < 1 || $primaryRoleId < 1) {
+		return $defaultScope;
+	}
+
+	if (userHasPermission($pdo, $normalizedUserId, 'admin', 'admin_permissions_edit_all')) {
+		return [
+			'mode' => 'all',
+			'label' => 'All roles',
+			'current_role_id' => $primaryRoleId,
+			'max_role_id' => null,
+		];
+	}
+
+	if (userHasPermission($pdo, $normalizedUserId, 'admin', 'admin_permissions_edit_self')) {
+		return [
+			'mode' => 'self',
+			'label' => 'Up to and including your role',
+			'current_role_id' => $primaryRoleId,
+			'max_role_id' => $primaryRoleId,
+		];
+	}
+
+	if (userHasPermission($pdo, $normalizedUserId, 'admin', 'admin_permissions_edit_lower')) {
+		return [
+			'mode' => 'lower',
+			'label' => 'Below your role',
+			'current_role_id' => $primaryRoleId,
+			'max_role_id' => max(0, $primaryRoleId - 1),
+		];
+	}
+
+	return $defaultScope;
+}
+
+function canUserEditRolePermissions(PDO $pdo, $userId, $targetRoleId) {
+	$normalizedTargetRoleId = (int)$targetRoleId;
+	if ($normalizedTargetRoleId < 1) {
+		return false;
+	}
+
+	$scope = getUserPermissionEditScope($pdo, $userId);
+	$mode = (string)($scope['mode'] ?? 'none');
+	$currentRoleId = (int)($scope['current_role_id'] ?? 0);
+
+	if ($mode === 'all') {
+		return true;
+	}
+	if ($mode === 'self') {
+		return $currentRoleId > 0 && $normalizedTargetRoleId <= $currentRoleId;
+	}
+	if ($mode === 'lower') {
+		return $currentRoleId > 0 && $normalizedTargetRoleId < $currentRoleId;
+	}
+
+	return false;
+}
+
+function getEditableRolesForPermissionScope(array $roles, array $scope) {
+	$mode = (string)($scope['mode'] ?? 'none');
+	$currentRoleId = (int)($scope['current_role_id'] ?? 0);
+	$maxRoleId = isset($scope['max_role_id']) ? $scope['max_role_id'] : 0;
+	$maxRoleId = $maxRoleId === null ? null : (int)$maxRoleId;
+
+	$editableRoles = [];
+	foreach ($roles as $role) {
+		$roleId = (int)($role['id'] ?? 0);
+		if ($roleId < 1) {
+			continue;
+		}
+		if ($mode === 'all') {
+			$editableRoles[] = $role;
+			continue;
+		}
+		if ($mode === 'self' && $currentRoleId > 0 && $roleId <= $currentRoleId) {
+			$editableRoles[] = $role;
+			continue;
+		}
+		if ($mode === 'lower' && $currentRoleId > 0 && $roleId <= (int)$maxRoleId) {
+			$editableRoles[] = $role;
+		}
+	}
+
+	return $editableRoles;
 }
 
 function seedDefaultRolePermissions(PDO $pdo) {
@@ -728,13 +873,38 @@ function getAllRolePermissionsMatrix(PDO $pdo) {
 	return $matrix;
 }
 
-function getRolePermissionsEditorPayload(PDO $pdo) {
+
+function getRolePermissionsEditorPayload(PDO $pdo, $userId = null) {
 	return [
 		'roles' => getAvailableRoles($pdo),
-		'resources' => getAllPermissionResources($pdo),
+		'resources' => getPermissionEditorVisibleResources($pdo, $userId),
 		'permissions' => getAllPermissionActions($pdo),
 		'role_permissions' => getAllRolePermissionsMatrix($pdo),
+		'allowed_permissions_by_resource' => getPermissionEditorResourceActionMap(),
 	];
+}
+
+function filterRolePermissionGrantsForUser(PDO $pdo, $userId, array $grants) {
+	$accessMap = getPermissionEditorResourceActionMap();
+	$filtered = [];
+	foreach ($grants as $grant) {
+		$grant = trim((string)$grant);
+		if ($grant === '' || strpos($grant, ':') === false) {
+			continue;
+		}
+		list($resourceKey, $permissionKey) = array_pad(explode(':', $grant, 2), 2, '');
+		$resourceKey = trim((string)$resourceKey);
+		$permissionKey = trim((string)$permissionKey);
+		if ($resourceKey === '' || $permissionKey === '' || !isset($accessMap[$resourceKey])) {
+			continue;
+		}
+		if (!in_array($permissionKey, $accessMap[$resourceKey]['permissions'], true)) {
+			continue;
+		}
+		$filtered[] = $resourceKey . ':' . $permissionKey;
+	}
+
+	return array_values(array_unique($filtered));
 }
 
 function userHasPermission(PDO $pdo, $userId, $resourceKey, $permissionKey) {

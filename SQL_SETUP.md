@@ -354,8 +354,16 @@ These templates describe the initial grant set for the current role names. They 
 - Administrator: home read, records read/create/update.
 - Coordinator: Administrator plus records delete.
 - Team Leader: Coordinator plus data export and reports read/export.
-- Manager: Team Leader plus audit_log read and admin read/manage_users/manage_permissions, plus admin user/role/notifications/permissions tabs and role create/update, but not role delete or database/application management.
-- Director: same as Manager plus admin database/application tabs; still no role delete unless granted explicitly.
-- Full Access: all resources and permissions, including role delete.
+- Manager: Team Leader plus audit_log read and admin read/manage_users/manage_permissions, plus admin user/role/notifications/permissions tabs, role create/update, and permission-edit scope below the current role, but not role delete or database/application management.
+- Director: same as Manager plus admin database/application tabs and permission-edit scope through the current role; still no role delete unless granted explicitly.
+- Full Access: all resources and permissions, including role delete and full permission-edit scope.
+
+The permission editor now respects a separate edit-scope layer:
+
+- Below your role: can edit roles with a lower ID only.
+- Through your role: can edit roles up to and including the current role ID.
+- All roles: can edit any role.
+
+It also filters the editor to resources the current user can already access, so unavailable sections do not appear in the permissions matrix.
 
 The permission editor in the Admin page can be used to change role grants at any time without altering the role table structure.

@@ -215,6 +215,11 @@
     color: #64748b;
 }
 
+.permissions-editor-scope-note {
+    margin: 0 0 12px;
+    color: #475569;
+}
+
 .permissions-editor-controls {
     min-width: 240px;
     display: flex;

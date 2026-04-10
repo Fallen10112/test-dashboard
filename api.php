@@ -900,7 +900,7 @@ if ($method === 'POST') {
 
 	if ($postAction === 'admin_role_permissions') {
 		requireApiPermission('admin', 'manage_permissions');
-		$payload = getRolePermissionsEditorPayload($pdo);
+		$payload = getRolePermissionsEditorPayload($pdo, getApiAuthUserId());
 		respondJson(200, [
 			'success' => true,
 			'message' => 'Role permissions loaded',
@@ -919,8 +919,23 @@ if ($method === 'POST') {
 		if ($targetId < 1) {
 			respondJson(400, ['success' => false, 'message' => 'A valid role id is required']);
 		}
+		if (!canUserEditRolePermissions($pdo, $actorUserId, $targetId)) {
+			respondJson(403, ['success' => false, 'message' => 'You do not have permission to edit that role']);
+		}
+		$normalizedRequestedGrants = [];
+		foreach ($grants as $grant) {
+			$grant = trim((string)$grant);
+			if ($grant === '') {
+				continue;
+			}
+			$normalizedRequestedGrants[$grant] = true;
+		}
+		$filteredGrants = filterRolePermissionGrantsForUser($pdo, $actorUserId, $grants);
+		if (count($filteredGrants) !== count($normalizedRequestedGrants)) {
+			respondJson(403, ['success' => false, 'message' => 'You do not have permission to edit one or more selected permissions']);
+		}
 
-		$result = setRolePermissions($pdo, $targetId, $grants);
+		$result = setRolePermissions($pdo, $targetId, $filteredGrants);
 		if (!$result) {
 			respondJson(400, ['success' => false, 'message' => 'Failed to update role permissions']);
 		}

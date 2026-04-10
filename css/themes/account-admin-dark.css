@@ -68,6 +68,9 @@ body.dark-mode .permissions-editor-summary h5 {
 body.dark-mode .permissions-editor-copy {
     color: #b9c4d4;
 }
+body.dark-mode .permissions-editor-scope-note {
+    color: #c5d0e3;
+}
 body.dark-mode .permissions-editor-metrics > div {
     background: rgba(127, 147, 255, 0.12);
 }
