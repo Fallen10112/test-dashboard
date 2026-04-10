@@ -168,6 +168,33 @@
     margin-bottom: 16px;
 }
 
+.admin-user-list-filter-group {
+    max-width: 280px;
+    margin-bottom: 12px;
+}
+
+.admin-user-list-wrap {
+    max-height: 360px;
+    overflow: auto;
+    border: 1px solid #dbe3ef;
+    border-radius: 10px;
+    background: #ffffff;
+}
+
+.admin-user-list-table {
+    table-layout: auto;
+    min-width: 720px;
+}
+
+.admin-user-list-table th,
+.admin-user-list-table td {
+    vertical-align: top;
+}
+
+.admin-user-list-table .btn-sm {
+    min-width: 92px;
+}
+
 .admin-role-table {
     table-layout: auto;
 }

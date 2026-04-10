@@ -19,6 +19,11 @@ requirePagePermission('admin', 'read');
 		'role_permissions' => [],
 		'allowed_permissions_by_resource' => [],
 	];
+	$adminUserListPayload = [
+		'success' => true,
+		'users' => [],
+		'status_filter' => 'all',
+	];
 	$adminPermissionEditScope = [
 		'mode' => 'none',
 		'label' => 'No editable roles',
@@ -39,6 +44,7 @@ requirePagePermission('admin', 'read');
 		ensurePermissionsSchema($adminPdo);
 		$adminRoles = getAvailableRoles($adminPdo);
 		$adminPermissionEditorPayload = getRolePermissionsEditorPayload($adminPdo, $adminCurrentUserId);
+		$adminUserListPayload = getAdminUserListPayload($adminPdo, 'all');
 		if ($adminCurrentUserId > 0) {
 			$adminPermissionEditScope = getUserPermissionEditScope($adminPdo, $adminCurrentUserId);
 			$adminEditableRoles = getEditableRolesForPermissionScope($adminRoles, $adminPermissionEditScope);
@@ -85,6 +91,10 @@ requirePagePermission('admin', 'read');
 	if (!is_string($adminPermissionEditorJson) || $adminPermissionEditorJson === '') {
 		$adminPermissionEditorJson = '{"roles":[],"resources":[],"permissions":[],"role_permissions":[]}';
 	}
+	$adminUserListJson = json_encode($adminUserListPayload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+	if (!is_string($adminUserListJson) || $adminUserListJson === '') {
+		$adminUserListJson = '{"success":true,"users":[],"status_filter":"all"}';
+	}
 	$adminPermissionEditScopeJson = json_encode($adminPermissionEditScope, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 	if (!is_string($adminPermissionEditScopeJson) || $adminPermissionEditScopeJson === '') {
 		$adminPermissionEditScopeJson = '{"mode":"none","label":"No editable roles","current_role_id":null,"max_role_id":0}';
@@ -104,6 +114,7 @@ requirePagePermission('admin', 'read');
 	window.ADMIN_CURRENT_ROLE_ID = <?php echo $adminCurrentRoleIdJson; ?>;
 	window.ADMIN_EDITABLE_ROLES = <?php echo $adminEditableRolesJson; ?>;
 	window.ADMIN_ROLE_PERMISSION_EDITOR = <?php echo $adminPermissionEditorJson; ?>;
+	window.ADMIN_USER_LIST = <?php echo $adminUserListJson; ?>;
 	window.ADMIN_PERMISSION_EDIT_SCOPE = <?php echo $adminPermissionEditScopeJson; ?>;
 	window.ADMIN_PAGE_PERMISSIONS = <?php echo $adminTabPermissionJson; ?>;
 	window.ADMIN_ROLE_MANAGEMENT_FLAGS = <?php echo $adminRoleManagementJson; ?>;
@@ -173,6 +184,56 @@ requirePagePermission('admin', 'read');
 								</div>
 							</div>
 						</div>
+
+						<div class="admin-accordion-section admin-user-list-section">
+							<button type="button" class="admin-accordion-header" aria-expanded="false" aria-controls="admin-accordion-body-user-list">
+								<span>User List</span>
+								<svg class="admin-accordion-chevron" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+							</button>
+							<div class="admin-accordion-body" id="admin-accordion-body-user-list" hidden>
+								<div class="account-form" autocomplete="off">
+									<div class="form-group admin-user-list-filter-group">
+										<label for="dev-users-list-status-filter">Status</label>
+										<select id="dev-users-list-status-filter">
+											<option value="all" selected>All</option>
+											<option value="active">Active</option>
+											<option value="disabled">Deactivated</option>
+										</select>
+									</div>
+									<div class="admin-user-list-wrap">
+										<table class="data-table admin-user-list-table" id="admin-user-list-table">
+											<thead>
+												<tr>
+													<th>ID</th>
+													<th>Username</th>
+													<th>Email</th>
+													<th>Display Name</th>
+													<th>Last Login</th>
+													<th>Edit User</th>
+												</tr>
+											</thead>
+											<tbody id="admin-user-list-table-body">
+												<?php if (empty($adminUserListPayload['users'])): ?>
+													<tr class="admin-user-list-empty-row"><td colspan="6">No users found.</td></tr>
+												<?php else: ?>
+													<?php foreach ($adminUserListPayload['users'] as $adminUser): ?>
+														<tr>
+															<td><?php echo (int)($adminUser['id'] ?? 0); ?></td>
+															<td><?php echo htmlspecialchars($adminUser['username'] ?? '', ENT_QUOTES, 'UTF-8'); ?></td>
+															<td><?php echo htmlspecialchars($adminUser['email'] ?? '', ENT_QUOTES, 'UTF-8'); ?></td>
+															<td><?php echo htmlspecialchars($adminUser['display_name'] ?? '', ENT_QUOTES, 'UTF-8'); ?></td>
+															<td><?php echo htmlspecialchars(($adminUser['last_login_at'] ?? '') !== '' ? (string)$adminUser['last_login_at'] : 'Never', ENT_QUOTES, 'UTF-8'); ?></td>
+															<td><button type="button" class="btn btn-secondary btn-sm dev-users-edit-user-btn" data-user-id="<?php echo (int)($adminUser['id'] ?? 0); ?>">Edit User</button></td>
+														</tr>
+													<?php endforeach; ?>
+												<?php endif; ?>
+											</tbody>
+										</table>
+									</div>
+								</div>
+							</div>
+						</div>
+
 
 						<div class="admin-accordion-section">
 							<button type="button" class="admin-accordion-header" aria-expanded="false" aria-controls="admin-accordion-body-update">

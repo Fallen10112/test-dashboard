@@ -1393,6 +1393,161 @@ function setupDevToolsUserManagementHandlers() {
 		});
 	};
 
+	const initialUserListPayload = window.ADMIN_USER_LIST && typeof window.ADMIN_USER_LIST === 'object'
+		? window.ADMIN_USER_LIST
+		: {};
+	const $userListStatusFilter = $('#dev-users-list-status-filter');
+	const $userListTableBody = $('#admin-user-list-table-body');
+	const $updateSectionBody = $('#admin-accordion-body-update');
+	const $updateSectionHeader = $('[aria-controls="admin-accordion-body-update"]');
+	let currentUserList = [];
+	let currentUserListStatus = 'all';
+
+	const normalizeUserListEntry = function(user) {
+		if (!user || typeof user !== 'object') {
+			return null;
+		}
+
+		const id = parseInt(user.id, 10) || 0;
+		if (id < 1) {
+			return null;
+		}
+
+		return {
+			id: id,
+			username: String(user.username || ''),
+			email: String(user.email || ''),
+			display_name: String(user.display_name || ''),
+			status: String(user.status || '').toLowerCase(),
+			last_login_at: String(user.last_login_at || '')
+		};
+	};
+
+	const getUserListStatusFilter = function() {
+		const filterValue = String($userListStatusFilter.val() || 'all').toLowerCase();
+		return ['all', 'active', 'disabled'].indexOf(filterValue) !== -1 ? filterValue : 'all';
+	};
+
+	const formatUserLastLogin = function(value) {
+		const text = String(value || '').trim();
+		return text !== '' ? text : 'Never';
+	};
+
+	const renderUserListTable = function() {
+		if ($userListTableBody.length === 0) {
+			return;
+		}
+
+		currentUserListStatus = getUserListStatusFilter();
+		const filteredUsers = currentUserList.filter(function(user) {
+			if (currentUserListStatus === 'all') {
+				return true;
+			}
+			return String(user.status || '').toLowerCase() === currentUserListStatus;
+		});
+
+		$userListTableBody.empty();
+		if (filteredUsers.length === 0) {
+			const emptyRow = document.createElement('tr');
+			emptyRow.className = 'admin-user-list-empty-row';
+			const emptyCell = document.createElement('td');
+			emptyCell.colSpan = 6;
+			emptyCell.textContent = currentUserList.length === 0 ? 'No users found.' : 'No users match this status filter.';
+			emptyRow.appendChild(emptyCell);
+			$userListTableBody.append(emptyRow);
+			return;
+		}
+
+		filteredUsers.forEach(function(user) {
+			const row = document.createElement('tr');
+			const idCell = document.createElement('td');
+			const usernameCell = document.createElement('td');
+			const emailCell = document.createElement('td');
+			const displayNameCell = document.createElement('td');
+			const lastLoginCell = document.createElement('td');
+			const actionCell = document.createElement('td');
+			const editButton = document.createElement('button');
+			idCell.textContent = String(user.id || '');
+			usernameCell.textContent = String(user.username || '');
+			emailCell.textContent = String(user.email || '');
+			displayNameCell.textContent = String(user.display_name || '');
+			lastLoginCell.textContent = formatUserLastLogin(user.last_login_at);
+			editButton.type = 'button';
+			editButton.className = 'btn btn-secondary btn-sm dev-users-edit-user-btn';
+			editButton.textContent = 'Edit User';
+			editButton.setAttribute('data-user-id', String(user.id || ''));
+			editButton.addEventListener('click', function() {
+				editUserFromList(user.id);
+			});
+			actionCell.appendChild(editButton);
+			row.appendChild(idCell);
+			row.appendChild(usernameCell);
+			row.appendChild(emailCell);
+			row.appendChild(displayNameCell);
+			row.appendChild(lastLoginCell);
+			row.appendChild(actionCell);
+			$userListTableBody.append(row);
+		});
+	};
+
+	const setUserList = function(users) {
+		currentUserList = Array.isArray(users)
+			? users.map(normalizeUserListEntry).filter(function(user) {
+				return user !== null;
+			})
+			: [];
+		renderUserListTable();
+	};
+
+	const refreshUserList = function() {
+		return $.ajax({
+			url: '../api.php',
+			type: 'GET',
+			dataType: 'json',
+			data: {
+				action: 'admin_user_list',
+				status: 'all'
+			}
+		}).done(function(response) {
+			if (response && response.success && Array.isArray(response.users)) {
+				setUserList(response.users);
+			}
+		});
+	};
+
+	const openUpdateUserSection = function() {
+		if ($updateSectionBody.length > 0) {
+			$updateSectionBody.removeAttr('hidden');
+		}
+		if ($updateSectionHeader.length > 0) {
+			$updateSectionHeader.attr('aria-expanded', 'true');
+		}
+	};
+
+	const editUserFromList = function(userId) {
+		const normalizedUserId = parseInt(userId, 10) || 0;
+		if (normalizedUserId < 1) {
+			return;
+		}
+
+		openUpdateUserSection();
+		$('#dev-users-update-lookup').val(String(normalizedUserId));
+		setInlineResult('#dev-users-update-result', '', false);
+		$updateDetectButton.trigger('click');
+		const updateBodyEl = $updateSectionBody.get(0);
+		if (updateBodyEl && typeof updateBodyEl.scrollIntoView === 'function') {
+			updateBodyEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+		}
+	};
+
+	if ($userListStatusFilter.length > 0) {
+		$userListStatusFilter.on('change', function() {
+			renderUserListTable();
+		});
+	}
+
+	setUserList(Array.isArray(initialUserListPayload.users) ? initialUserListPayload.users : []);
+
 	const userLabel = function(user) {
 		if (!user || typeof user !== 'object') {
 			return '';
@@ -1519,6 +1674,7 @@ function setupDevToolsUserManagementHandlers() {
 				showOkayButton: true,
 				autoCloseMs: 0
 			});
+			refreshUserList();
 		}).fail(function(xhr) {
 			const message = xhr && xhr.responseJSON && xhr.responseJSON.message
 				? xhr.responseJSON.message
@@ -1586,6 +1742,7 @@ function setupDevToolsUserManagementHandlers() {
 			updateDetectedLabel = userLabel(user);
 			setInlineResult('#dev-users-update-detected', updateDetectedLabel, false);
 			$('#dev-users-update-reset-password').val('no');
+			refreshUserList();
 		}).fail(function(xhr) {
 			const message = xhr && xhr.responseJSON && xhr.responseJSON.message
 				? xhr.responseJSON.message
@@ -1655,6 +1812,7 @@ function setupDevToolsUserManagementHandlers() {
 								deleteDetectedLabel = '';
 								$deleteButton.prop('disabled', true);
 								$('#dev-users-delete-lookup').val('');
+								refreshUserList();
 							}
 							)
 							.fail(function(xhr) {

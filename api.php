@@ -2071,6 +2071,13 @@ if ($method === 'GET') {
 		exit;
 	}
 
+	if ($action === 'admin_user_list') {
+		requireApiPermission('admin', 'manage_users');
+		$statusFilter = isset($_GET['status']) ? (string)$_GET['status'] : 'all';
+		echo json_encode(getAdminUserListPayload($pdo, $statusFilter));
+		exit;
+	}
+
 	if ($action === 'logs') {
 		requireApiPermission('dev_tools', 'read');
 		echo json_encode(getLogsPayload($pdo));

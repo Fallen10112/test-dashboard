@@ -1548,6 +1548,76 @@ function getUserByIdOrUsername(PDO $pdo, $lookupQuery) {
 }
 
 
+function getAdminUserListPayload(PDO $pdo, $statusFilter = 'all') {
+	if (!dashboardTableExists($pdo, 'users')) {
+		return [
+			'success' => true,
+			'users' => [],
+			'status_filter' => 'all',
+		];
+	}
+
+	$normalizedStatusFilter = strtolower(trim((string)$statusFilter));
+	if (!in_array($normalizedStatusFilter, ['all', 'active', 'disabled'], true)) {
+		$normalizedStatusFilter = 'all';
+	}
+
+	$whereClauses = ['u.deleted_at IS NULL'];
+	$params = [];
+	if ($normalizedStatusFilter !== 'all' && doesTableColumnExist($pdo, 'users', 'status')) {
+		$whereClauses[] = 'u.status = :status';
+		$params[':status'] = $normalizedStatusFilter;
+	}
+
+	$selectColumns = [
+		'u.id',
+		'u.username',
+		'u.email',
+		'u.display_name',
+	];
+	if (doesTableColumnExist($pdo, 'users', 'status')) {
+		$selectColumns[] = 'u.status';
+	} else {
+		$selectColumns[] = "'' AS status";
+	}
+	if (doesTableColumnExist($pdo, 'users', 'last_login_at')) {
+		$selectColumns[] = 'DATE_FORMAT(u.last_login_at, "%Y-%m-%d %H:%i:%s") AS last_login_at';
+	} else {
+		$selectColumns[] = 'NULL AS last_login_at';
+	}
+
+	try {
+		$stmt = $pdo->prepare(
+			'SELECT ' . implode(', ', $selectColumns) . '
+			 FROM users u
+			 WHERE ' . implode(' AND ', $whereClauses) . '
+			 ORDER BY u.id ASC'
+		);
+		$stmt->execute($params);
+		$rows = $stmt->fetchAll();
+	} catch (Throwable $e) {
+		$rows = [];
+	}
+
+	$users = array_map(static function($row) {
+		return [
+			'id' => (int)($row['id'] ?? 0),
+			'username' => (string)($row['username'] ?? ''),
+			'email' => (string)($row['email'] ?? ''),
+			'display_name' => (string)($row['display_name'] ?? ''),
+			'status' => strtolower((string)($row['status'] ?? '')),
+			'last_login_at' => (string)($row['last_login_at'] ?? ''),
+		];
+	}, is_array($rows) ? $rows : []);
+
+	return [
+		'success' => true,
+		'users' => $users,
+		'status_filter' => $normalizedStatusFilter,
+	];
+}
+
+
 function createDevToolsUser(PDO $pdo, $email, $username, $displayName, $status, $roleId, $assignedByUserId = null) {
 	$normalizedEmail = trim((string)$email);
 	$normalizedUsername = trim((string)$username);
