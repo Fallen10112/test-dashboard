@@ -65,6 +65,7 @@ function setupAdminPermissionManagementHandlers() {
 		: {};
 	var permissionOrder = {
 		'read': 10,
+		'customize': 15,
 		'create': 20,
 		'update': 30,
 		'delete': 40,
@@ -83,17 +84,23 @@ function setupAdminPermissionManagementHandlers() {
 	};
 	var resourceOrder = {
 		'home': 10,
-		'records': 20,
-		'reports': 30,
-		'audit_log': 40,
-		'admin': 50,
-		'dev_tools': 60
+		'widgets': 20,
+		'records': 30,
+		'reports': 40,
+		'audit_log': 50,
+		'admin': 60,
+		'dev_tools': 70
 	};
 	var resourceGroups = [
 		{
 			title: 'Core access',
 			description: 'Landing, records, reports, and audit visibility.',
 			keys: ['home', 'records', 'reports', 'audit_log']
+		},
+		{
+			title: 'Header widgets',
+			description: 'Visibility and customization controls for the header widgets.',
+			keys: ['widgets']
 		},
 		{
 			title: 'Admin workspace',
@@ -118,7 +125,7 @@ function setupAdminPermissionManagementHandlers() {
 	}
 
 	if (resources.length === 0) {
-		matrixContainer.innerHTML = '<div class="permissions-editor-empty"><p>No resources are currently available within your edit scope.</p><p class="permissions-editor-empty-note">Current scope: ' + escapeHtml(String(permissionEditScope.label || 'No editable roles')) + '.</p></div>';
+		matrixContainer.innerHTML = buildPermissionEmptyStateHtml('No resources are currently available within your edit scope.', String(permissionEditScope.label || 'No editable roles'), false);
 		saveButton.disabled = true;
 		return;
 	}
@@ -133,6 +140,47 @@ function setupAdminPermissionManagementHandlers() {
 				"'": '&#39;'
 			})[character] || character;
 		});
+	}
+
+	function buildPermissionToggleHtml(resourceKey, permission, checked, disabled, noteText, extraClass) {
+		var grantKey = String(resourceKey || '') + ':' + String(permission.key || '');
+		var checkedAttribute = checked ? ' checked' : '';
+		var disabledAttribute = disabled ? ' disabled' : '';
+		var className = 'permission-toggle' + (extraClass ? ' ' + extraClass : '');
+		var noteHtml = noteText ? '<em class="permission-toggle-note">' + escapeHtml(noteText) + '</em>' : '';
+		return '<label class="' + className + '"><input type="checkbox" data-grant-key="' + escapeHtml(grantKey) + '"' + checkedAttribute + disabledAttribute + '><span><strong>' + escapeHtml(permission.display_name || permission.key) + '</strong><em>' + escapeHtml(permission.description || '') + '</em>' + noteHtml + '</span></label>';
+	}
+
+	function buildPermissionResourceCard(resource, permissionItems) {
+		return '<article class="permission-resource-card"><div class="permission-resource-card-header"><div><h6>' + escapeHtml(resource.display_name || resource.key) + '</h6><p>' + escapeHtml(resource.description || '') + '</p></div></div><div class="permission-resource-actions">' + permissionItems + '</div></article>';
+	}
+
+	function buildPermissionGroup(title, description, cards) {
+		return '<section class="permission-group"><div class="permission-group-heading"><h5>' + escapeHtml(title) + '</h5><p>' + escapeHtml(description) + '</p></div><div class="permission-group-grid">' + cards + '</div></section>';
+	}
+
+	function buildPermissionEditorHeader(selectedRoleName, visibleGrantCount) {
+		return [
+			'<div class="permission-editor-header">',
+				'<div class="permission-editor-title"><strong>' + escapeHtml(selectedRoleName) + '</strong><span>permissions</span></div>',
+				'<div class="permission-editor-metrics">',
+					'<div><strong>' + String(visibleGrantCount) + '</strong><span> grants</span></div>',
+				'</div>',
+			'</div>'
+		].join('');
+	}
+
+	function buildPermissionEditorMeta(scopeLabel) {
+		return '<div class="permission-editor-meta"><p class="permission-editor-role-description permission-editor-role-scope">Current scope: ' + escapeHtml(scopeLabel) + '.</p></div>';
+	}
+
+	function buildPermissionEmptyStateHtml(message, scopeLabel, includeFeatureNote) {
+		var parts = ['<div class="permissions-editor-empty"><p>' + escapeHtml(message) + '</p>'];
+		if (includeFeatureNote) {
+			parts.push('<p class="permissions-editor-empty-note">Permissions are grouped by feature so access is easier to scan than a single wide matrix.</p>');
+		}
+		parts.push('<p class="permissions-editor-empty-note">Current scope: ' + escapeHtml(scopeLabel) + '.</p></div>');
+		return parts.join('');
 	}
 
 	function setInlineResult(message, isError) {
@@ -185,11 +233,37 @@ function setupAdminPermissionManagementHandlers() {
 		var resourcePermissions = currentPermissions[resource.key] || {};
 		var permissionList = getResourcePermissionList(resource.key);
 		var permissionItems = permissionList.map(function(permission) {
-			var grantKey = String(resource.key || '') + ':' + String(permission.key || '');
-			var checked = resourcePermissions[permission.key] ? ' checked' : '';
-			return '<label class="permission-toggle"><input type="checkbox" data-grant-key="' + escapeHtml(grantKey) + '"' + checked + '><span><strong>' + escapeHtml(permission.display_name || permission.key) + '</strong><em>' + escapeHtml(permission.description || '') + '</em></span></label>';
+			var isDisabled = false;
+			var isChecked = !!resourcePermissions[permission.key];
+			var noteText = '';
+			var extraClass = '';
+			if (resource.key === 'widgets' && permission.key === 'customize' && !resourcePermissions.read) {
+				isDisabled = true;
+				isChecked = false;
+				noteText = 'Requires Visible';
+				extraClass = 'is-dependent';
+			}
+			if (resource.key === 'widgets' && permission.key === 'customize' && resourcePermissions.read) {
+				noteText = 'Requires Visible';
+				extraClass = 'is-dependent';
+			}
+			return buildPermissionToggleHtml(resource.key, permission, isChecked, isDisabled, noteText, extraClass);
 		}).join('');
-		return '<article class="permission-resource-card"><div class="permission-resource-card-header"><div><h6>' + escapeHtml(resource.display_name || resource.key) + '</h6><p>' + escapeHtml(resource.description || '') + '</p></div></div><div class="permission-resource-actions">' + permissionItems + '</div></article>';
+		return buildPermissionResourceCard(resource, permissionItems);
+	}
+
+	function syncWidgetCustomizeDependency() {
+		var visibleCheckbox = matrixContainer.querySelector('input[data-grant-key="widgets:read"]');
+		var customizeCheckbox = matrixContainer.querySelector('input[data-grant-key="widgets:customize"]');
+		if (!visibleCheckbox || !customizeCheckbox) {
+			return;
+		}
+
+		var visibleEnabled = visibleCheckbox.checked;
+		customizeCheckbox.disabled = !visibleEnabled;
+		if (!visibleEnabled) {
+			customizeCheckbox.checked = false;
+		}
 	}
 
 	function countCurrentGrants(currentPermissions) {
@@ -210,7 +284,7 @@ function setupAdminPermissionManagementHandlers() {
 		if (selectedRoleId < 1) {
 			var scopeLabel = String(permissionEditScope.label || 'No editable roles');
 			var hasEditableRoles = roleSelect.options.length > 1;
-			matrixContainer.innerHTML = '<div class="permissions-editor-empty"><p>' + (hasEditableRoles ? 'Select a role to view and edit permissions.' : 'No roles are currently editable with your permission scope.') + '</p><p class="permissions-editor-empty-note">Permissions are grouped by feature so access is easier to scan than a single wide matrix.</p><p class="permissions-editor-empty-note">Current scope: ' + escapeHtml(scopeLabel) + '.</p></div>';
+			matrixContainer.innerHTML = buildPermissionEmptyStateHtml(hasEditableRoles ? 'Select a role to view and edit permissions.' : 'No roles are currently editable with your permission scope.', scopeLabel, true);
 			saveButton.disabled = true;
 			return;
 		}
@@ -254,21 +328,15 @@ function setupAdminPermissionManagementHandlers() {
 			if (cards === '') {
 				return '';
 			}
-			return '<section class="permission-group"><div class="permission-group-heading"><h5>' + escapeHtml(group.title) + '</h5><p>' + escapeHtml(group.description) + '</p></div><div class="permission-group-grid">' + cards + '</div></section>';
+			return buildPermissionGroup(group.title, group.description, cards);
 		}).join('');
 		var remainingCards = sortedResources.filter(function(resource) {
 			return !usedKeys[resource.key];
 		}).map(function(resource) {
 			return renderResourceCard(resource, currentPermissions);
 		}).join('');
-		var headerHtml = '<div class="permission-editor-header">'
-			+ '<div class="permission-editor-title"><strong>' + escapeHtml(selectedRoleName) + '</strong><span>permissions</span></div>'
-			+ '<div class="permission-editor-metrics">'
-				+ '<div><strong>' + String(visibleGrantCount) + '</strong><span> grants</span></div>'
-			+ '</div>'
-		+ '</div>';
-		var scopeHtml = '<p class="permission-editor-role-description permission-editor-role-scope">Current scope: ' + escapeHtml(String(permissionEditScope.label || 'No editable roles')) + '.</p>';
-		var metaHtml = '<div class="permission-editor-meta">' + scopeHtml + '</div>';
+		var headerHtml = buildPermissionEditorHeader(selectedRoleName, visibleGrantCount);
+		var metaHtml = buildPermissionEditorMeta(String(permissionEditScope.label || 'No editable roles'));
 		var remainingSectionHtml = remainingCards ? '<section class="permission-group"><div class="permission-group-heading"><h5>Other resources</h5><p>Resources not covered by the main groups above.</p></div><div class="permission-group-grid">' + remainingCards + '</div></section>' : '';
 		matrixContainer.innerHTML = headerHtml + metaHtml + groupedCards + remainingSectionHtml;
 		saveButton.disabled = false;
@@ -292,6 +360,16 @@ function setupAdminPermissionManagementHandlers() {
 		renderMatrix();
 	});
 
+	matrixContainer.addEventListener('change', function(event) {
+		var target = event.target;
+		if (!target || target.tagName !== 'INPUT' || target.type !== 'checkbox') {
+			return;
+		}
+		if ((target.getAttribute('data-grant-key') || '') === 'widgets:read') {
+			syncWidgetCustomizeDependency();
+		}
+	});
+
 	saveButton.addEventListener('click', function() {
 		var selectedRoleId = getSelectedRoleId();
 		if (selectedRoleId < 1) {
@@ -307,6 +385,7 @@ function setupAdminPermissionManagementHandlers() {
 
 		saveButton.disabled = true;
 		setInlineResult('Saving permissions...', false);
+		syncWidgetCustomizeDependency();
 
 		apiPost('admin_role_permissions_update', {
 			role_id: selectedRoleId,
@@ -344,4 +423,5 @@ function setupAdminPermissionManagementHandlers() {
 	}
 
 	renderMatrix();
+	syncWidgetCustomizeDependency();
 }

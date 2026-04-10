@@ -291,6 +291,7 @@ function getPermissionResourceDefinitions() {
 	return [
 		'home' => ['display_name' => 'Home', 'description' => 'Landing page access'],
 		'records' => ['display_name' => 'Data', 'description' => 'Records page and CRUD actions'],
+		'widgets' => ['display_name' => 'Widgets', 'description' => 'Header widgets and customization controls'],
 		'reports' => ['display_name' => 'Reports', 'description' => 'Reports page and exports'],
 		'audit_log' => ['display_name' => 'Audit Trail', 'description' => 'Audit trail page access'],
 		'admin' => ['display_name' => 'Admin', 'description' => 'Admin workspace access'],
@@ -300,11 +301,17 @@ function getPermissionResourceDefinitions() {
 
 function getPermissionActionDefinitions() {
 	return [
-		'read' => ['display_name' => 'Read', 'description' => 'View the page or resource'],
+		'read' => ['display_name' => 'Visible', 'description' => 'View the page or resource'],
+		'customize' => ['display_name' => 'Customize', 'description' => 'Change widget visibility preferences'],
 		'create' => ['display_name' => 'Create', 'description' => 'Add new entries'],
 		'update' => ['display_name' => 'Update', 'description' => 'Edit existing entries'],
 		'delete' => ['display_name' => 'Delete', 'description' => 'Remove entries, including bulk delete'],
 		'export' => ['display_name' => 'Export', 'description' => 'Download or export data'],
+		'total_entries' => ['display_name' => 'Entries Widget', 'description' => 'Show the entries widget in the header'],
+		'total_edits' => ['display_name' => 'Edits Widget', 'description' => 'Show the edits widget in the header'],
+		'adds_today' => ['display_name' => 'Adds Today Widget', 'description' => 'Show the adds today widget in the header'],
+		'deletes_today' => ['display_name' => 'Deletes Today Widget', 'description' => 'Show the deletes today widget in the header'],
+		'local_time' => ['display_name' => 'Local Time Widget', 'description' => 'Show the local time widget in the header'],
 		'manage_users' => ['display_name' => 'Manage Users', 'description' => 'Create and edit users'],
 		'manage_permissions' => ['display_name' => 'Manage Permissions', 'description' => 'Edit role and user permissions'],
 		'admin_role_create' => ['display_name' => 'Admin Role Create', 'description' => 'Add new roles'],
@@ -397,12 +404,37 @@ function ensurePermissionsSchema(PDO $pdo) {
 		'INSERT IGNORE INTO permissions (permission_key, display_name, description, created_at)
 		 VALUES (:permission_key, :display_name, :description, :created_at)'
 	);
+	$permissionUpdateStmt = $pdo->prepare(
+		'UPDATE permissions
+		 SET display_name = :display_name,
+		     description = :description
+		 WHERE permission_key = :permission_key'
+	);
 	foreach (getPermissionActionDefinitions() as $permissionKey => $definition) {
 		$permissionStmt->execute([
 			':permission_key' => $permissionKey,
 			':display_name' => substr((string)($definition['display_name'] ?? $permissionKey), 0, 100),
 			':description' => isset($definition['description']) ? substr((string)$definition['description'], 0, 255) : null,
 			':created_at' => getDashboardSqlTimestamp(),
+		]);
+		$permissionUpdateStmt->execute([
+			':permission_key' => $permissionKey,
+			':display_name' => substr((string)($definition['display_name'] ?? $permissionKey), 0, 100),
+			':description' => isset($definition['description']) ? substr((string)$definition['description'], 0, 255) : null,
+		]);
+	}
+
+	$resourceUpdateStmt = $pdo->prepare(
+		'UPDATE resources
+		 SET display_name = :display_name,
+		     description = :description
+		 WHERE resource_key = :resource_key'
+	);
+	foreach (getPermissionResourceDefinitions() as $resourceKey => $definition) {
+		$resourceUpdateStmt->execute([
+			':resource_key' => $resourceKey,
+			':display_name' => substr((string)($definition['display_name'] ?? $resourceKey), 0, 150),
+			':description' => isset($definition['description']) ? substr((string)$definition['description'], 0, 255) : null,
 		]);
 	}
 
@@ -579,11 +611,11 @@ function getAllPermissionActions(PDO $pdo) {
 function getDefaultRolePermissionTemplates() {
 	return [
 		'Guest' => ['home' => ['read']],
-		'Administrator' => ['home' => ['read'], 'records' => ['read', 'create', 'update']],
-		'Coordinator' => ['home' => ['read'], 'records' => ['read', 'create', 'update', 'delete']],
-		'Team Leader' => ['home' => ['read'], 'records' => ['read', 'create', 'update', 'delete', 'export'], 'reports' => ['read', 'export']],
-		'Manager' => ['home' => ['read'], 'records' => ['read', 'create', 'update', 'delete', 'export'], 'reports' => ['read', 'export'], 'audit_log' => ['read'], 'admin' => ['read', 'manage_users', 'manage_permissions', 'admin_user_management', 'admin_role_management', 'admin_notifications_management', 'admin_permissions_management', 'admin_role_create', 'admin_role_update', 'admin_permissions_edit_lower']],
-		'Director' => ['home' => ['read'], 'records' => ['read', 'create', 'update', 'delete', 'export'], 'reports' => ['read', 'export'], 'audit_log' => ['read'], 'admin' => ['read', 'manage_users', 'manage_permissions', 'admin_user_management', 'admin_role_management', 'admin_database_management', 'admin_application_management', 'admin_notifications_management', 'admin_permissions_management', 'admin_role_create', 'admin_role_update', 'admin_permissions_edit_self']],
+		'Administrator' => ['home' => ['read'], 'records' => ['read', 'create', 'update'], 'widgets' => ['read', 'customize', 'total_entries', 'total_edits', 'adds_today', 'deletes_today', 'local_time']],
+		'Coordinator' => ['home' => ['read'], 'records' => ['read', 'create', 'update', 'delete'], 'widgets' => ['read', 'customize', 'total_entries', 'total_edits', 'adds_today', 'deletes_today', 'local_time']],
+		'Team Leader' => ['home' => ['read'], 'records' => ['read', 'create', 'update', 'delete', 'export'], 'reports' => ['read', 'export'], 'widgets' => ['read', 'customize', 'total_entries', 'total_edits', 'adds_today', 'deletes_today', 'local_time']],
+		'Manager' => ['home' => ['read'], 'records' => ['read', 'create', 'update', 'delete', 'export'], 'reports' => ['read', 'export'], 'audit_log' => ['read'], 'widgets' => ['read', 'customize', 'total_entries', 'total_edits', 'adds_today', 'deletes_today', 'local_time'], 'admin' => ['read', 'manage_users', 'manage_permissions', 'admin_user_management', 'admin_role_management', 'admin_notifications_management', 'admin_permissions_management', 'admin_role_create', 'admin_role_update', 'admin_permissions_edit_lower']],
+		'Director' => ['home' => ['read'], 'records' => ['read', 'create', 'update', 'delete', 'export'], 'reports' => ['read', 'export'], 'audit_log' => ['read'], 'widgets' => ['read', 'customize', 'total_entries', 'total_edits', 'adds_today', 'deletes_today', 'local_time'], 'admin' => ['read', 'manage_users', 'manage_permissions', 'admin_user_management', 'admin_role_management', 'admin_database_management', 'admin_application_management', 'admin_notifications_management', 'admin_permissions_management', 'admin_role_create', 'admin_role_update', 'admin_permissions_edit_self']],
 		'Full Access' => ['__all__' => ['__all__']],
 	];
 }
@@ -601,10 +633,33 @@ function getPermissionEditorResourceActionMap() {
 	return [
 		'home' => ['read'],
 		'records' => ['read', 'create', 'update', 'delete', 'export'],
+		'widgets' => ['read', 'customize', 'total_entries', 'total_edits', 'adds_today', 'deletes_today', 'local_time'],
 		'reports' => ['read', 'export'],
 		'audit_log' => ['read'],
 		'admin' => ['read', 'manage_users', 'manage_permissions', 'admin_user_management', 'admin_role_management', 'admin_role_create', 'admin_role_update', 'admin_role_delete', 'admin_database_management', 'admin_application_management', 'admin_notifications_management', 'admin_permissions_management'],
 		'dev_tools' => ['read'],
+	];
+}
+
+function getHeaderWidgetPermissionState(PDO $pdo, $userId) {
+	$normalizedUserId = (int)$userId;
+	$widgetKeys = ['total_entries', 'total_edits', 'adds_today', 'deletes_today', 'local_time'];
+	$canView = $normalizedUserId > 0 && userHasPermission($pdo, $normalizedUserId, 'widgets', 'read');
+	$allowedKeys = [];
+	if ($canView) {
+		foreach ($widgetKeys as $widgetKey) {
+			if (userHasPermission($pdo, $normalizedUserId, 'widgets', $widgetKey)) {
+				$allowedKeys[] = $widgetKey;
+			}
+		}
+	}
+
+	$canCustomize = $normalizedUserId > 0 && userHasPermission($pdo, $normalizedUserId, 'widgets', 'customize');
+
+	return [
+		'can_view' => $canView,
+		'can_customize' => $canCustomize,
+		'allowed_keys' => $allowedKeys,
 	];
 }
 
@@ -752,6 +807,7 @@ function seedDefaultRolePermissions(PDO $pdo) {
 	foreach ($permissions as $permission) {
 		$permissionLookup[$permission['key']] = $permission;
 	}
+	$roleHasPermissionsStmt = $pdo->prepare('SELECT 1 FROM role_permissions WHERE role_id = :role_id LIMIT 1');
 
 	$insertStmt = $pdo->prepare('INSERT IGNORE INTO role_permissions (role_id, resource_id, permission_id, created_at) VALUES (:role_id, :resource_id, :permission_id, :created_at)');
 
@@ -759,6 +815,11 @@ function seedDefaultRolePermissions(PDO $pdo) {
 		$roleId = (int)($roleRow['id'] ?? 0);
 		$roleName = trim((string)($roleRow['name'] ?? ''));
 		if ($roleId < 1 || $roleName === '' || !isset($roleTemplates[$roleName])) {
+			continue;
+		}
+
+		$roleHasPermissionsStmt->execute([':role_id' => $roleId]);
+		if ($roleHasPermissionsStmt->fetchColumn()) {
 			continue;
 		}
 
@@ -895,13 +956,19 @@ function filterRolePermissionGrantsForUser(PDO $pdo, $userId, array $grants) {
 		list($resourceKey, $permissionKey) = array_pad(explode(':', $grant, 2), 2, '');
 		$resourceKey = trim((string)$resourceKey);
 		$permissionKey = trim((string)$permissionKey);
-		if ($resourceKey === '' || $permissionKey === '' || !isset($accessMap[$resourceKey])) {
+		if ($resourceKey === '' || $permissionKey === '' || !isset($accessMap[$resourceKey]) || !is_array($accessMap[$resourceKey])) {
 			continue;
 		}
-		if (!in_array($permissionKey, $accessMap[$resourceKey]['permissions'], true)) {
+		if (!in_array($permissionKey, $accessMap[$resourceKey], true)) {
 			continue;
 		}
 		$filtered[] = $resourceKey . ':' . $permissionKey;
+	}
+
+	if (in_array('widgets:customize', $filtered, true) && !in_array('widgets:read', $filtered, true)) {
+		$filtered = array_values(array_filter($filtered, static function($grant) {
+			return $grant !== 'widgets:customize';
+		}));
 	}
 
 	return array_values(array_unique($filtered));
@@ -921,7 +988,13 @@ function userHasPermission(PDO $pdo, $userId, $resourceKey, $permissionKey) {
 
 	$override = getUserPermissionOverride($pdo, $normalizedUserId, $resourceKey, $permissionKey);
 	if ($override !== null) {
-		return (bool)$override;
+		if (!$override) {
+			return false;
+		}
+		if ($resourceKey === 'widgets' && $permissionKey === 'customize' && !userHasPermission($pdo, $normalizedUserId, 'widgets', 'read')) {
+			return false;
+		}
+		return true;
 	}
 
 	$roleIds = getUserRoleIds($pdo, $normalizedUserId);
@@ -930,6 +1003,15 @@ function userHasPermission(PDO $pdo, $userId, $resourceKey, $permissionKey) {
 	}
 
 	foreach ($roleIds as $roleId) {
+		if (!getRolePermissionGrant($pdo, $roleId, $resourceKey, $permissionKey)) {
+			continue;
+		}
+		if ($resourceKey === 'widgets' && $permissionKey === 'customize' && !userHasPermission($pdo, $normalizedUserId, 'widgets', 'read')) {
+			continue;
+		}
+		if ($resourceKey === 'widgets' && $permissionKey === 'customize') {
+			return true;
+		}
 		if (getRolePermissionGrant($pdo, $roleId, $resourceKey, $permissionKey)) {
 			return true;
 		}
@@ -1522,10 +1604,8 @@ function createDevToolsUser(PDO $pdo, $email, $username, $displayName, $status, 
 	}
 
 	try {
-		// Do not fail user creation if preferences already exist or setup temporarily fails.
 		ensureDefaultHeaderWidgetPreferencesForUser($pdo, $userId);
 	} catch (Throwable $e) {
-		// Non-critical: preferences are lazily ensured elsewhere when needed.
 	}
 
 	return [
@@ -1776,7 +1856,6 @@ function resetDashboardSqlData(PDO $pdo) {
 		$pdo->exec('DELETE FROM records');
 		$pdo->commit();
 
-		// Reset counters while tables are empty, then insert deterministic sample IDs.
 		$pdo->exec('ALTER TABLE records AUTO_INCREMENT = 1');
 		$pdo->exec('ALTER TABLE activity_log AUTO_INCREMENT = 1');
 		$pdo->exec('ALTER TABLE audit_log AUTO_INCREMENT = 1');
