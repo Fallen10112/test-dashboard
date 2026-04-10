@@ -139,7 +139,7 @@ requirePagePermission('admin', 'read');
 				<?php if ($adminTabPermissionFlags['user_management']): ?><div class="admin-tab-panel active" id="admin-tab-panel-user-management" role="tabpanel" aria-labelledby="admin-tab-btn-user-management">
 					<h4>User Management</h4>
 					<p>Create new users and update existing users details.</p>
-					<input type="hidden" id="dev-tools-current-user-id" value="<?php echo $adminCurrentUserId; ?>">
+					<input type="hidden" id="admin-current-user-id" value="<?php echo $adminCurrentUserId; ?>">
 
 					<div class="admin-accordion">
 						<div class="admin-accordion-section">
@@ -150,20 +150,20 @@ requirePagePermission('admin', 'read');
 							<div class="admin-accordion-body" id="admin-accordion-body-create" hidden>
 								<div class="account-form" autocomplete="off">
 									<div class="form-group">
-										<label for="dev-users-create-email">Email</label>
-										<input type="email" id="dev-users-create-email" maxlength="255" placeholder="new.user@example.com">
+										<label for="admin-users-create-email">Email</label>
+										<input type="email" id="admin-users-create-email" maxlength="255" placeholder="new.user@example.com">
 									</div>
 									<div class="form-group">
-										<label for="dev-users-create-username">Username</label>
-										<input type="text" id="dev-users-create-username" maxlength="100" placeholder="newuser">
+										<label for="admin-users-create-username">Username</label>
+										<input type="text" id="admin-users-create-username" maxlength="100" placeholder="newuser">
 									</div>
 									<div class="form-group">
-										<label for="dev-users-create-display-name">Display Name</label>
-										<input type="text" id="dev-users-create-display-name" maxlength="150" placeholder="New User">
+										<label for="admin-users-create-display-name">Display Name</label>
+										<input type="text" id="admin-users-create-display-name" maxlength="150" placeholder="New User">
 									</div>
 									<div class="form-group">
-										<label for="dev-users-create-role">Role</label>
-										<select id="dev-users-create-role">
+										<label for="admin-users-create-role">Role</label>
+										<select id="admin-users-create-role">
 											<option value="" selected disabled>Select role</option>
 											<?php foreach ($adminRoles as $adminRole): ?>
 												<option value="<?php echo (int)($adminRole['id'] ?? 0); ?>"><?php echo htmlspecialchars($adminRole['name'] ?? '', ENT_QUOTES, 'UTF-8'); ?></option>
@@ -171,16 +171,16 @@ requirePagePermission('admin', 'read');
 										</select>
 									</div>
 									<div class="form-group">
-										<label for="dev-users-create-status">Status</label>
-										<select id="dev-users-create-status">
+										<label for="admin-users-create-status">Status</label>
+										<select id="admin-users-create-status">
 											<option value="active" selected>active</option>
 											<option value="disabled">disabled</option>
 										</select>
 									</div>
 									<div class="form-actions">
-										<button id="dev-users-create-btn" type="button" class="btn btn-primary">Create User</button>
+										<button id="admin-users-create-btn" type="button" class="btn btn-primary">Create User</button>
 									</div>
-									<p id="dev-users-create-result" class="dev-tools-inline-result" hidden></p>
+									<p id="admin-users-create-result" class="admin-tools-inline-result" hidden></p>
 								</div>
 							</div>
 						</div>
@@ -193,8 +193,8 @@ requirePagePermission('admin', 'read');
 							<div class="admin-accordion-body" id="admin-accordion-body-user-list" hidden>
 								<div class="account-form" autocomplete="off">
 									<div class="form-group admin-user-list-filter-group">
-										<label for="dev-users-list-status-filter">Status</label>
-										<select id="dev-users-list-status-filter">
+										<label for="admin-users-list-status-filter">Status</label>
+										<select id="admin-users-list-status-filter">
 											<option value="all" selected>All</option>
 											<option value="active">Active</option>
 											<option value="disabled">Deactivated</option>
@@ -223,7 +223,7 @@ requirePagePermission('admin', 'read');
 															<td><?php echo htmlspecialchars($adminUser['email'] ?? '', ENT_QUOTES, 'UTF-8'); ?></td>
 															<td><?php echo htmlspecialchars($adminUser['display_name'] ?? '', ENT_QUOTES, 'UTF-8'); ?></td>
 															<td><?php echo htmlspecialchars(($adminUser['last_login_at'] ?? '') !== '' ? (string)$adminUser['last_login_at'] : 'Never', ENT_QUOTES, 'UTF-8'); ?></td>
-															<td><button type="button" class="btn btn-secondary btn-sm dev-users-edit-user-btn" data-user-id="<?php echo (int)($adminUser['id'] ?? 0); ?>">Edit User</button></td>
+															<td><button type="button" class="btn btn-secondary btn-sm admin-users-edit-user-btn" data-user-id="<?php echo (int)($adminUser['id'] ?? 0); ?>">Edit User</button></td>
 														</tr>
 													<?php endforeach; ?>
 												<?php endif; ?>
@@ -243,30 +243,30 @@ requirePagePermission('admin', 'read');
 							<div class="admin-accordion-body" id="admin-accordion-body-update" hidden>
 								<div class="account-form" autocomplete="off">
 									<div class="form-group">
-										<label for="dev-users-update-lookup">Lookup (email, username or id)</label>
-										<input type="text" id="dev-users-update-lookup" maxlength="100" placeholder="e.g. 12 or johndoe">
+										<label for="admin-users-update-lookup">Lookup (email, username or id)</label>
+										<input type="text" id="admin-users-update-lookup" maxlength="100" placeholder="e.g. 12 or johndoe">
 									</div>
 									<div class="form-actions">
-										<button id="dev-users-update-detect-btn" type="button" class="btn btn-secondary">Detect User</button>
+										<button id="admin-users-update-detect-btn" type="button" class="btn btn-secondary">Detect User</button>
 									</div>
-									<p id="dev-users-update-detected" class="dev-tools-inline-result" hidden></p>
+									<p id="admin-users-update-detected" class="admin-tools-inline-result" hidden></p>
 
-									<div id="dev-users-update-fields" hidden>
+									<div id="admin-users-update-fields" hidden>
 										<div class="form-group">
-											<label for="dev-users-update-email">Email</label>
-											<input type="email" id="dev-users-update-email" maxlength="255" placeholder="user@example.com" disabled>
+											<label for="admin-users-update-email">Email</label>
+											<input type="email" id="admin-users-update-email" maxlength="255" placeholder="user@example.com" disabled>
 										</div>
 										<div class="form-group">
-											<label for="dev-users-update-username">Username</label>
-											<input type="text" id="dev-users-update-username" maxlength="100" placeholder="username" disabled>
+											<label for="admin-users-update-username">Username</label>
+											<input type="text" id="admin-users-update-username" maxlength="100" placeholder="username" disabled>
 										</div>
 										<div class="form-group">
-											<label for="dev-users-update-display-name">Display Name</label>
-											<input type="text" id="dev-users-update-display-name" maxlength="150" placeholder="Display name" disabled>
+											<label for="admin-users-update-display-name">Display Name</label>
+											<input type="text" id="admin-users-update-display-name" maxlength="150" placeholder="Display name" disabled>
 										</div>
 										<div class="form-group">
-											<label for="dev-users-update-role">Role</label>
-											<select id="dev-users-update-role" disabled>
+											<label for="admin-users-update-role">Role</label>
+											<select id="admin-users-update-role" disabled>
 												<option value="" selected disabled>Select role</option>
 												<?php foreach ($adminRoles as $adminRole): ?>
 													<option value="<?php echo (int)($adminRole['id'] ?? 0); ?>"><?php echo htmlspecialchars($adminRole['name'] ?? '', ENT_QUOTES, 'UTF-8'); ?></option>
@@ -274,24 +274,24 @@ requirePagePermission('admin', 'read');
 											</select>
 										</div>
 										<div class="form-group">
-											<label for="dev-users-update-status">Status</label>
-											<select id="dev-users-update-status" disabled>
+											<label for="admin-users-update-status">Status</label>
+											<select id="admin-users-update-status" disabled>
 												<option value="active">active</option>
 												<option value="disabled">disabled</option>
 											</select>
 										</div>
 										<div class="form-group">
-											<label for="dev-users-update-reset-password">Reset Password</label>
-											<select id="dev-users-update-reset-password" disabled>
+											<label for="admin-users-update-reset-password">Reset Password</label>
+											<select id="admin-users-update-reset-password" disabled>
 												<option value="no" selected>No</option>
 												<option value="yes">Yes</option>
 											</select>
 										</div>
 									</div>
-									<div class="form-actions" id="dev-users-update-actions" hidden>
-										<button id="dev-users-update-btn" type="button" class="btn btn-primary" disabled>Update User</button>
+									<div class="form-actions" id="admin-users-update-actions" hidden>
+										<button id="admin-users-update-btn" type="button" class="btn btn-primary" disabled>Update User</button>
 									</div>
-									<p id="dev-users-update-result" class="dev-tools-inline-result" hidden></p>
+									<p id="admin-users-update-result" class="admin-tools-inline-result" hidden></p>
 								</div>
 							</div>
 						</div>
@@ -337,17 +337,17 @@ requirePagePermission('admin', 'read');
 							<div class="admin-accordion-body" id="admin-accordion-body-role-create" hidden>
 								<div class="account-form" autocomplete="off">
 									<div class="form-group">
-										<label for="dev-roles-create-name">Name</label>
-										<input type="text" id="dev-roles-create-name" maxlength="50" placeholder="viewer">
+										<label for="admin-roles-create-name">Name</label>
+										<input type="text" id="admin-roles-create-name" maxlength="50" placeholder="viewer">
 									</div>
 									<div class="form-group">
-										<label for="dev-roles-create-description">Description</label>
-										<textarea id="dev-roles-create-description" maxlength="255" rows="3" placeholder="Read-only access role"></textarea>
+										<label for="admin-roles-create-description">Description</label>
+										<textarea id="admin-roles-create-description" maxlength="255" rows="3" placeholder="Read-only access role"></textarea>
 									</div>
 									<div class="form-actions">
-										<button id="dev-roles-create-btn" type="button" class="btn btn-primary">Create Role</button>
+										<button id="admin-roles-create-btn" type="button" class="btn btn-primary">Create Role</button>
 									</div>
-									<p id="dev-roles-create-result" class="dev-tools-inline-result" hidden></p>
+									<p id="admin-roles-create-result" class="admin-tools-inline-result" hidden></p>
 								</div>
 							</div>
 						</div>
@@ -362,28 +362,28 @@ requirePagePermission('admin', 'read');
 							<div class="admin-accordion-body" id="admin-accordion-body-role-update" hidden>
 								<div class="account-form" autocomplete="off">
 									<div class="form-group">
-										<label for="dev-roles-update-lookup">Lookup (id or name)</label>
-										<input type="text" id="dev-roles-update-lookup" maxlength="100" placeholder="e.g. 7 or viewer">
+										<label for="admin-roles-update-lookup">Lookup (id or name)</label>
+										<input type="text" id="admin-roles-update-lookup" maxlength="100" placeholder="e.g. 7 or viewer">
 									</div>
 									<div class="form-actions">
-										<button id="dev-roles-update-detect-btn" type="button" class="btn btn-secondary">Detect Role</button>
+										<button id="admin-roles-update-detect-btn" type="button" class="btn btn-secondary">Detect Role</button>
 									</div>
-									<p id="dev-roles-update-detected" class="dev-tools-inline-result" hidden></p>
+									<p id="admin-roles-update-detected" class="admin-tools-inline-result" hidden></p>
 
-									<div id="dev-roles-update-fields" hidden>
+									<div id="admin-roles-update-fields" hidden>
 										<div class="form-group">
-											<label for="dev-roles-update-name">Name</label>
-											<input type="text" id="dev-roles-update-name" maxlength="50" placeholder="viewer" disabled>
+											<label for="admin-roles-update-name">Name</label>
+											<input type="text" id="admin-roles-update-name" maxlength="50" placeholder="viewer" disabled>
 										</div>
 										<div class="form-group">
-											<label for="dev-roles-update-description">Description</label>
-											<textarea id="dev-roles-update-description" maxlength="255" rows="3" placeholder="Read-only access role" disabled></textarea>
+											<label for="admin-roles-update-description">Description</label>
+											<textarea id="admin-roles-update-description" maxlength="255" rows="3" placeholder="Read-only access role" disabled></textarea>
 										</div>
 									</div>
-									<div class="form-actions" id="dev-roles-update-actions" hidden>
-										<button id="dev-roles-update-btn" type="button" class="btn btn-primary" disabled>Update Role</button>
+									<div class="form-actions" id="admin-roles-update-actions" hidden>
+										<button id="admin-roles-update-btn" type="button" class="btn btn-primary" disabled>Update Role</button>
 									</div>
-									<p id="dev-roles-update-result" class="dev-tools-inline-result" hidden></p>
+									<p id="admin-roles-update-result" class="admin-tools-inline-result" hidden></p>
 								</div>
 							</div>
 						</div>
@@ -398,8 +398,8 @@ requirePagePermission('admin', 'read');
 							<div class="admin-accordion-body" id="admin-accordion-body-role-delete" hidden>
 								<div class="account-form" autocomplete="off">
 									<div class="form-group">
-										<label for="dev-roles-delete-role">Role</label>
-										<select id="dev-roles-delete-role">
+										<label for="admin-roles-delete-role">Role</label>
+										<select id="admin-roles-delete-role">
 											<option value="" selected disabled>Select role to delete</option>
 											<?php foreach ($adminRoles as $adminRole): ?>
 												<option value="<?php echo (int)($adminRole['id'] ?? 0); ?>"><?php echo (int)($adminRole['id'] ?? 0); ?>: <?php echo htmlspecialchars($adminRole['name'] ?? '', ENT_QUOTES, 'UTF-8'); ?></option>
@@ -407,11 +407,11 @@ requirePagePermission('admin', 'read');
 										</select>
 									</div>
 									<div class="form-actions">
-										<button id="dev-roles-delete-btn" type="button" class="btn btn-danger" disabled>Delete Role</button>
+										<button id="admin-roles-delete-btn" type="button" class="btn btn-danger" disabled>Delete Role</button>
 									</div>
-									<p id="dev-roles-delete-detected" class="dev-tools-inline-result" hidden></p>
-									<p id="dev-roles-delete-result" class="dev-tools-inline-result" hidden></p>
-									<div id="dev-roles-delete-details" class="role-delete-details" hidden></div>
+									<p id="admin-roles-delete-detected" class="admin-tools-inline-result" hidden></p>
+									<p id="admin-roles-delete-result" class="admin-tools-inline-result" hidden></p>
+									<div id="admin-roles-delete-details" class="role-delete-details" hidden></div>
 								</div>
 							</div>
 						</div>
@@ -448,7 +448,7 @@ requirePagePermission('admin', 'read');
 							</div>
 
 							<div id="admin-permissions-matrix" class="admin-permissions-matrix"></div>
-							<p id="admin-permissions-result" class="dev-tools-inline-result" hidden></p>
+							<p id="admin-permissions-result" class="admin-tools-inline-result" hidden></p>
 						</div>
 				</div><?php endif; ?>
 

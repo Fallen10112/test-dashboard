@@ -1344,14 +1344,14 @@ function setupDevToolsMaintenanceHandlers() {
 }
 
 
-function setupDevToolsUserManagementHandlers() {
-	const $createButton = $('#dev-users-create-btn');
-	const $updateDetectButton = $('#dev-users-update-detect-btn');
-	const $updateButton = $('#dev-users-update-btn');
-	const $deleteDetectButton = $('#dev-users-delete-detect-btn');
-	const $deleteButton = $('#dev-users-delete-btn');
-	const $widgetResetDetectButton = $('#dev-users-widget-reset-detect-btn');
-	const $widgetResetButton = $('#dev-users-widget-reset-btn');
+function setupUserManagementHandlers() {
+	const $createButton = $('[id$="-users-create-btn"]');
+	const $updateDetectButton = $('[id$="-users-update-detect-btn"]');
+	const $updateButton = $('[id$="-users-update-btn"]');
+	const $deleteDetectButton = $('[id$="-users-delete-detect-btn"]');
+	const $deleteButton = $('[id$="-users-delete-btn"]');
+	const $widgetResetDetectButton = $('[id$="-users-widget-reset-detect-btn"]');
+	const $widgetResetButton = $('[id$="-users-widget-reset-btn"]');
 
 	if ($createButton.length === 0 && $updateDetectButton.length === 0 && $deleteDetectButton.length === 0 && $widgetResetDetectButton.length === 0) {
 		return;
@@ -1363,7 +1363,7 @@ function setupDevToolsUserManagementHandlers() {
 	let updateDetectedLabel = '';
 	let deleteDetectedLabel = '';
 	let widgetResetDetectedLabel = '';
-	const currentUserId = parseInt($('#dev-tools-current-user-id').val(), 10) || 0;
+	const currentUserId = parseInt($('#admin-current-user-id').length > 0 ? $('#admin-current-user-id').val() : $('#dev-tools-current-user-id').val(), 10) || 0;
 
 	const setInlineResult = function(selector, message, isError) {
 		const $target = $(selector);
@@ -1396,7 +1396,7 @@ function setupDevToolsUserManagementHandlers() {
 	const initialUserListPayload = window.ADMIN_USER_LIST && typeof window.ADMIN_USER_LIST === 'object'
 		? window.ADMIN_USER_LIST
 		: {};
-	const $userListStatusFilter = $('#dev-users-list-status-filter');
+	const $userListStatusFilter = $('[id$="-users-list-status-filter"]');
 	const $userListTableBody = $('#admin-user-list-table-body');
 	const $updateSectionBody = $('#admin-accordion-body-update');
 	const $updateSectionHeader = $('[aria-controls="admin-accordion-body-update"]');
@@ -1473,7 +1473,7 @@ function setupDevToolsUserManagementHandlers() {
 			displayNameCell.textContent = String(user.display_name || '');
 			lastLoginCell.textContent = formatUserLastLogin(user.last_login_at);
 			editButton.type = 'button';
-			editButton.className = 'btn btn-secondary btn-sm dev-users-edit-user-btn';
+			editButton.className = 'btn btn-secondary btn-sm admin-users-edit-user-btn';
 			editButton.textContent = 'Edit User';
 			editButton.setAttribute('data-user-id', String(user.id || ''));
 			editButton.addEventListener('click', function() {
@@ -1531,8 +1531,8 @@ function setupDevToolsUserManagementHandlers() {
 		}
 
 		openUpdateUserSection();
-		$('#dev-users-update-lookup').val(String(normalizedUserId));
-		setInlineResult('#dev-users-update-result', '', false);
+		$('[id$="-users-update-lookup"]').val(String(normalizedUserId));
+		setInlineResult('[id$="-users-update-result"]', '', false);
 		$updateDetectButton.trigger('click');
 		const updateBodyEl = $updateSectionBody.get(0);
 		if (updateBodyEl && typeof updateBodyEl.scrollIntoView === 'function') {
@@ -1564,8 +1564,8 @@ function setupDevToolsUserManagementHandlers() {
 
 	const setUpdateControlsEnabled = function(enabled) {
 		const canEdit = !!enabled;
-		const $updateFields = $('#dev-users-update-fields');
-		const $updateActions = $('#dev-users-update-actions');
+		const $updateFields = $('[id$="-users-update-fields"]');
+		const $updateActions = $('[id$="-users-update-actions"]');
 		if ($updateFields.length > 0) {
 			if (canEdit) {
 				$updateFields.removeAttr('hidden');
@@ -1580,37 +1580,37 @@ function setupDevToolsUserManagementHandlers() {
 				$updateActions.attr('hidden', 'hidden');
 			}
 		}
-		$('#dev-users-update-email').prop('disabled', !canEdit);
-		$('#dev-users-update-username').prop('disabled', !canEdit);
-		$('#dev-users-update-display-name').prop('disabled', !canEdit);
-		$('#dev-users-update-role').prop('disabled', !canEdit);
-		$('#dev-users-update-status').prop('disabled', !canEdit);
-		$('#dev-users-update-reset-password').prop('disabled', !canEdit);
+		$('[id$="-users-update-email"]').prop('disabled', !canEdit);
+		$('[id$="-users-update-username"]').prop('disabled', !canEdit);
+		$('[id$="-users-update-display-name"]').prop('disabled', !canEdit);
+		$('[id$="-users-update-role"]').prop('disabled', !canEdit);
+		$('[id$="-users-update-status"]').prop('disabled', !canEdit);
+		$('[id$="-users-update-reset-password"]').prop('disabled', !canEdit);
 		$updateButton.prop('disabled', !canEdit);
 	};
 
 	setUpdateControlsEnabled(false);
 
-	$('#dev-users-update-lookup').on('input', function() {
+	$('[id$="-users-update-lookup"]').on('input', function() {
 		updateTargetUserId = 0;
 		updateDetectedLabel = '';
 		setUpdateControlsEnabled(false);
-		setInlineResult('#dev-users-update-detected', '', false);
+		setInlineResult('[id$="-users-update-detected"]', '', false);
 	});
 
-	$('#dev-users-delete-lookup').on('input', function() {
+	$('[id$="-users-delete-lookup"]').on('input', function() {
 		deleteTargetUserId = 0;
 		deleteDetectedLabel = '';
 		$deleteButton.prop('disabled', true);
-		setInlineResult('#dev-users-delete-detected', '', false);
+		setInlineResult('[id$="-users-delete-detected"]', '', false);
 	});
 
-	$('#dev-users-widget-reset-lookup').on('input', function() {
+	$('[id$="-users-widget-reset-lookup"]').on('input', function() {
 		widgetResetTargetUserId = 0;
 		widgetResetDetectedLabel = '';
 		$widgetResetButton.prop('disabled', true);
-		setInlineResult('#dev-users-widget-reset-detected', '', false);
-		setInlineResult('#dev-users-widget-reset-result', '', false);
+		setInlineResult('[id$="-users-widget-reset-detected"]', '', false);
+		setInlineResult('[id$="-users-widget-reset-result"]', '', false);
 	});
 
 	const lookupUser = function(lookupValue, onSuccess, onError) {
@@ -1637,14 +1637,14 @@ function setupDevToolsUserManagementHandlers() {
 	};
 
 	$createButton.on('click', function() {
-		setInlineResult('#dev-users-create-result', '', false);
-		const email = String($('#dev-users-create-email').val() || '').trim();
-		const username = String($('#dev-users-create-username').val() || '').trim();
-		const displayName = String($('#dev-users-create-display-name').val() || '').trim();
-		const roleId = parseInt($('#dev-users-create-role').val(), 10) || 0;
-		const status = String($('#dev-users-create-status').val() || 'active').toLowerCase();
+		setInlineResult('[id$="-users-create-result"]', '', false);
+		const email = String($('[id$="-users-create-email"]').val() || '').trim();
+		const username = String($('[id$="-users-create-username"]').val() || '').trim();
+		const displayName = String($('[id$="-users-create-display-name"]').val() || '').trim();
+		const roleId = parseInt($('[id$="-users-create-role"]').val(), 10) || 0;
+		const status = String($('[id$="-users-create-status"]').val() || 'active').toLowerCase();
 		if (roleId < 1) {
-			setInlineResult('#dev-users-create-result', 'Select a role before creating a user.', true);
+			setInlineResult('[id$="-users-create-result"]', 'Select a role before creating a user.', true);
 			return;
 		}
 
@@ -1656,14 +1656,14 @@ function setupDevToolsUserManagementHandlers() {
 			role_id: roleId
 		}).done(function(response) {
 			if (!response || !response.success) {
-				setInlineResult('#dev-users-create-result', 'Failed to create user.', true);
+				setInlineResult('[id$="-users-create-result"]', 'Failed to create user.', true);
 				return;
 			}
 
 			const generatedPassword = String(response.generated_password || '');
 			const user = response.user || {};
 			setInlineResult(
-				'#dev-users-create-result',
+				'[id$="-users-create-result"]',
 				'User created. ' + userLabel(user) + ' | Generated password: ' + generatedPassword,
 				false
 			);
@@ -1679,49 +1679,49 @@ function setupDevToolsUserManagementHandlers() {
 			const message = xhr && xhr.responseJSON && xhr.responseJSON.message
 				? xhr.responseJSON.message
 				: 'Failed to create user.';
-			setInlineResult('#dev-users-create-result', message, true);
+			setInlineResult('[id$="-users-create-result"]', message, true);
 		});
 	});
 
 	$updateDetectButton.on('click', function() {
-		setInlineResult('#dev-users-update-result', '', false);
-		lookupUser($('#dev-users-update-lookup').val(), function(user) {
+		setInlineResult('[id$="-users-update-result"]', '', false);
+		lookupUser($('[id$="-users-update-lookup"]').val(), function(user) {
 			updateTargetUserId = parseInt(user.id, 10) || 0;
 			updateDetectedLabel = userLabel(user);
-			$('#dev-users-update-email').val(String(user.email || ''));
-			$('#dev-users-update-username').val(String(user.username || ''));
-			$('#dev-users-update-display-name').val(String(user.display_name || ''));
-			$('#dev-users-update-role').val(String(user.role_id || ''));
-			$('#dev-users-update-status').val(String(user.status || 'active').toLowerCase());
-			$('#dev-users-update-reset-password').val('no');
+			$('[id$="-users-update-email"]').val(String(user.email || ''));
+			$('[id$="-users-update-username"]').val(String(user.username || ''));
+			$('[id$="-users-update-display-name"]').val(String(user.display_name || ''));
+			$('[id$="-users-update-role"]').val(String(user.role_id || ''));
+			$('[id$="-users-update-status"]').val(String(user.status || 'active').toLowerCase());
+			$('[id$="-users-update-reset-password"]').val('no');
 			setUpdateControlsEnabled(updateTargetUserId > 0);
-			setInlineResult('#dev-users-update-detected', updateDetectedLabel, false);
+			setInlineResult('[id$="-users-update-detected"]', updateDetectedLabel, false);
 		}, function(message) {
 			updateTargetUserId = 0;
 			updateDetectedLabel = '';
-			$('#dev-users-update-reset-password').val('no');
+			$('[id$="-users-update-reset-password"]').val('no');
 			setUpdateControlsEnabled(false);
-			setInlineResult('#dev-users-update-detected', message, true);
+			setInlineResult('[id$="-users-update-detected"]', message, true);
 		});
 	});
 
 	$updateButton.on('click', function() {
 		if (updateTargetUserId < 1) {
-			setInlineResult('#dev-users-update-result', 'Detect a user before updating.', true);
+			setInlineResult('[id$="-users-update-result"]', 'Detect a user before updating.', true);
 			return;
 		}
 
 		apiPost('admin_user_update', {
 			user_id: updateTargetUserId,
-			email: String($('#dev-users-update-email').val() || '').trim(),
-			username: String($('#dev-users-update-username').val() || '').trim(),
-			display_name: String($('#dev-users-update-display-name').val() || '').trim(),
-			role_id: parseInt($('#dev-users-update-role').val(), 10) || 0,
-			status: String($('#dev-users-update-status').val() || 'active').toLowerCase(),
-			reset_password: String($('#dev-users-update-reset-password').val() || 'no').toLowerCase() === 'yes'
+			email: String($('[id$="-users-update-email"]').val() || '').trim(),
+			username: String($('[id$="-users-update-username"]').val() || '').trim(),
+			display_name: String($('[id$="-users-update-display-name"]').val() || '').trim(),
+			role_id: parseInt($('[id$="-users-update-role"]').val(), 10) || 0,
+			status: String($('[id$="-users-update-status"]').val() || 'active').toLowerCase(),
+			reset_password: String($('[id$="-users-update-reset-password"]').val() || 'no').toLowerCase() === 'yes'
 		}).done(function(response) {
 			if (!response || !response.success) {
-				setInlineResult('#dev-users-update-result', 'Failed to update user.', true);
+				setInlineResult('[id$="-users-update-result"]', 'Failed to update user.', true);
 				return;
 			}
 
@@ -1738,48 +1738,48 @@ function setupDevToolsUserManagementHandlers() {
 					autoCloseMs: 0
 				});
 			}
-			setInlineResult('#dev-users-update-result', message, false);
+			setInlineResult('[id$="-users-update-result"]', message, false);
 			updateDetectedLabel = userLabel(user);
-			setInlineResult('#dev-users-update-detected', updateDetectedLabel, false);
-			$('#dev-users-update-reset-password').val('no');
+			setInlineResult('[id$="-users-update-detected"]', updateDetectedLabel, false);
+			$('[id$="-users-update-reset-password"]').val('no');
 			refreshUserList();
 		}).fail(function(xhr) {
 			const message = xhr && xhr.responseJSON && xhr.responseJSON.message
 				? xhr.responseJSON.message
 				: 'Failed to update user.';
-			setInlineResult('#dev-users-update-result', message, true);
+			setInlineResult('[id$="-users-update-result"]', message, true);
 		});
 	});
 
 	$deleteDetectButton.on('click', function() {
-		setInlineResult('#dev-users-delete-result', '', false);
-		lookupUser($('#dev-users-delete-lookup').val(), function(user) {
+		setInlineResult('[id$="-users-delete-result"]', '', false);
+		lookupUser($('[id$="-users-delete-lookup"]').val(), function(user) {
 			deleteTargetUserId = parseInt(user.id, 10) || 0;
 			deleteDetectedLabel = userLabel(user);
 			if (currentUserId > 0 && deleteTargetUserId === currentUserId) {
 				$deleteButton.prop('disabled', true);
-				setInlineResult('#dev-users-delete-detected', deleteDetectedLabel, false);
-				setInlineResult('#dev-users-delete-result', 'You cannot force delete your own account.', true);
+				setInlineResult('[id$="-users-delete-detected"]', deleteDetectedLabel, false);
+				setInlineResult('[id$="-users-delete-result"]', 'You cannot force delete your own account.', true);
 				return;
 			}
 			$deleteButton.prop('disabled', deleteTargetUserId < 1);
-			setInlineResult('#dev-users-delete-detected', deleteDetectedLabel, false);
+			setInlineResult('[id$="-users-delete-detected"]', deleteDetectedLabel, false);
 		}, function(message) {
 			deleteTargetUserId = 0;
 			deleteDetectedLabel = '';
 			$deleteButton.prop('disabled', true);
-			setInlineResult('#dev-users-delete-detected', message, true);
+			setInlineResult('[id$="-users-delete-detected"]', message, true);
 		});
 	});
 
 	$deleteButton.on('click', function() {
 		if (deleteTargetUserId < 1) {
-			setInlineResult('#dev-users-delete-result', 'Detect a user before deleting.', true);
+			setInlineResult('[id$="-users-delete-result"]', 'Detect a user before deleting.', true);
 			return;
 		}
 		if (currentUserId > 0 && deleteTargetUserId === currentUserId) {
 			$deleteButton.prop('disabled', true);
-			setInlineResult('#dev-users-delete-result', 'You cannot force delete your own account.', true);
+			setInlineResult('[id$="-users-delete-result"]', 'You cannot force delete your own account.', true);
 			return;
 		}
 
@@ -1797,21 +1797,21 @@ function setupDevToolsUserManagementHandlers() {
 						apiPost('admin_user_force_delete', { user_id: deleteTargetUserId })
 							.done(function(response) {
 								if (!response || !response.success) {
-									setInlineResult('#dev-users-delete-result', 'Failed to force delete user.', true);
+									setInlineResult('[id$="-users-delete-result"]', 'Failed to force delete user.', true);
 									return;
 								}
 
 								const deleted = response.deleted_user || {};
 								setInlineResult(
-									'#dev-users-delete-result',
+									'[id$="-users-delete-result"]',
 									'Force deleted user #' + String(deleted.id || deleteTargetUserId) + ' (' + String(deleted.username || '') + ')',
 									false
 								);
-								setInlineResult('#dev-users-delete-detected', '', false);
+								setInlineResult('[id$="-users-delete-detected"]', '', false);
 								deleteTargetUserId = 0;
 								deleteDetectedLabel = '';
 								$deleteButton.prop('disabled', true);
-								$('#dev-users-delete-lookup').val('');
+								$('[id$="-users-delete-lookup"]').val('');
 								refreshUserList();
 							}
 							)
@@ -1819,7 +1819,7 @@ function setupDevToolsUserManagementHandlers() {
 								const message = xhr && xhr.responseJSON && xhr.responseJSON.message
 									? xhr.responseJSON.message
 									: 'Failed to force delete user.';
-								setInlineResult('#dev-users-delete-result', message, true);
+								setInlineResult('[id$="-users-delete-result"]', message, true);
 							});
 					}
 				}
@@ -1828,23 +1828,23 @@ function setupDevToolsUserManagementHandlers() {
 	});
 
 	$widgetResetDetectButton.on('click', function() {
-		setInlineResult('#dev-users-widget-reset-result', '', false);
-		lookupUser($('#dev-users-widget-reset-lookup').val(), function(user) {
+		setInlineResult('[id$="-users-widget-reset-result"]', '', false);
+		lookupUser($('[id$="-users-widget-reset-lookup"]').val(), function(user) {
 			widgetResetTargetUserId = parseInt(user.id, 10) || 0;
 			widgetResetDetectedLabel = userLabel(user);
 			$widgetResetButton.prop('disabled', widgetResetTargetUserId < 1);
-			setInlineResult('#dev-users-widget-reset-detected', widgetResetDetectedLabel, false);
+			setInlineResult('[id$="-users-widget-reset-detected"]', widgetResetDetectedLabel, false);
 		}, function(message) {
 			widgetResetTargetUserId = 0;
 			widgetResetDetectedLabel = '';
 			$widgetResetButton.prop('disabled', true);
-			setInlineResult('#dev-users-widget-reset-detected', message, true);
+			setInlineResult('[id$="-users-widget-reset-detected"]', message, true);
 		});
 	});
 
 	$widgetResetButton.on('click', function() {
 		if (widgetResetTargetUserId < 1) {
-			setInlineResult('#dev-users-widget-reset-result', 'Detect a user before resetting widget preferences.', true);
+			setInlineResult('[id$="-users-widget-reset-result"]', 'Detect a user before resetting widget preferences.', true);
 			return;
 		}
 
@@ -1862,18 +1862,18 @@ function setupDevToolsUserManagementHandlers() {
 						apiPost('admin_user_reset_widget_prefs', { user_id: widgetResetTargetUserId })
 							.done(function(response) {
 								if (!response || !response.success) {
-									setInlineResult('#dev-users-widget-reset-result', 'Failed to reset widget preferences.', true);
+									setInlineResult('[id$="-users-widget-reset-result"]', 'Failed to reset widget preferences.', true);
 									return;
 								}
 
-								setInlineResult('#dev-users-widget-reset-result', 'Widget preferences reset. ' + widgetResetDetectedLabel, false);
+								setInlineResult('[id$="-users-widget-reset-result"]', 'Widget preferences reset. ' + widgetResetDetectedLabel, false);
 							}
 							)
 							.fail(function(xhr) {
 								const message = xhr && xhr.responseJSON && xhr.responseJSON.message
 									? xhr.responseJSON.message
 									: 'Failed to reset widget preferences.';
-								setInlineResult('#dev-users-widget-reset-result', message, true);
+								setInlineResult('[id$="-users-widget-reset-result"]', message, true);
 							});
 					}
 				}
@@ -1884,11 +1884,11 @@ function setupDevToolsUserManagementHandlers() {
 
 
 function setupAdminRoleManagementHandlers() {
-	const $createButton = $('#dev-roles-create-btn');
-	const $updateDetectButton = $('#dev-roles-update-detect-btn');
-	const $updateButton = $('#dev-roles-update-btn');
-	const $deleteSelect = $('#dev-roles-delete-role');
-	const $deleteButton = $('#dev-roles-delete-btn');
+	const $createButton = $('[id$="-roles-create-btn"]');
+	const $updateDetectButton = $('[id$="-roles-update-detect-btn"]');
+	const $updateButton = $('[id$="-roles-update-btn"]');
+	const $deleteSelect = $('[id$="-roles-delete-role"]');
+	const $deleteButton = $('[id$="-roles-delete-btn"]');
 
 	if ($createButton.length === 0 && $updateDetectButton.length === 0 && $deleteSelect.length === 0) {
 		return;
@@ -2079,19 +2079,19 @@ function setupAdminRoleManagementHandlers() {
 	};
 
 	const renderRoleSelects = function() {
-		populateRoleSelect($('#dev-users-create-role'), 'Select role', function(role) {
+		populateRoleSelect($('[id$="-users-create-role"]'), 'Select role', function(role) {
 			return String(role.name || '');
 		});
-		populateRoleSelect($('#dev-users-update-role'), 'Select role', function(role) {
+		populateRoleSelect($('[id$="-users-update-role"]'), 'Select role', function(role) {
 			return String(role.name || '');
-		}, $('#dev-users-update-role').val());
-		populateRoleSelect($('#dev-roles-delete-role'), 'Select role to delete', roleLabel, deleteTargetRoleId > 0 ? String(deleteTargetRoleId) : '');
+		}, $('[id$="-users-update-role"]').val());
+		populateRoleSelect($('[id$="-roles-delete-role"]'), 'Select role to delete', roleLabel, deleteTargetRoleId > 0 ? String(deleteTargetRoleId) : '');
 	};
 
 	const setRoleUpdateControlsEnabled = function(enabled) {
 		const canEdit = !!enabled;
-		const $updateFields = $('#dev-roles-update-fields');
-		const $updateActions = $('#dev-roles-update-actions');
+		const $updateFields = $('[id$="-roles-update-fields"]');
+		const $updateActions = $('[id$="-roles-update-actions"]');
 		if ($updateFields.length > 0) {
 			if (canEdit) {
 				$updateFields.removeAttr('hidden');
@@ -2106,13 +2106,13 @@ function setupAdminRoleManagementHandlers() {
 				$updateActions.attr('hidden', 'hidden');
 			}
 		}
-		$('#dev-roles-update-name').prop('disabled', !canEdit);
-		$('#dev-roles-update-description').prop('disabled', !canEdit);
+		$('[id$="-roles-update-name"]').prop('disabled', !canEdit);
+		$('[id$="-roles-update-description"]').prop('disabled', !canEdit);
 		$updateButton.prop('disabled', !canEdit);
 	};
 
 	const setRoleDeleteDetails = function(affectedUsers, replacementRole) {
-		const detailsEl = document.getElementById('dev-roles-delete-details');
+		const detailsEl = document.querySelector('[id$="-roles-delete-details"]');
 		if (!detailsEl) {
 			return;
 		}
@@ -2155,16 +2155,16 @@ function setupAdminRoleManagementHandlers() {
 			updateTargetRoleId = 0;
 			updateDetectedLabel = '';
 			setRoleUpdateControlsEnabled(false);
-			setInlineResult('#dev-roles-update-detected', '', false);
-			setInlineResult('#dev-roles-update-result', '', false);
-			$('#dev-roles-update-name').val('');
-			$('#dev-roles-update-description').val('');
+			setInlineResult('[id$="-roles-update-detected"]', '', false);
+			setInlineResult('[id$="-roles-update-result"]', '', false);
+			$('[id$="-roles-update-name"]').val('');
+			$('[id$="-roles-update-description"]').val('');
 		}
 		if (deleteTargetRoleId > 0 && getRoleByIdFromState(deleteTargetRoleId) === null) {
 			deleteTargetRoleId = 0;
 			deleteDetectedLabel = '';
 			$deleteButton.prop('disabled', true);
-			setInlineResult('#dev-roles-delete-result', '', false);
+			setInlineResult('[id$="-roles-delete-result"]', '', false);
 			setRoleDeleteDetails([], null);
 		}
 	};
@@ -2196,38 +2196,38 @@ function setupAdminRoleManagementHandlers() {
 	setRoleUpdateControlsEnabled(false);
 	$deleteButton.prop('disabled', deleteTargetRoleId < 1);
 
-	$('#dev-roles-create-name').on('input', function() {
-		setInlineResult('#dev-roles-create-result', '', false);
+	$('[id$="-roles-create-name"]').on('input', function() {
+		setInlineResult('[id$="-roles-create-result"]', '', false);
 	});
-	$('#dev-roles-create-description').on('input', function() {
-		setInlineResult('#dev-roles-create-result', '', false);
+	$('[id$="-roles-create-description"]').on('input', function() {
+		setInlineResult('[id$="-roles-create-result"]', '', false);
 	});
 
-	$('#dev-roles-update-lookup').on('input', function() {
+	$('[id$="-roles-update-lookup"]').on('input', function() {
 		updateTargetRoleId = 0;
 		updateDetectedLabel = '';
 		setRoleUpdateControlsEnabled(false);
-		setInlineResult('#dev-roles-update-detected', '', false);
-		setInlineResult('#dev-roles-update-result', '', false);
-		$('#dev-roles-update-name').val('');
-		$('#dev-roles-update-description').val('');
+		setInlineResult('[id$="-roles-update-detected"]', '', false);
+		setInlineResult('[id$="-roles-update-result"]', '', false);
+		$('[id$="-roles-update-name"]').val('');
+		$('[id$="-roles-update-description"]').val('');
 	});
 
 	$deleteSelect.on('change', function() {
 		deleteTargetRoleId = parseInt($(this).val(), 10) || 0;
 		deleteDetectedLabel = deleteTargetRoleId > 0 ? roleLookupLabel(getRoleByIdFromState(deleteTargetRoleId)) : '';
 		$deleteButton.prop('disabled', deleteTargetRoleId < 1);
-		setInlineResult('#dev-roles-delete-detected', deleteDetectedLabel, false);
-		setInlineResult('#dev-roles-delete-result', '', false);
+		setInlineResult('[id$="-roles-delete-detected"]', deleteDetectedLabel, false);
+		setInlineResult('[id$="-roles-delete-result"]', '', false);
 		setRoleDeleteDetails([], null);
 	});
 
 	$createButton.on('click', function() {
-		setInlineResult('#dev-roles-create-result', '', false);
-		const name = String($('#dev-roles-create-name').val() || '').trim();
-		const description = String($('#dev-roles-create-description').val() || '').trim();
+		setInlineResult('[id$="-roles-create-result"]', '', false);
+		const name = String($('[id$="-roles-create-name"]').val() || '').trim();
+		const description = String($('[id$="-roles-create-description"]').val() || '').trim();
 		if (name === '') {
-			setInlineResult('#dev-roles-create-result', 'Enter a role name before creating a role.', true);
+			setInlineResult('[id$="-roles-create-result"]', 'Enter a role name before creating a role.', true);
 			return;
 		}
 
@@ -2236,16 +2236,16 @@ function setupAdminRoleManagementHandlers() {
 			description: description
 		}).done(function(response) {
 			if (!response || !response.success) {
-				setInlineResult('#dev-roles-create-result', 'Failed to create role.', true);
+				setInlineResult('[id$="-roles-create-result"]', 'Failed to create role.', true);
 				return;
 			}
 
 			setCurrentRoles(response.roles || []);
-			$('#dev-roles-create-name').val('');
-			$('#dev-roles-create-description').val('');
+			$('[id$="-roles-create-name"]').val('');
+			$('[id$="-roles-create-description"]').val('');
 			const createdRole = response.role || {};
 			const message = 'Role created. ' + roleLookupLabel(createdRole);
-			setInlineResult('#dev-roles-create-result', message, false);
+			setInlineResult('[id$="-roles-create-result"]', message, false);
 			showToast({
 				type: 'success',
 				title: 'Role Created',
@@ -2257,48 +2257,48 @@ function setupAdminRoleManagementHandlers() {
 			const message = xhr && xhr.responseJSON && xhr.responseJSON.message
 				? xhr.responseJSON.message
 				: 'Failed to create role.';
-			setInlineResult('#dev-roles-create-result', message, true);
+			setInlineResult('[id$="-roles-create-result"]', message, true);
 		});
 	});
 
 	$updateDetectButton.on('click', function() {
-		setInlineResult('#dev-roles-update-result', '', false);
-		lookupRole($('#dev-roles-update-lookup').val(), function(role) {
+		setInlineResult('[id$="-roles-update-result"]', '', false);
+		lookupRole($('[id$="-roles-update-lookup"]').val(), function(role) {
 			updateTargetRoleId = parseInt(role.id, 10) || 0;
 			updateDetectedLabel = roleLookupLabel(role);
-			$('#dev-roles-update-name').val(String(role.name || ''));
-			$('#dev-roles-update-description').val(String(role.description || ''));
+			$('[id$="-roles-update-name"]').val(String(role.name || ''));
+			$('[id$="-roles-update-description"]').val(String(role.description || ''));
 			setRoleUpdateControlsEnabled(updateTargetRoleId > 0);
-			setInlineResult('#dev-roles-update-detected', updateDetectedLabel, false);
+			setInlineResult('[id$="-roles-update-detected"]', updateDetectedLabel, false);
 		}, function(message) {
 			updateTargetRoleId = 0;
 			updateDetectedLabel = '';
 			setRoleUpdateControlsEnabled(false);
-			setInlineResult('#dev-roles-update-detected', message, true);
+			setInlineResult('[id$="-roles-update-detected"]', message, true);
 		});
 	});
 
 	$updateButton.on('click', function() {
 		if (updateTargetRoleId < 1) {
-			setInlineResult('#dev-roles-update-result', 'Detect a role before updating.', true);
+			setInlineResult('[id$="-roles-update-result"]', 'Detect a role before updating.', true);
 			return;
 		}
 
 		apiPost('admin_role_update', {
 			role_id: updateTargetRoleId,
-			name: String($('#dev-roles-update-name').val() || '').trim(),
-			description: String($('#dev-roles-update-description').val() || '').trim()
+			name: String($('[id$="-roles-update-name"]').val() || '').trim(),
+			description: String($('[id$="-roles-update-description"]').val() || '').trim()
 		}).done(function(response) {
 			if (!response || !response.success) {
-				setInlineResult('#dev-roles-update-result', 'Failed to update role.', true);
+				setInlineResult('[id$="-roles-update-result"]', 'Failed to update role.', true);
 				return;
 			}
 
 			setCurrentRoles(response.roles || []);
 			const role = response.role || {};
 			updateDetectedLabel = roleLookupLabel(role);
-			setInlineResult('#dev-roles-update-detected', updateDetectedLabel, false);
-			setInlineResult('#dev-roles-update-result', 'Role updated. ' + updateDetectedLabel, false);
+			setInlineResult('[id$="-roles-update-detected"]', updateDetectedLabel, false);
+			setInlineResult('[id$="-roles-update-result"]', 'Role updated. ' + updateDetectedLabel, false);
 			showToast({
 				type: 'success',
 				title: 'Role Updated',
@@ -2310,13 +2310,13 @@ function setupAdminRoleManagementHandlers() {
 			const message = xhr && xhr.responseJSON && xhr.responseJSON.message
 				? xhr.responseJSON.message
 				: 'Failed to update role.';
-			setInlineResult('#dev-roles-update-result', message, true);
+			setInlineResult('[id$="-roles-update-result"]', message, true);
 		});
 	});
 
 	$deleteButton.on('click', function() {
 		if (deleteTargetRoleId < 1) {
-			setInlineResult('#dev-roles-delete-result', 'Select a role before deleting.', true);
+			setInlineResult('[id$="-roles-delete-result"]', 'Select a role before deleting.', true);
 			return;
 		}
 
@@ -2339,7 +2339,7 @@ function setupAdminRoleManagementHandlers() {
 						apiPost('admin_role_delete', { role_id: deleteTargetRoleId })
 							.done(function(response) {
 								if (!response || !response.success) {
-									setInlineResult('#dev-roles-delete-result', 'Failed to delete role.', true);
+									setInlineResult('[id$="-roles-delete-result"]', 'Failed to delete role.', true);
 									return;
 								}
 
@@ -2351,9 +2351,9 @@ function setupAdminRoleManagementHandlers() {
 								const reassignmentMessage = affectedUsers.length > 0 && replacementRole
 									? (' ' + String(affectedUsers.length) + ' user(s) reassigned to ' + roleLookupLabel(replacementRole) + '.')
 									: ' No users were affected.';
-								setInlineResult('#dev-roles-delete-result', summaryMessage + reassignmentMessage, false);
+								setInlineResult('[id$="-roles-delete-result"]', summaryMessage + reassignmentMessage, false);
 								setRoleDeleteDetails(affectedUsers, replacementRole);
-								setInlineResult('#dev-roles-delete-detected', '', false);
+								setInlineResult('[id$="-roles-delete-detected"]', '', false);
 								deleteTargetRoleId = 0;
 								deleteDetectedLabel = '';
 								$deleteSelect.val('');
@@ -2370,7 +2370,7 @@ function setupAdminRoleManagementHandlers() {
 								const message = xhr && xhr.responseJSON && xhr.responseJSON.message
 									? xhr.responseJSON.message
 									: 'Failed to delete role.';
-								setInlineResult('#dev-roles-delete-result', message, true);
+								setInlineResult('[id$="-roles-delete-result"]', message, true);
 							});
 					}
 				}

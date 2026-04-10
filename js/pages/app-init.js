@@ -1,7 +1,7 @@
 $(document).ready(function() {
 	initializeTheme();
 	setupDevToolsMaintenanceHandlers();
-	setupDevToolsUserManagementHandlers();
+	setupUserManagementHandlers();
 	setupDevToolsCategorySelector();
 	setupNotificationDropdown();
 	setupUserAvatarDropdown();
