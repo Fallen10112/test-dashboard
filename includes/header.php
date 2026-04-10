@@ -70,7 +70,7 @@ $pageTitle = "Dashboard Showcase";
 		</script>
 		<h1><?php echo $pageTitle; ?></h1>
 		<div class="title-bar-right">
-			<div class="header-metrics header-metrics--loading" aria-label="Dashboard analytics">
+			<div class="header-metrics header-metrics--loading" style="visibility: hidden;" aria-label="Dashboard analytics">
 				<div class="metric-pill" id="metric-total-entries" data-widget-key="total_entries">
 					<span class="metric-label">Entries</span>
 					<span class="metric-value">--</span>

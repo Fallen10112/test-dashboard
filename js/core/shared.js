@@ -147,6 +147,7 @@ function applyHeaderWidgetPreferences(preferences) {
 	});
 
 	container.hidden = visibleCount === 0;
+	container.style.visibility = visibleCount === 0 ? 'hidden' : 'visible';
 	container.classList.remove('header-metrics--loading');
 	return normalized;
 }
@@ -169,6 +170,9 @@ function loadHeaderWidgetPreferences() {
 	}).always(function() {
 		const container = document.querySelector('.header-metrics');
 		if (container) {
+			if (container.hidden !== true) {
+				container.style.visibility = 'visible';
+			}
 			container.classList.remove('header-metrics--loading');
 		}
 	});
