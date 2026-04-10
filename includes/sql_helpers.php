@@ -301,7 +301,7 @@ function getPermissionResourceDefinitions() {
 
 function getPermissionActionDefinitions() {
 	return [
-		'read' => ['display_name' => 'Visible', 'description' => 'View the page or resource'],
+		'read' => ['display_name' => 'Visible', 'description' => 'View the page'],
 		'customize' => ['display_name' => 'Customize', 'description' => 'Change widget visibility preferences'],
 		'create' => ['display_name' => 'Create', 'description' => 'Add new entries'],
 		'update' => ['display_name' => 'Update', 'description' => 'Edit existing entries'],

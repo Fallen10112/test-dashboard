@@ -685,6 +685,10 @@
     margin-top: 14px;
 }
 
+#admin-users-update-result {
+    margin-top: 14px;
+}
+
 #dev-users-update-actions[hidden],
 #admin-users-update-actions[hidden] {
     display: none !important;

@@ -1,6 +1,7 @@
 function setupAdminPageHandlers() {
 	const tabs = Array.prototype.slice.call(document.querySelectorAll('.admin-tab-btn[data-admin-tab]'));
 	const panels = Array.prototype.slice.call(document.querySelectorAll('.admin-tab-panel'));
+	const tabStorageKey = 'admin-page-active-tab';
 
 	if (tabs.length === 0 || panels.length === 0) {
 		return;
@@ -10,17 +11,30 @@ function setupAdminPageHandlers() {
 		if (!tabKey) {
 			return;
 		}
+		const normalizedTabKey = String(tabKey || '').trim();
+		const hasMatchingTab = tabs.some(function(tabBtn) {
+			return String(tabBtn.getAttribute('data-admin-tab') || '') === normalizedTabKey;
+		});
+		if (!hasMatchingTab) {
+			return;
+		}
 		tabs.forEach(function(tabBtn) {
-			const isActive = String(tabBtn.getAttribute('data-admin-tab') || '') === String(tabKey);
+			const isActive = String(tabBtn.getAttribute('data-admin-tab') || '') === normalizedTabKey;
 			tabBtn.classList.toggle('active', isActive);
 			tabBtn.setAttribute('aria-selected', isActive ? 'true' : 'false');
 		});
 
 		panels.forEach(function(panel) {
-			const shouldShow = panel.id === 'admin-tab-panel-' + String(tabKey);
+			const shouldShow = panel.id === 'admin-tab-panel-' + normalizedTabKey;
 			panel.classList.toggle('active', shouldShow);
 			panel.hidden = !shouldShow;
 		});
+
+		try {
+			localStorage.setItem(tabStorageKey, normalizedTabKey);
+		} catch (error) {
+			// Ignore storage failures and keep the UI usable.
+		}
 	}
 
 	tabs.forEach(function(tabBtn) {
@@ -29,7 +43,17 @@ function setupAdminPageHandlers() {
 		});
 	});
 
-	const initialTab = tabs.length > 0 ? tabs[0].getAttribute('data-admin-tab') : null;
+	let initialTab = null;
+	try {
+		initialTab = localStorage.getItem(tabStorageKey);
+	} catch (error) {
+		initialTab = null;
+	}
+	if (!initialTab || !tabs.some(function(tabBtn) {
+		return String(tabBtn.getAttribute('data-admin-tab') || '') === String(initialTab || '').trim();
+	})) {
+		initialTab = tabs.length > 0 ? tabs[0].getAttribute('data-admin-tab') : null;
+	}
 	activateTab(initialTab);
 
 	var accordionHeaders = Array.prototype.slice.call(document.querySelectorAll('.admin-accordion-header'));
