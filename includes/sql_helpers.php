@@ -693,6 +693,7 @@ function getUserPermissionEditScope(PDO $pdo, $userId) {
 	$normalizedUserId = (int)$userId;
 	$primaryRole = getUserPrimaryRole($pdo, $normalizedUserId);
 	$primaryRoleId = (int)($primaryRole['id'] ?? 0);
+	$primaryRoleName = trim((string)($primaryRole['name'] ?? ''));
 	$defaultScope = [
 		'mode' => 'none',
 		'label' => 'No editable roles',
@@ -702,6 +703,15 @@ function getUserPermissionEditScope(PDO $pdo, $userId) {
 
 	if ($normalizedUserId < 1 || $primaryRoleId < 1) {
 		return $defaultScope;
+	}
+
+	if ($primaryRoleName === 'Full Access') {
+		return [
+			'mode' => 'all',
+			'label' => 'All roles',
+			'current_role_id' => $primaryRoleId,
+			'max_role_id' => null,
+		];
 	}
 
 	if (userHasPermission($pdo, $normalizedUserId, 'admin', 'admin_permissions_edit_all')) {
