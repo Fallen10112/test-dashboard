@@ -59,6 +59,9 @@ body.dark-mode .permissions-editor-summary {
     background: linear-gradient(180deg, #20283a 0%, #1a2130 100%);
     border-color: #3e4b66;
 }
+body.dark-mode .permissions-editor-summary-copy {
+    color: #d9e2f0;
+}
 body.dark-mode .permissions-editor-kicker {
     color: #9fb1ff;
 }
@@ -70,6 +73,8 @@ body.dark-mode .permissions-editor-copy {
 }
 body.dark-mode .permissions-editor-scope-note {
     color: #c5d0e3;
+    border-color: #3e4b66;
+    background: #1e2636;
 }
 body.dark-mode .permissions-editor-metrics > div {
     background: rgba(127, 147, 255, 0.12);
@@ -89,6 +94,9 @@ body.dark-mode .permission-toggle em,
 body.dark-mode .permission-editor-role-description,
 body.dark-mode .permissions-editor-empty-note {
     color: #aab7cc;
+}
+body.dark-mode .permission-editor-role-scope {
+    color: #d9e2f0;
 }
 body.dark-mode .permission-group,
 body.dark-mode .permission-resource-card,

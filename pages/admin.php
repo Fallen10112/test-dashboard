@@ -10,6 +10,7 @@ requirePagePermission('admin', 'read');
 <?php
 	$adminAuthUser = $GLOBALS['auth_user'] ?? null;
 	$adminCurrentUserId = (int)($adminAuthUser['id'] ?? 0);
+	$adminCurrentRoleId = (int)($adminAuthUser['role_id'] ?? 0);
 	$adminRoles = [];
 	$adminPermissionEditorPayload = [
 		'roles' => [],
@@ -74,6 +75,7 @@ requirePagePermission('admin', 'read');
 	if (!is_string($adminRolesJson) || $adminRolesJson === '') {
 		$adminRolesJson = '[]';
 	}
+	$adminCurrentRoleIdJson = json_encode($adminCurrentRoleId, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 	$adminEditableRolesJson = json_encode($adminEditableRoles, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 	if (!is_string($adminEditableRolesJson) || $adminEditableRolesJson === '') {
 		$adminEditableRolesJson = '[]';
@@ -98,6 +100,7 @@ requirePagePermission('admin', 'read');
 
 <script>
 	window.ADMIN_ROLE_MANAGEMENT_ROLES = <?php echo $adminRolesJson; ?>;
+	window.ADMIN_CURRENT_ROLE_ID = <?php echo $adminCurrentRoleIdJson; ?>;
 	window.ADMIN_EDITABLE_ROLES = <?php echo $adminEditableRolesJson; ?>;
 	window.ADMIN_ROLE_PERMISSION_EDITOR = <?php echo $adminPermissionEditorJson; ?>;
 	window.ADMIN_PERMISSION_EDIT_SCOPE = <?php echo $adminPermissionEditScopeJson; ?>;
@@ -383,15 +386,14 @@ requirePagePermission('admin', 'read');
 
 				<?php if ($adminTabPermissionFlags['permissions']): ?><div class="admin-tab-panel" id="admin-tab-panel-6" role="tabpanel" aria-labelledby="admin-tab-btn-6" hidden>
 						<h4>Role Permissions</h4>
-						<p>Choose a role, then adjust access by section. The editor is grouped by feature so it is easier to reason about page access, admin tools, and special actions at a glance.</p>
-						<p class="permissions-editor-scope-note">Current edit scope: <strong><?php echo htmlspecialchars($adminPermissionEditScope['label'] ?? 'No editable roles', ENT_QUOTES, 'UTF-8'); ?></strong>.</p>
+						<p>Choose a role, then adjust access by section.</p>
 
 						<div class="permissions-editor-shell">
 							<div class="permissions-editor-summary">
-								<div>
+								<div class="permissions-editor-summary-copy">
 									<p class="permissions-editor-kicker">Role-based access</p>
 									<h5>Pick a role to review its grants</h5>
-									<p class="permissions-editor-copy">The matrix below shows only the resources and actions available in the system. Save updates from one place after you finish making changes.</p>
+									<p class="permissions-editor-scope-note">Current edit scope: <strong><?php echo htmlspecialchars($adminPermissionEditScope['label'] ?? 'No editable roles', ENT_QUOTES, 'UTF-8'); ?></strong>.</p>
 								</div>
 
 								<div class="permissions-editor-controls">

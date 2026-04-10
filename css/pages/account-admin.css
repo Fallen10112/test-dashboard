@@ -184,14 +184,18 @@
 }
 
 .permissions-editor-summary {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
     gap: 18px;
     padding: 16px 18px;
     border: 1px solid #dbe3ef;
     border-radius: 12px;
     background: linear-gradient(180deg, #ffffff 0%, #f6f9ff 100%);
+}
+
+.permissions-editor-summary-copy {
+    min-width: 0;
 }
 
 .permissions-editor-kicker {
@@ -204,7 +208,7 @@
 }
 
 .permissions-editor-summary h5 {
-    margin: 0 0 8px;
+    margin: 0 0 10px;
     color: #1f2f63;
     font-size: 1.05rem;
 }
@@ -213,18 +217,25 @@
     margin: 0;
     max-width: 58ch;
     color: #64748b;
+    line-height: 1.55;
 }
 
 .permissions-editor-scope-note {
-    margin: 0 0 12px;
+    margin: 0 0 10px;
     color: #475569;
+    padding: 10px 12px;
+    border: 1px solid #dbe3ef;
+    border-radius: 10px;
+    background: #f8fbff;
 }
 
 .permissions-editor-controls {
-    min-width: 240px;
+    min-width: 260px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
+    justify-self: end;
+    align-self: start;
 }
 
 .permissions-editor-controls .form-group {
@@ -236,15 +247,17 @@
 }
 
 .permissions-editor-metrics {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(108px, auto));
     gap: 10px;
-    align-items: center;
+    align-items: stretch;
     flex-shrink: 0;
+    justify-content: end;
 }
 
 .permissions-editor-metrics > div {
-    min-width: 96px;
-    padding: 10px 12px;
+    min-width: 112px;
+    padding: 12px 14px;
     border-radius: 10px;
     background: rgba(102, 126, 234, 0.1);
     text-align: center;
@@ -252,49 +265,66 @@
 
 .permissions-editor-metrics strong {
     display: block;
-    font-size: 1.2rem;
+    font-size: 1.32rem;
     line-height: 1.1;
     color: #1f2f63;
 }
 
 .permissions-editor-metrics span {
     display: block;
-    margin-top: 4px;
-    font-size: 0.78rem;
+    margin-top: 5px;
+    font-size: 0.79rem;
     color: #64748b;
+    line-height: 1.25;
 }
 
 .permission-editor-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-end;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
     gap: 16px;
     padding: 0 2px;
 }
 
+.permission-editor-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px;
+}
+
 .permission-editor-header strong {
-    display: block;
     font-size: 1.05rem;
     color: #1f2f63;
 }
 
 .permission-editor-header span {
-    display: block;
-    margin-top: 3px;
+    display: inline;
     font-size: 0.88rem;
     color: #64748b;
 }
 
 .permission-editor-role-description {
-    margin: -2px 0 0;
+    margin: 0;
     color: #64748b;
+}
+
+.permission-editor-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 6px 0 8px;
+}
+
+.permission-editor-role-scope {
+    font-weight: 600;
 }
 
 .permission-group {
     display: flex;
     flex-direction: column;
     gap: 12px;
-    margin-top: 12px;
+    margin-top: 8px;
     padding: 16px;
     border: 1px solid #dbe3ef;
     border-radius: 12px;
@@ -302,9 +332,9 @@
 }
 
 .permission-group-heading {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-end;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
     gap: 14px;
 }
 
@@ -324,13 +354,17 @@
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     gap: 12px;
+    align-items: stretch;
 }
 
 .permission-resource-card {
+    display: flex;
+    flex-direction: column;
     border: 1px solid #e2e8f0;
     border-radius: 12px;
     padding: 14px;
     background: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
+    height: 100%;
 }
 
 .permission-resource-card-header {
@@ -353,6 +387,7 @@
 .permission-resource-actions {
     display: grid;
     gap: 8px;
+    flex: 1;
 }
 
 .permission-toggle {
@@ -517,8 +552,16 @@
     .permissions-editor-summary,
     .permission-editor-header,
     .permission-group-heading {
-        flex-direction: column;
+        grid-template-columns: 1fr;
+        justify-items: start;
+    }
+
+    .permission-editor-title {
         align-items: flex-start;
+    }
+
+    .permission-editor-meta {
+        margin: 4px 0 8px;
     }
 
     .permissions-editor-controls {
@@ -529,6 +572,10 @@
     .permissions-editor-metrics {
         width: 100%;
         justify-content: flex-start;
+    }
+
+    .permissions-editor-controls {
+        justify-self: stretch;
     }
 }
 
