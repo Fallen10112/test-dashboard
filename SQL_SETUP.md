@@ -320,7 +320,7 @@ Recommended indexes:
 - read: View data.
 - create: Add new data.
 - update: Edit existing data.
-- delete: Remove data.
+- delete: Remove data, including bulk delete.
 - manage_users: Create/disable users.
 - manage_permissions: Grant/revoke roles and permission overrides.
 - export: Download/export data.
@@ -345,3 +345,17 @@ Use this order in your auth middleware:
 4. If an explicit deny exists (is_allowed = 0), deny even if role allows.
 
 This pattern supports scenarios like mixed access across resources and table-specific restrictions per user.
+
+## Default Role Templates
+
+These templates describe the initial grant set for the current role names. They are not hard-coded to role IDs, so if roles are renamed or recreated later, the admin permission editor should be used to reapply the intended grants.
+
+- Guest: home read only.
+- Administrator: home read, records read/create/update.
+- Coordinator: Administrator plus records delete.
+- Team Leader: Coordinator plus data export and reports read/export.
+- Manager: Team Leader plus audit_log read and admin read/manage_users/manage_permissions, plus admin user/role/notifications/permissions tabs and role create/update, but not role delete or database/application management.
+- Director: same as Manager plus admin database/application tabs; still no role delete unless granted explicitly.
+- Full Access: all resources and permissions, including role delete.
+
+The permission editor in the Admin page can be used to change role grants at any time without altering the role table structure.

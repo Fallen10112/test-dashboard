@@ -24,6 +24,20 @@ $pageTitle = "Dashboard Showcase";
 	if ($_headerRole === '') {
 		$_headerRole = 'Unassigned';
 	}
+	$_headerCanViewDevTools = false;
+	$_headerCanViewAdmin = false;
+	try {
+		$_headerUserId = (int)($_headerUser['id'] ?? 0);
+		if ($_headerUserId > 0) {
+			$_headerPdo = getDashboardPdo();
+			ensurePermissionsSchema($_headerPdo);
+			$_headerCanViewDevTools = userHasPermission($_headerPdo, $_headerUserId, 'dev_tools', 'read');
+			$_headerCanViewAdmin = userHasPermission($_headerPdo, $_headerUserId, 'admin', 'read');
+		}
+	} catch (Throwable $e) {
+		$_headerCanViewDevTools = false;
+		$_headerCanViewAdmin = false;
+	}
 	$_headerEmail = htmlspecialchars($_headerUser['email'] ?? '', ENT_QUOTES, 'UTF-8');
 	$_words = preg_split('/\s+/', trim($_headerDisplay));
 	$_initials = '';
@@ -104,8 +118,8 @@ $pageTitle = "Dashboard Showcase";
 					<div class="user-dropdown-divider"></div>
 					<a href="user.php" class="user-dropdown-item">Account Settings</a>
 					<a href="ui-customization.php" class="user-dropdown-item">UI Customization</a>
-					<a href="dev-tools.php" class="user-dropdown-item">Dev Tools</a>
-					<a href="admin.php" class="user-dropdown-item">Admin</a>
+					<?php if ($_headerCanViewDevTools): ?><a href="dev-tools.php" class="user-dropdown-item">Dev Tools</a><?php endif; ?>
+					<?php if ($_headerCanViewAdmin): ?><a href="admin.php" class="user-dropdown-item">Admin</a><?php endif; ?>
 					<form method="POST" action="login.php">
 						<input type="hidden" name="action" value="logout">
 						<button type="submit" class="user-dropdown-item user-dropdown-signout">Sign Out</button>

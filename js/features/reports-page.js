@@ -1,18 +1,26 @@
+const canExportReports = !!(window.DASHBOARD_PAGE_PERMISSIONS && window.DASHBOARD_PAGE_PERMISSIONS.export);
+
 function setupReportsPageHandlers() {
 	loadData();
 	loadLogs();
+	if (!canExportReports) {
+		$('#download-pdf-btn').addClass('hidden');
+		$('#download-csv-btn').addClass('hidden');
+	}
 
 	$('#generate-report-btn').on('click', function() {
 		generateReport();
 	});
 
-	$('#download-pdf-btn').on('click', function() {
-		downloadReportAsPDF();
-	});
+	if (canExportReports) {
+		$('#download-pdf-btn').on('click', function() {
+			downloadReportAsPDF();
+		});
 
-	$('#download-csv-btn').on('click', function() {
-		downloadReportAsCSV();
-	});
+		$('#download-csv-btn').on('click', function() {
+			downloadReportAsCSV();
+		});
+	}
 
 	$('#dataset-selector').on('change', function() {
 		$('#report-container').empty();
@@ -113,8 +121,10 @@ function generateDataReport() {
 	footer.appendChild(footerText);
 	report.appendChild(footer);
 	container.appendChild(report);
-	$('#download-pdf-btn').removeClass('hidden');
-	$('#download-csv-btn').removeClass('hidden');
+	if (canExportReports) {
+		$('#download-pdf-btn').removeClass('hidden');
+		$('#download-csv-btn').removeClass('hidden');
+	}
 }
 
 
@@ -197,8 +207,10 @@ function generateLogsReport() {
 	footer.appendChild(footerText);
 	report.appendChild(footer);
 	container.appendChild(report);
-	$('#download-pdf-btn').removeClass('hidden');
-	$('#download-csv-btn').removeClass('hidden');
+	if (canExportReports) {
+		$('#download-pdf-btn').removeClass('hidden');
+		$('#download-csv-btn').removeClass('hidden');
+	}
 }
 
 

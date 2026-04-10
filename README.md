@@ -5,6 +5,7 @@ A web dashboard built with PHP, MySQL, jQuery, HTML, and CSS.
 The app includes:
 
 - Session-based authentication (single-device policy)
+- Role-based page and action permissions with editable role grants
 - CRUD data management with server-side paging/filter/sort
 - Audit trail (table + timeline)
 - Reports and export (PDF/CSV)
@@ -120,10 +121,10 @@ Application behavior settings are loaded from the `app_settings` table (not from
 
 - Server-side search, sort, pagination (`10/20/25/50/100`)
 - Virtualized table rendering for the current page
-- Add/Edit/Delete + bulk delete
+- Add/Edit/Delete + bulk delete, with controls hidden by permission
 - Add New Record includes a "Save & add another record" action for rapid entry
 - Import CSV via a modal with a downloadable template and bulk database upload
-- Filtered export endpoint support for CSV/PDF flows
+- Filtered export endpoint support for CSV/PDF flows when export is granted
 - Realtime refresh every 10 seconds
 - Footer status text: `Last refreshed HH:MM:SS`
 
@@ -140,7 +141,7 @@ Application behavior settings are loaded from the `app_settings` table (not from
 
 - Dataset selector (Data or Logs)
 - On-screen report generation
-- PDF and CSV download actions
+- PDF and CSV download actions when export is granted
 
 ### Notifications
 
@@ -155,6 +156,16 @@ Application behavior settings are loaded from the `app_settings` table (not from
 - User management actions (lookup/create/update/force delete/reset widget prefs)
 - Role management actions (list/lookup/create/update/delete with user reassignment)
 - Role deletion reassigns affected users to the next lower role ID when possible, otherwise to the next higher role ID
+
+### Permissions
+
+- Home is the only page available to the Guest role.
+- Data access is split into read, create, update, delete, and export permissions; delete covers both single-record delete and bulk delete, and roles 4-7 include data export by default.
+- Reports, Audit Trail, Admin, and Dev Tools each have their own page-level permission checks.
+- The Admin page now includes a role permission editor so grants can be changed over time without relying on a fixed role ID.
+- The Admin page tabs are permissioned separately; role 5 can stop short of Database and Application Management, while role 6/7 can include them.
+- The Role Management tab is also split into create/update/delete, so role 5/6 can add and edit roles without being able to delete and reassign users.
+- The default role templates are based on the current role names, but they are editable and should be treated as long-term configuration rather than hard-coded behavior.
 
 ### UI and Personalization
 
@@ -192,7 +203,7 @@ POST actions (`Content-Type: application/json`):
 - Widget preferences: `widget_preferences_update`
 - Dev tools/system: `reset_activity_log`, `reset_audit_log`, `reset_records`, `reset_widget_prefs`, `reset_notifications_table`, `reset_all`, `reset_data`, `logout_all_users`
 - Dev tools/users: `admin_user_lookup`, `admin_user_create`, `admin_user_update`, `admin_user_force_delete`, `admin_user_reset_widget_prefs`
-- Dev tools/roles: `admin_role_list`, `admin_role_lookup`, `admin_role_create`, `admin_role_update`, `admin_role_delete`
+- Dev tools/roles: `admin_role_list`, `admin_role_lookup`, `admin_role_permissions`, `admin_role_permissions_update`, `admin_role_create`, `admin_role_update`, `admin_role_delete`
 
 ## Setup
 

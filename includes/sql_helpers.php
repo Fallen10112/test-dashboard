@@ -287,6 +287,508 @@ function ensureUserWidgetPreferencesSchema(PDO $pdo) {
 	}
 }
 
+function getPermissionResourceDefinitions() {
+	return [
+		'home' => ['display_name' => 'Home', 'description' => 'Landing page access'],
+		'records' => ['display_name' => 'Data', 'description' => 'Records page and CRUD actions'],
+		'reports' => ['display_name' => 'Reports', 'description' => 'Reports page and exports'],
+		'audit_log' => ['display_name' => 'Audit Trail', 'description' => 'Audit trail page access'],
+		'admin' => ['display_name' => 'Admin', 'description' => 'Admin workspace access'],
+		'dev_tools' => ['display_name' => 'Dev Tools', 'description' => 'Maintenance and reset tools'],
+	];
+}
+
+function getPermissionActionDefinitions() {
+	return [
+		'read' => ['display_name' => 'Read', 'description' => 'View the page or resource'],
+		'create' => ['display_name' => 'Create', 'description' => 'Add new entries'],
+		'update' => ['display_name' => 'Update', 'description' => 'Edit existing entries'],
+		'delete' => ['display_name' => 'Delete', 'description' => 'Remove entries, including bulk delete'],
+		'export' => ['display_name' => 'Export', 'description' => 'Download or export data'],
+		'manage_users' => ['display_name' => 'Manage Users', 'description' => 'Create and edit users'],
+		'manage_permissions' => ['display_name' => 'Manage Permissions', 'description' => 'Edit role and user permissions'],
+		'admin_role_create' => ['display_name' => 'Admin Role Create', 'description' => 'Add new roles'],
+		'admin_role_update' => ['display_name' => 'Admin Role Update', 'description' => 'Edit existing roles'],
+		'admin_role_delete' => ['display_name' => 'Admin Role Delete', 'description' => 'Delete roles and reassign users'],
+		'admin_user_management' => ['display_name' => 'Admin User Management', 'description' => 'Open the user management tab'],
+		'admin_role_management' => ['display_name' => 'Admin Role Management', 'description' => 'Open the role management tab'],
+		'admin_database_management' => ['display_name' => 'Admin Database Management', 'description' => 'Open the database management tab'],
+		'admin_application_management' => ['display_name' => 'Admin Application Management', 'description' => 'Open the application management tab'],
+		'admin_notifications_management' => ['display_name' => 'Admin Notifications Management', 'description' => 'Open the notifications tab'],
+		'admin_permissions_management' => ['display_name' => 'Admin Permissions Management', 'description' => 'Open the permissions tab'],
+	];
+}
+
+function ensurePermissionsSchema(PDO $pdo) {
+	$pdo->exec(
+		'CREATE TABLE IF NOT EXISTS resources (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			resource_key VARCHAR(100) NOT NULL,
+			display_name VARCHAR(150) NOT NULL,
+			description VARCHAR(255) NULL,
+			created_at DATETIME NOT NULL,
+			PRIMARY KEY (id),
+			UNIQUE KEY uniq_resource_key (resource_key)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+	);
+	$pdo->exec(
+		'CREATE TABLE IF NOT EXISTS permissions (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			permission_key VARCHAR(50) NOT NULL,
+			display_name VARCHAR(100) NOT NULL,
+			description VARCHAR(255) NULL,
+			created_at DATETIME NOT NULL,
+			PRIMARY KEY (id),
+			UNIQUE KEY uniq_permission_key (permission_key)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+	);
+	$pdo->exec(
+		'CREATE TABLE IF NOT EXISTS role_permissions (
+			role_id BIGINT UNSIGNED NOT NULL,
+			resource_id BIGINT UNSIGNED NOT NULL,
+			permission_id BIGINT UNSIGNED NOT NULL,
+			created_at DATETIME NOT NULL,
+			PRIMARY KEY (role_id, resource_id, permission_id),
+			KEY idx_role_permissions_role (role_id),
+			KEY idx_role_permissions_resource (resource_id),
+			KEY idx_role_permissions_permission (permission_id),
+			CONSTRAINT fk_role_permissions_role FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE,
+			CONSTRAINT fk_role_permissions_resource FOREIGN KEY (resource_id) REFERENCES resources(id) ON DELETE CASCADE,
+			CONSTRAINT fk_role_permissions_permission FOREIGN KEY (permission_id) REFERENCES permissions(id) ON DELETE CASCADE
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+	);
+	$pdo->exec(
+		'CREATE TABLE IF NOT EXISTS user_permissions (
+			user_id BIGINT UNSIGNED NOT NULL,
+			resource_id BIGINT UNSIGNED NOT NULL,
+			permission_id BIGINT UNSIGNED NOT NULL,
+			is_allowed TINYINT(1) NOT NULL,
+			granted_by_user_id BIGINT UNSIGNED NULL,
+			created_at DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL,
+			PRIMARY KEY (user_id, resource_id, permission_id),
+			KEY idx_user_permissions_user (user_id),
+			KEY idx_user_permissions_resource (resource_id),
+			KEY idx_user_permissions_permission (permission_id),
+			CONSTRAINT fk_user_permissions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+			CONSTRAINT fk_user_permissions_resource FOREIGN KEY (resource_id) REFERENCES resources(id) ON DELETE CASCADE,
+			CONSTRAINT fk_user_permissions_permission FOREIGN KEY (permission_id) REFERENCES permissions(id) ON DELETE CASCADE,
+			CONSTRAINT fk_user_permissions_granted_by FOREIGN KEY (granted_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+	);
+
+	$resourceStmt = $pdo->prepare(
+		'INSERT IGNORE INTO resources (resource_key, display_name, description, created_at)
+		 VALUES (:resource_key, :display_name, :description, :created_at)'
+	);
+	foreach (getPermissionResourceDefinitions() as $resourceKey => $definition) {
+		$resourceStmt->execute([
+			':resource_key' => $resourceKey,
+			':display_name' => substr((string)($definition['display_name'] ?? $resourceKey), 0, 150),
+			':description' => isset($definition['description']) ? substr((string)$definition['description'], 0, 255) : null,
+			':created_at' => getDashboardSqlTimestamp(),
+		]);
+	}
+
+	$permissionStmt = $pdo->prepare(
+		'INSERT IGNORE INTO permissions (permission_key, display_name, description, created_at)
+		 VALUES (:permission_key, :display_name, :description, :created_at)'
+	);
+	foreach (getPermissionActionDefinitions() as $permissionKey => $definition) {
+		$permissionStmt->execute([
+			':permission_key' => $permissionKey,
+			':display_name' => substr((string)($definition['display_name'] ?? $permissionKey), 0, 100),
+			':description' => isset($definition['description']) ? substr((string)$definition['description'], 0, 255) : null,
+			':created_at' => getDashboardSqlTimestamp(),
+		]);
+	}
+
+	seedDefaultRolePermissions($pdo);
+}
+
+function getPermissionResourceByKey(PDO $pdo, $resourceKey) {
+	$key = trim((string)$resourceKey);
+	if ($key === '' || !dashboardTableExists($pdo, 'resources')) {
+		return null;
+	}
+
+	$stmt = $pdo->prepare('SELECT id, resource_key, display_name, description FROM resources WHERE resource_key = :resource_key LIMIT 1');
+	$stmt->execute([':resource_key' => $key]);
+	$row = $stmt->fetch();
+	if (!$row) {
+		return null;
+	}
+
+	return ['id' => (int)($row['id'] ?? 0), 'key' => (string)($row['resource_key'] ?? ''), 'display_name' => (string)($row['display_name'] ?? ''), 'description' => (string)($row['description'] ?? '')];
+}
+
+function getPermissionByKey(PDO $pdo, $permissionKey) {
+	$key = trim((string)$permissionKey);
+	if ($key === '' || !dashboardTableExists($pdo, 'permissions')) {
+		return null;
+	}
+
+	$stmt = $pdo->prepare('SELECT id, permission_key, display_name, description FROM permissions WHERE permission_key = :permission_key LIMIT 1');
+	$stmt->execute([':permission_key' => $key]);
+	$row = $stmt->fetch();
+	if (!$row) {
+		return null;
+	}
+
+	return ['id' => (int)($row['id'] ?? 0), 'key' => (string)($row['permission_key'] ?? ''), 'display_name' => (string)($row['display_name'] ?? ''), 'description' => (string)($row['description'] ?? '')];
+}
+
+function getUserRoleIds(PDO $pdo, $userId) {
+	$normalizedUserId = (int)$userId;
+	if ($normalizedUserId < 1 || !dashboardTableExists($pdo, 'user_roles')) {
+		return [];
+	}
+
+	try {
+		$stmt = $pdo->prepare('SELECT role_id FROM user_roles WHERE user_id = :user_id ORDER BY created_at ASC, role_id ASC');
+		$stmt->execute([':user_id' => $normalizedUserId]);
+		$rows = $stmt->fetchAll();
+	} catch (Throwable $e) {
+		return [];
+	}
+
+	$roleIds = [];
+	foreach ($rows as $row) {
+		$roleId = (int)($row['role_id'] ?? 0);
+		if ($roleId > 0) {
+			$roleIds[] = $roleId;
+		}
+	}
+
+	return array_values(array_unique($roleIds));
+}
+
+function getUserPermissionOverride(PDO $pdo, $userId, $resourceKey, $permissionKey) {
+	$normalizedUserId = (int)$userId;
+	if ($normalizedUserId < 1 || !dashboardTableExists($pdo, 'user_permissions')) {
+		return null;
+	}
+
+	$resource = getPermissionResourceByKey($pdo, $resourceKey);
+	$permission = getPermissionByKey($pdo, $permissionKey);
+	if (!$resource || !$permission) {
+		return null;
+	}
+
+	$stmt = $pdo->prepare('SELECT is_allowed FROM user_permissions WHERE user_id = :user_id AND resource_id = :resource_id AND permission_id = :permission_id LIMIT 1');
+	$stmt->execute([':user_id' => $normalizedUserId, ':resource_id' => (int)$resource['id'], ':permission_id' => (int)$permission['id']]);
+	$row = $stmt->fetch();
+	if (!$row) {
+		return null;
+	}
+
+	return ((int)($row['is_allowed'] ?? 0)) === 1;
+}
+
+function getRolePermissionGrant(PDO $pdo, $roleId, $resourceKey, $permissionKey) {
+	$normalizedRoleId = (int)$roleId;
+	if ($normalizedRoleId < 1 || !dashboardTableExists($pdo, 'role_permissions')) {
+		return false;
+	}
+
+	$resource = getPermissionResourceByKey($pdo, $resourceKey);
+	$permission = getPermissionByKey($pdo, $permissionKey);
+	if (!$resource || !$permission) {
+		return false;
+	}
+
+	$stmt = $pdo->prepare('SELECT 1 FROM role_permissions WHERE role_id = :role_id AND resource_id = :resource_id AND permission_id = :permission_id LIMIT 1');
+	$stmt->execute([':role_id' => $normalizedRoleId, ':resource_id' => (int)$resource['id'], ':permission_id' => (int)$permission['id']]);
+
+	return (bool)$stmt->fetchColumn();
+}
+
+function getRolePermissionsByRoleId(PDO $pdo, $roleId) {
+	$normalizedRoleId = (int)$roleId;
+	if ($normalizedRoleId < 1 || !dashboardTableExists($pdo, 'role_permissions')) {
+		return [];
+	}
+
+	try {
+		$stmt = $pdo->prepare('SELECT r.resource_key, p.permission_key FROM role_permissions rp JOIN resources r ON r.id = rp.resource_id JOIN permissions p ON p.id = rp.permission_id WHERE rp.role_id = :role_id');
+		$stmt->execute([':role_id' => $normalizedRoleId]);
+		$rows = $stmt->fetchAll();
+	} catch (Throwable $e) {
+		return [];
+	}
+
+	$grants = [];
+	foreach ($rows as $row) {
+		$resourceKey = trim((string)($row['resource_key'] ?? ''));
+		$permissionKey = trim((string)($row['permission_key'] ?? ''));
+		if ($resourceKey === '' || $permissionKey === '') {
+			continue;
+		}
+		if (!isset($grants[$resourceKey])) {
+			$grants[$resourceKey] = [];
+		}
+		$grants[$resourceKey][$permissionKey] = true;
+	}
+
+	return $grants;
+}
+
+function getAllPermissionResources(PDO $pdo) {
+	if (!dashboardTableExists($pdo, 'resources')) {
+		return [];
+	}
+
+	try {
+		$stmt = $pdo->query('SELECT id, resource_key, display_name, description FROM resources ORDER BY id ASC');
+		$rows = $stmt ? $stmt->fetchAll() : [];
+	} catch (Throwable $e) {
+		return [];
+	}
+
+	$resources = [];
+	foreach ($rows as $row) {
+		$resources[] = ['id' => (int)($row['id'] ?? 0), 'key' => (string)($row['resource_key'] ?? ''), 'display_name' => (string)($row['display_name'] ?? ''), 'description' => (string)($row['description'] ?? '')];
+	}
+
+	return $resources;
+}
+
+function getAllPermissionActions(PDO $pdo) {
+	if (!dashboardTableExists($pdo, 'permissions')) {
+		return [];
+	}
+
+	try {
+		$stmt = $pdo->query('SELECT id, permission_key, display_name, description FROM permissions ORDER BY id ASC');
+		$rows = $stmt ? $stmt->fetchAll() : [];
+	} catch (Throwable $e) {
+		return [];
+	}
+
+	$permissions = [];
+	foreach ($rows as $row) {
+		$permissions[] = ['id' => (int)($row['id'] ?? 0), 'key' => (string)($row['permission_key'] ?? ''), 'display_name' => (string)($row['display_name'] ?? ''), 'description' => (string)($row['description'] ?? '')];
+	}
+
+	return $permissions;
+}
+
+function getDefaultRolePermissionTemplates() {
+	return [
+		'Guest' => ['home' => ['read']],
+		'Administrator' => ['home' => ['read'], 'records' => ['read', 'create', 'update']],
+		'Coordinator' => ['home' => ['read'], 'records' => ['read', 'create', 'update', 'delete']],
+		'Team Leader' => ['home' => ['read'], 'records' => ['read', 'create', 'update', 'delete', 'export'], 'reports' => ['read', 'export']],
+		'Manager' => ['home' => ['read'], 'records' => ['read', 'create', 'update', 'delete', 'export'], 'reports' => ['read', 'export'], 'audit_log' => ['read'], 'admin' => ['read', 'manage_users', 'manage_permissions', 'admin_user_management', 'admin_role_management', 'admin_notifications_management', 'admin_permissions_management', 'admin_role_create', 'admin_role_update']],
+		'Director' => ['home' => ['read'], 'records' => ['read', 'create', 'update', 'delete', 'export'], 'reports' => ['read', 'export'], 'audit_log' => ['read'], 'admin' => ['read', 'manage_users', 'manage_permissions', 'admin_user_management', 'admin_role_management', 'admin_database_management', 'admin_application_management', 'admin_notifications_management', 'admin_permissions_management', 'admin_role_create', 'admin_role_update']],
+		'Full Access' => ['__all__' => ['__all__']],
+	];
+}
+
+function seedDefaultRolePermissions(PDO $pdo) {
+	if (!dashboardTableExists($pdo, 'roles') || !dashboardTableExists($pdo, 'resources') || !dashboardTableExists($pdo, 'permissions') || !dashboardTableExists($pdo, 'role_permissions')) {
+		return;
+	}
+
+	$resources = getAllPermissionResources($pdo);
+	$permissions = getAllPermissionActions($pdo);
+	if (empty($resources) || empty($permissions)) {
+		return;
+	}
+
+	$roleTemplates = getDefaultRolePermissionTemplates();
+	$roleStmt = $pdo->query('SELECT id, name FROM roles');
+	$roleRows = $roleStmt ? $roleStmt->fetchAll() : [];
+	$resourceLookup = [];
+	foreach ($resources as $resource) {
+		$resourceLookup[$resource['key']] = $resource;
+	}
+	$permissionLookup = [];
+	foreach ($permissions as $permission) {
+		$permissionLookup[$permission['key']] = $permission;
+	}
+
+	$insertStmt = $pdo->prepare('INSERT IGNORE INTO role_permissions (role_id, resource_id, permission_id, created_at) VALUES (:role_id, :resource_id, :permission_id, :created_at)');
+
+	foreach ($roleRows as $roleRow) {
+		$roleId = (int)($roleRow['id'] ?? 0);
+		$roleName = trim((string)($roleRow['name'] ?? ''));
+		if ($roleId < 1 || $roleName === '' || !isset($roleTemplates[$roleName])) {
+			continue;
+		}
+
+		$template = $roleTemplates[$roleName];
+		if (isset($template['__all__'])) {
+			foreach ($resources as $resource) {
+				foreach ($permissions as $permission) {
+					$insertStmt->execute([':role_id' => $roleId, ':resource_id' => (int)$resource['id'], ':permission_id' => (int)$permission['id'], ':created_at' => getDashboardSqlTimestamp()]);
+				}
+			}
+			continue;
+		}
+
+		foreach ($template as $resourceKey => $allowedPermissions) {
+			if (!isset($resourceLookup[$resourceKey]) || !is_array($allowedPermissions)) {
+				continue;
+			}
+			foreach ($allowedPermissions as $permissionKey) {
+				if (!isset($permissionLookup[$permissionKey])) {
+					continue;
+				}
+				$insertStmt->execute([':role_id' => $roleId, ':resource_id' => (int)$resourceLookup[$resourceKey]['id'], ':permission_id' => (int)$permissionLookup[$permissionKey]['id'], ':created_at' => getDashboardSqlTimestamp()]);
+			}
+		}
+	}
+}
+
+function setRolePermissions(PDO $pdo, $roleId, array $grants) {
+	$normalizedRoleId = (int)$roleId;
+	if ($normalizedRoleId < 1 || !dashboardTableExists($pdo, 'roles') || !dashboardTableExists($pdo, 'resources') || !dashboardTableExists($pdo, 'permissions') || !dashboardTableExists($pdo, 'role_permissions')) {
+		return false;
+	}
+
+	$normalizedGrants = [];
+	foreach ($grants as $grant) {
+		$grant = trim((string)$grant);
+		if ($grant === '' || strpos($grant, ':') === false) {
+			continue;
+		}
+		list($resourceKey, $permissionKey) = array_pad(explode(':', $grant, 2), 2, '');
+		$resourceKey = trim((string)$resourceKey);
+		$permissionKey = trim((string)$permissionKey);
+		if ($resourceKey === '' || $permissionKey === '') {
+			continue;
+		}
+		$normalizedGrants[$resourceKey . ':' . $permissionKey] = ['resource_key' => $resourceKey, 'permission_key' => $permissionKey];
+	}
+
+	try {
+		$pdo->beginTransaction();
+		$pdo->prepare('DELETE FROM role_permissions WHERE role_id = :role_id')->execute([':role_id' => $normalizedRoleId]);
+
+		if (!empty($normalizedGrants)) {
+			$resourceLookup = [];
+			foreach (getAllPermissionResources($pdo) as $resource) {
+				$resourceLookup[$resource['key']] = $resource;
+			}
+			$permissionLookup = [];
+			foreach (getAllPermissionActions($pdo) as $permission) {
+				$permissionLookup[$permission['key']] = $permission;
+			}
+			$insertStmt = $pdo->prepare('INSERT INTO role_permissions (role_id, resource_id, permission_id, created_at) VALUES (:role_id, :resource_id, :permission_id, :created_at)');
+			foreach ($normalizedGrants as $grant) {
+				$resourceKey = $grant['resource_key'];
+				$permissionKey = $grant['permission_key'];
+				if (!isset($resourceLookup[$resourceKey], $permissionLookup[$permissionKey])) {
+					continue;
+				}
+				$insertStmt->execute([':role_id' => $normalizedRoleId, ':resource_id' => (int)$resourceLookup[$resourceKey]['id'], ':permission_id' => (int)$permissionLookup[$permissionKey]['id'], ':created_at' => getDashboardSqlTimestamp()]);
+			}
+		}
+		$pdo->commit();
+	} catch (Throwable $e) {
+		if ($pdo->inTransaction()) {
+			$pdo->rollBack();
+		}
+		return false;
+	}
+
+	return true;
+}
+
+function getAllRolePermissionsMatrix(PDO $pdo) {
+	if (!dashboardTableExists($pdo, 'roles') || !dashboardTableExists($pdo, 'role_permissions')) {
+		return [];
+	}
+
+	try {
+		$stmt = $pdo->query('SELECT rp.role_id, r.resource_key, p.permission_key FROM role_permissions rp JOIN resources r ON r.id = rp.resource_id JOIN permissions p ON p.id = rp.permission_id ORDER BY rp.role_id ASC, r.id ASC, p.id ASC');
+		$rows = $stmt ? $stmt->fetchAll() : [];
+	} catch (Throwable $e) {
+		return [];
+	}
+
+	$matrix = [];
+	foreach ($rows as $row) {
+		$roleId = (int)($row['role_id'] ?? 0);
+		$resourceKey = trim((string)($row['resource_key'] ?? ''));
+		$permissionKey = trim((string)($row['permission_key'] ?? ''));
+		if ($roleId < 1 || $resourceKey === '' || $permissionKey === '') {
+			continue;
+		}
+		if (!isset($matrix[$roleId])) {
+			$matrix[$roleId] = [];
+		}
+		if (!isset($matrix[$roleId][$resourceKey])) {
+			$matrix[$roleId][$resourceKey] = [];
+		}
+		$matrix[$roleId][$resourceKey][$permissionKey] = true;
+	}
+
+	return $matrix;
+}
+
+function getRolePermissionsEditorPayload(PDO $pdo) {
+	return [
+		'roles' => getAvailableRoles($pdo),
+		'resources' => getAllPermissionResources($pdo),
+		'permissions' => getAllPermissionActions($pdo),
+		'role_permissions' => getAllRolePermissionsMatrix($pdo),
+	];
+}
+
+function userHasPermission(PDO $pdo, $userId, $resourceKey, $permissionKey) {
+	$normalizedUserId = (int)$userId;
+	if ($normalizedUserId < 1) {
+		return false;
+	}
+
+	$resourceKey = trim((string)$resourceKey);
+	$permissionKey = trim((string)$permissionKey);
+	if ($resourceKey === '' || $permissionKey === '') {
+		return false;
+	}
+
+	$override = getUserPermissionOverride($pdo, $normalizedUserId, $resourceKey, $permissionKey);
+	if ($override !== null) {
+		return (bool)$override;
+	}
+
+	$roleIds = getUserRoleIds($pdo, $normalizedUserId);
+	if (empty($roleIds)) {
+		return false;
+	}
+
+	foreach ($roleIds as $roleId) {
+		if (getRolePermissionGrant($pdo, $roleId, $resourceKey, $permissionKey)) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+function requirePagePermission($resourceKey, $permissionKey = 'read', $denyRedirect = '../pages/home.php') {
+	startAuthSession();
+	$user = $GLOBALS['auth_user'] ?? null;
+	if (!is_array($user) || empty($user['id'])) {
+		header('Location: login.php');
+		exit();
+	}
+
+	$pdo = getDashboardPdo();
+	ensurePermissionsSchema($pdo);
+	if (!userHasPermission($pdo, (int)$user['id'], $resourceKey, $permissionKey)) {
+		if (is_string($denyRedirect) && $denyRedirect !== '') {
+			header('Location: ' . $denyRedirect);
+			exit();
+		}
+		http_response_code(403);
+		echo 'Forbidden';
+		exit();
+	}
+}
+
 function getAvailableRoles(PDO $pdo) {
 	if (!dashboardTableExists($pdo, 'roles')) {
 		return [];

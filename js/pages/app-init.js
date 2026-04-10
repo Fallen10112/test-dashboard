@@ -64,6 +64,9 @@ $(document).ready(function() {
 	if ($('#admin-container').length > 0 && typeof setupAdminRoleManagementHandlers === 'function') {
 		setupAdminRoleManagementHandlers();
 	}
+	if ($('#admin-container').length > 0 && typeof setupAdminPermissionManagementHandlers === 'function') {
+		setupAdminPermissionManagementHandlers();
+	}
 });
 
 

@@ -36,6 +36,21 @@ function getApiAuthUserId(): int {
 	return (int)($GLOBALS['auth_user']['id'] ?? 0);
 }
 
+function requireApiPermission(string $resourceKey, string $permissionKey, int $statusCode = 403): void {
+	$authUserId = getApiAuthUserId();
+	$pdo = getDashboardPdo();
+	ensurePermissionsSchema($pdo);
+	if (!userHasPermission($pdo, $authUserId, $resourceKey, $permissionKey)) {
+		respondJson($statusCode, [
+			'success' => false,
+			'message' => 'Permission denied.',
+			'reason' => 'forbidden',
+			'resource' => $resourceKey,
+			'permission' => $permissionKey,
+		]);
+	}
+}
+
 function enforceApiRateLimit(string $bucketKey, int $limit, int $windowSeconds): void {
 	startAuthSession();
 	$key = trim($bucketKey);
@@ -709,6 +724,7 @@ try {
 	ensureActivityLogSchema($pdo);
 	ensureAuditLogSchema($pdo);
 	ensureUserWidgetPreferencesSchema($pdo);
+	ensurePermissionsSchema($pdo);
 } catch (Throwable $e) {
 	respondJson(500, ['success' => false, 'message' => 'Database connection failed']);
 }
@@ -726,6 +742,7 @@ if ($method === 'POST') {
 	$postAction = $data['action'] ?? '';
 
 	if ($postAction === 'reset_activity_log') {
+		requireApiPermission('dev_tools', 'read');
 		$userId = getApiAuthUserId();
 		try {
 			resetActivityLogTable($pdo);
@@ -743,6 +760,7 @@ if ($method === 'POST') {
 	}
 
 	if ($postAction === 'reset_audit_log') {
+		requireApiPermission('dev_tools', 'read');
 		try {
 			resetAuditLogEntries($pdo);
 			respondJson(200, ['success' => true, 'message' => 'Audit log table reset successfully']);
@@ -752,6 +770,7 @@ if ($method === 'POST') {
 	}
 
 	if ($postAction === 'reset_records') {
+		requireApiPermission('dev_tools', 'read');
 		if (!resetRecordsTableToSample($pdo)) {
 			respondJson(500, ['success' => false, 'message' => 'Failed to reset records table']);
 		}
@@ -768,6 +787,7 @@ if ($method === 'POST') {
 	}
 
 	if ($postAction === 'reset_widget_prefs') {
+		requireApiPermission('dev_tools', 'read');
 		$userId = getApiAuthUserId();
 		try {
 			$seededCount = (int)resetUserWidgetPreferencesTable($pdo);
@@ -789,6 +809,7 @@ if ($method === 'POST') {
 	}
 
 	if ($postAction === 'logout_all_users') {
+		requireApiPermission('dev_tools', 'read');
 		$userId = getApiAuthUserId();
 		try {
 			writeAuditEvent($pdo, [
@@ -807,6 +828,7 @@ if ($method === 'POST') {
 	}
 
 	if ($postAction === 'reset_all') {
+		requireApiPermission('dev_tools', 'read');
 		$userId = getApiAuthUserId();
 		try {
 			resetActivityLogTable($pdo);
@@ -831,6 +853,7 @@ if ($method === 'POST') {
 	}
 
 	if ($postAction === 'reset_data') {
+		requireApiPermission('dev_tools', 'read');
 		if (APP_MODE !== 'demo') {
 			respondJson(403, ['success' => false, 'message' => 'Reset is only allowed in demo mode']);
 		}
@@ -850,6 +873,7 @@ if ($method === 'POST') {
 	}
 
 	if ($postAction === 'admin_user_lookup') {
+		requireApiPermission('admin', 'manage_users');
 		$userId = getApiAuthUserId();
 		enforceApiRateLimit('admin_user_lookup_' . $userId, 120, 60);
 		$lookup = $data['lookup'] ?? '';
@@ -866,6 +890,7 @@ if ($method === 'POST') {
 	}
 
 	if ($postAction === 'admin_role_list') {
+		requireApiPermission('admin', 'manage_permissions');
 		respondJson(200, [
 			'success' => true,
 			'message' => 'Roles loaded',
@@ -873,7 +898,56 @@ if ($method === 'POST') {
 		]);
 	}
 
+	if ($postAction === 'admin_role_permissions') {
+		requireApiPermission('admin', 'manage_permissions');
+		$payload = getRolePermissionsEditorPayload($pdo);
+		respondJson(200, [
+			'success' => true,
+			'message' => 'Role permissions loaded',
+			'roles' => $payload['roles'],
+			'resources' => $payload['resources'],
+			'permissions' => $payload['permissions'],
+			'role_permissions' => $payload['role_permissions'],
+		]);
+	}
+
+	if ($postAction === 'admin_role_permissions_update') {
+		requireApiPermission('admin', 'manage_permissions');
+		$actorUserId = getApiAuthUserId();
+		$targetId = isset($data['role_id']) ? (int)$data['role_id'] : 0;
+		$grants = isset($data['grants']) && is_array($data['grants']) ? $data['grants'] : [];
+		if ($targetId < 1) {
+			respondJson(400, ['success' => false, 'message' => 'A valid role id is required']);
+		}
+
+		$result = setRolePermissions($pdo, $targetId, $grants);
+		if (!$result) {
+			respondJson(400, ['success' => false, 'message' => 'Failed to update role permissions']);
+		}
+
+		$role = getRoleById($pdo, $targetId);
+		try {
+			writeAuditEvent($pdo, [
+				'record_type' => 'role',
+				'record_id' => $targetId,
+				'action' => 'update',
+				'details' => 'Updated permissions for role #' . $targetId . ' (' . (string)($role['name'] ?? '') . ')',
+				'source_user_id' => $actorUserId,
+			]);
+		} catch (Throwable $e) {
+			// Permission audit should not block saving.
+		}
+
+		respondJson(200, [
+			'success' => true,
+			'message' => 'Role permissions updated successfully',
+			'role' => $role,
+			'role_permissions' => getAllRolePermissionsMatrix($pdo),
+		]);
+	}
+
 	if ($postAction === 'admin_role_lookup') {
+		requireApiPermission('admin', 'manage_permissions');
 		$actorUserId = getApiAuthUserId();
 		enforceApiRateLimit('admin_role_lookup_' . $actorUserId, 120, 60);
 		$lookup = $data['lookup'] ?? '';
@@ -890,6 +964,7 @@ if ($method === 'POST') {
 	}
 
 	if ($postAction === 'admin_role_create') {
+		requireApiPermission('admin', 'admin_role_create');
 		$actorUserId = getApiAuthUserId();
 		enforceApiRateLimit('admin_role_create_' . $actorUserId, 20, 60);
 		$result = createAdminRole(
@@ -926,6 +1001,7 @@ if ($method === 'POST') {
 	}
 
 	if ($postAction === 'admin_role_update') {
+		requireApiPermission('admin', 'admin_role_update');
 		$actorUserId = getApiAuthUserId();
 		enforceApiRateLimit('admin_role_update_' . $actorUserId, 30, 60);
 		$targetId = isset($data['role_id']) ? (int)$data['role_id'] : 0;
@@ -969,6 +1045,7 @@ if ($method === 'POST') {
 	}
 
 	if ($postAction === 'admin_role_delete') {
+		requireApiPermission('admin', 'admin_role_delete');
 		$actorUserId = getApiAuthUserId();
 		enforceApiRateLimit('admin_role_delete_' . $actorUserId, 12, 60);
 		$targetId = isset($data['role_id']) ? (int)$data['role_id'] : 0;
@@ -1026,6 +1103,7 @@ if ($method === 'POST') {
 	}
 
 	if ($postAction === 'admin_user_create') {
+		requireApiPermission('admin', 'manage_users');
 		$actorUserId = getApiAuthUserId();
 		enforceApiRateLimit('admin_user_create_' . $actorUserId, 20, 60);
 		$result = createDevToolsUser(
@@ -1083,6 +1161,7 @@ if ($method === 'POST') {
 	}
 
 	if ($postAction === 'admin_user_update') {
+		requireApiPermission('admin', 'manage_users');
 		$actorUserId = getApiAuthUserId();
 		enforceApiRateLimit('admin_user_update_' . $actorUserId, 30, 60);
 		$targetId = isset($data['user_id']) ? (int)$data['user_id'] : 0;
@@ -1178,6 +1257,7 @@ if ($method === 'POST') {
 	}
 
 	if ($postAction === 'admin_user_force_delete') {
+		requireApiPermission('admin', 'manage_users');
 		$actorUserId = getApiAuthUserId();
 		enforceApiRateLimit('admin_user_force_delete_' . $actorUserId, 12, 60);
 		$targetId = isset($data['user_id']) ? (int)$data['user_id'] : 0;
@@ -1202,6 +1282,7 @@ if ($method === 'POST') {
 	}
 
 	if ($postAction === 'admin_user_reset_widget_prefs') {
+		requireApiPermission('admin', 'manage_users');
 		$actorUserId = getApiAuthUserId();
 		enforceApiRateLimit('admin_user_reset_widget_prefs_' . $actorUserId, 30, 60);
 		$targetId = isset($data['user_id']) ? (int)$data['user_id'] : 0;
@@ -1514,6 +1595,7 @@ if ($method === 'POST') {
 	}
 
 	if ($postAction === 'data_create') {
+		requireApiPermission('records', 'create');
 		$actorUserId = getApiAuthUserId();
 		$title = normalizeRecordText($data['title'] ?? '');
 		$description = normalizeRecordText($data['description'] ?? '');
@@ -1550,6 +1632,7 @@ if ($method === 'POST') {
 	}
 
 	if ($postAction === 'data_bulk_create') {
+		requireApiPermission('records', 'create');
 		$actorUserId = getApiAuthUserId();
 		$items = isset($data['items']) && is_array($data['items']) ? $data['items'] : [];
 		$maxRows = 200;
@@ -1666,6 +1749,7 @@ if ($method === 'POST') {
 	}
 
 	if ($postAction === 'data_update') {
+		requireApiPermission('records', 'update');
 		$actorUserId = getApiAuthUserId();
 		$recordId = isset($data['id']) ? (int)$data['id'] : 0;
 		$title = normalizeRecordText($data['title'] ?? '');
@@ -1717,6 +1801,7 @@ if ($method === 'POST') {
 	}
 
 	if ($postAction === 'data_delete') {
+		requireApiPermission('records', 'delete');
 		$recordId = isset($data['id']) ? (int)$data['id'] : 0;
 		if ($recordId < 1) {
 			respondJson(400, ['success' => false, 'message' => 'A valid record id is required']);
@@ -1747,6 +1832,7 @@ if ($method === 'POST') {
 	}
 
 	if ($postAction === 'data_bulk_delete') {
+		requireApiPermission('records', 'delete');
 		$ids = isset($data['ids']) && is_array($data['ids']) ? $data['ids'] : [];
 		$normalizedIds = [];
 		foreach ($ids as $id) {
@@ -1901,11 +1987,13 @@ if ($method === 'GET') {
 	}
 
 	if ($action === 'audit_trail') {
+		requireApiPermission('audit_log', 'read');
 		echo json_encode(getAuditPayload($pdo));
 		exit;
 	}
 
 	if ($action === 'logs') {
+		requireApiPermission('dev_tools', 'read');
 		echo json_encode(getLogsPayload($pdo));
 		exit;
 	}
@@ -1924,16 +2012,19 @@ if ($method === 'GET') {
 	}
 
 	if ($action === 'data_page') {
+		requireApiPermission('records', 'read');
 		echo json_encode(buildDataPagePayload($pdo, false));
 		exit;
 	}
 
 	if ($action === 'data_filtered_export') {
+		requireApiPermission('records', 'export');
 		echo json_encode(buildDataPagePayload($pdo, true));
 		exit;
 	}
 
 	if ($action === '' || $action === 'data') {
+		requireApiPermission('records', 'read');
 		echo json_encode(getDataPayload($pdo));
 		exit;
 	}

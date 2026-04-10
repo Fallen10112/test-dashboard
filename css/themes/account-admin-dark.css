@@ -55,6 +55,58 @@ body.dark-mode .admin-tab-panel h4 {
 body.dark-mode .admin-tab-panel ul li {
     color: #d1d5db;
 }
+body.dark-mode .permissions-editor-summary {
+    background: linear-gradient(180deg, #20283a 0%, #1a2130 100%);
+    border-color: #3e4b66;
+}
+body.dark-mode .permissions-editor-kicker {
+    color: #9fb1ff;
+}
+body.dark-mode .permissions-editor-summary h5 {
+    color: #f3f4f6;
+}
+body.dark-mode .permissions-editor-copy {
+    color: #b9c4d4;
+}
+body.dark-mode .permissions-editor-metrics > div {
+    background: rgba(127, 147, 255, 0.12);
+}
+body.dark-mode .permissions-editor-metrics strong,
+body.dark-mode .permission-editor-header strong,
+body.dark-mode .permission-group-heading h5,
+body.dark-mode .permission-resource-card-header h6,
+body.dark-mode .permission-toggle strong {
+    color: #f3f4f6;
+}
+body.dark-mode .permissions-editor-metrics span,
+body.dark-mode .permission-editor-header span,
+body.dark-mode .permission-group-heading p,
+body.dark-mode .permission-resource-card-header p,
+body.dark-mode .permission-toggle em,
+body.dark-mode .permission-editor-role-description,
+body.dark-mode .permissions-editor-empty-note {
+    color: #aab7cc;
+}
+body.dark-mode .permission-group,
+body.dark-mode .permission-resource-card,
+body.dark-mode .permissions-editor-empty {
+    background: #1e2636;
+    border-color: #3e4b66;
+}
+body.dark-mode .permission-toggle {
+    background: #242c3a;
+    border-color: #3e4b66;
+}
+body.dark-mode .permission-toggle:hover {
+    background: #2c3850;
+    border-color: #5a6f98;
+}
+body.dark-mode .permission-toggle input[type="checkbox"] {
+    accent-color: #9fb1ff;
+}
+body.dark-mode .admin-permissions-matrix {
+    color: #dbe4f3;
+}
 body.dark-mode .dev-tools-user-section {
     border-color: rgba(203, 213, 225, 0.22);
     background: rgba(15, 23, 42, 0.35);

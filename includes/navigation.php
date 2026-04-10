@@ -1,10 +1,34 @@
 	
+	<?php
+	$navigationAuthUser = $GLOBALS['auth_user'] ?? null;
+	$navigationUserId = (int)($navigationAuthUser['id'] ?? 0);
+	$navigationCanViewData = true;
+	$navigationCanViewReports = true;
+	$navigationCanViewAudit = true;
+	$navigationCanViewAdmin = true;
+	$navigationCanViewDevTools = true;
+	try {
+		$navigationPdo = getDashboardPdo();
+		ensurePermissionsSchema($navigationPdo);
+		$navigationCanViewData = $navigationUserId > 0 ? userHasPermission($navigationPdo, $navigationUserId, 'records', 'read') : false;
+		$navigationCanViewReports = $navigationUserId > 0 ? userHasPermission($navigationPdo, $navigationUserId, 'reports', 'read') : false;
+		$navigationCanViewAudit = $navigationUserId > 0 ? userHasPermission($navigationPdo, $navigationUserId, 'audit_log', 'read') : false;
+		$navigationCanViewAdmin = $navigationUserId > 0 ? userHasPermission($navigationPdo, $navigationUserId, 'admin', 'read') : false;
+		$navigationCanViewDevTools = $navigationUserId > 0 ? userHasPermission($navigationPdo, $navigationUserId, 'dev_tools', 'read') : false;
+	} catch (Throwable $e) {
+		$navigationCanViewData = false;
+		$navigationCanViewReports = false;
+		$navigationCanViewAudit = false;
+		$navigationCanViewAdmin = false;
+		$navigationCanViewDevTools = false;
+	}
+	?>
 	<nav class="sidebar">
 		<ul class="nav-menu">
 			<li><a href="../pages/home.php" class="nav-link <?php echo (basename($_SERVER['PHP_SELF']) === 'home.php') ? 'active' : ''; ?>">Home</a></li>
-			<li><a href="../pages/data.php" class="nav-link <?php echo (basename($_SERVER['PHP_SELF']) === 'data.php') ? 'active' : ''; ?>">Data</a></li>
-			<li><a href="../pages/reports.php" class="nav-link <?php echo (basename($_SERVER['PHP_SELF']) === 'reports.php') ? 'active' : ''; ?>">Reports</a></li>
-			<li><a href="../pages/audit.php" class="nav-link <?php echo (basename($_SERVER['PHP_SELF']) === 'audit.php') ? 'active' : ''; ?>">Audit Trail</a></li>
+			<?php if ($navigationCanViewData): ?><li><a href="../pages/data.php" class="nav-link <?php echo (basename($_SERVER['PHP_SELF']) === 'data.php') ? 'active' : ''; ?>">Data</a></li><?php endif; ?>
+			<?php if ($navigationCanViewReports): ?><li><a href="../pages/reports.php" class="nav-link <?php echo (basename($_SERVER['PHP_SELF']) === 'reports.php') ? 'active' : ''; ?>">Reports</a></li><?php endif; ?>
+			<?php if ($navigationCanViewAudit): ?><li><a href="../pages/audit.php" class="nav-link <?php echo (basename($_SERVER['PHP_SELF']) === 'audit.php') ? 'active' : ''; ?>">Audit Trail</a></li><?php endif; ?>
 		</ul>
 		
 		

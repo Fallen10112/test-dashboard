@@ -18,6 +18,11 @@ const csvImportTemplateFilename = 'data-import-template.csv';
 let dataRealtimePollTimerId = null;
 let isDataRealtimePollInFlight = false;
 let dataLastRefreshedTimeText = '--:--:--';
+const dataPagePermissions = window.DASHBOARD_PAGE_PERMISSIONS || {};
+const canCreateDataRecords = !!dataPagePermissions.create;
+const canUpdateDataRecords = !!dataPagePermissions.update;
+const canDeleteDataRecords = !!dataPagePermissions.delete;
+const canExportDataRecords = !!dataPagePermissions.export;
 
 function updateDataLastRefreshedTime() {
 	const now = new Date();
@@ -62,26 +67,33 @@ function updateRecordModalActionButtons(isEditMode) {
 
 function setupDataPageHandlers() {
 	const debouncedFilter = debounce(loadDataPage, 180);
+	applyDataPagePermissionVisibility();
 
-	$('#add-record-btn').on('click', function() {
-		openAddModal();
-	});
+	if (canCreateDataRecords) {
+		$('#add-record-btn').on('click', function() {
+			openAddModal();
+		});
 
-	$('#import-csv-btn').on('click', function() {
-		openCsvImportModal();
-	});
+		$('#import-csv-btn').on('click', function() {
+			openCsvImportModal();
+		});
+	}
 
-	$('#export-filtered-pdf-btn').on('click', function() {
-		exportFilteredDataAsPDF();
-	});
+	if (canExportDataRecords) {
+		$('#export-filtered-pdf-btn').on('click', function() {
+			exportFilteredDataAsPDF();
+		});
 
-	$('#export-filtered-csv-btn').on('click', function() {
-		exportFilteredDataAsCSV();
-	});
+		$('#export-filtered-csv-btn').on('click', function() {
+			exportFilteredDataAsCSV();
+		});
+	}
 
-	$('#bulk-delete-btn').on('click', function() {
-		bulkDeleteSelectedRecords();
-	});
+	if (canDeleteDataRecords) {
+		$('#bulk-delete-btn').on('click', function() {
+			bulkDeleteSelectedRecords();
+		});
+	}
 
 	$('#search-input').on('input', function() {
 		currentPage = 1;
@@ -169,36 +181,40 @@ function setupDataPageHandlers() {
 
 	$('.modal-close').on('click', closeDataModals);
 	$('#modal-cancel').on('click', closeModal);
-	$('#save-and-add-another-btn').on('click', function() {
-		saveRecord({ keepOpen: true });
-	});
-	$('#csv-import-download-template-btn').on('click', function() {
-		downloadCsvImportTemplate();
-	});
-	$('#csv-import-file-input').on('change', function() {
-		const file = this.files && this.files[0] ? this.files[0] : null;
-		handleCsvImportFileSelect(file);
-	});
-	$('#csv-import-submit-btn').on('click', function() {
-		submitCsvImportRecords();
-	});
-	$('#csv-import-cancel-btn').on('click', function() {
-		closeCsvImportModal();
-	});
-	$('#record-form').on('submit', function(e) {
-		e.preventDefault();
-		saveRecord();
-	});
-	$('#record-modal').on('click', function(e) {
-		if (e.target.id === 'record-modal') {
-			closeModal();
-		}
-	});
-	$('#csv-import-modal').on('click', function(e) {
-		if (e.target.id === 'csv-import-modal') {
+	if (canCreateDataRecords || canUpdateDataRecords) {
+		$('#save-and-add-another-btn').on('click', function() {
+			saveRecord({ keepOpen: true });
+		});
+		$('#record-form').on('submit', function(e) {
+			e.preventDefault();
+			saveRecord();
+		});
+		$('#record-modal').on('click', function(e) {
+			if (e.target.id === 'record-modal') {
+				closeModal();
+			}
+		});
+	}
+	if (canCreateDataRecords) {
+		$('#csv-import-download-template-btn').on('click', function() {
+			downloadCsvImportTemplate();
+		});
+		$('#csv-import-file-input').on('change', function() {
+			const file = this.files && this.files[0] ? this.files[0] : null;
+			handleCsvImportFileSelect(file);
+		});
+		$('#csv-import-submit-btn').on('click', function() {
+			submitCsvImportRecords();
+		});
+		$('#csv-import-cancel-btn').on('click', function() {
 			closeCsvImportModal();
-		}
-	});
+		});
+		$('#csv-import-modal').on('click', function(e) {
+			if (e.target.id === 'csv-import-modal') {
+				closeCsvImportModal();
+			}
+		});
+	}
 
 	updateBulkDeleteButtonState();
 	updateFilteredExportButtonsState();
@@ -305,6 +321,11 @@ function startDataPageRealtimeSync() {
 
 
 function updateFilteredExportButtonsState() {
+	if (!canExportDataRecords) {
+		$('#export-filtered-pdf-btn').addClass('hidden');
+		$('#export-filtered-csv-btn').addClass('hidden');
+		return;
+	}
 	const hasRows = currentFilteredItemCount > 0;
 	$('#export-filtered-pdf-btn').prop('disabled', !hasRows);
 	$('#export-filtered-csv-btn').prop('disabled', !hasRows);
@@ -312,6 +333,10 @@ function updateFilteredExportButtonsState() {
 
 
 function updateBulkDeleteButtonState() {
+	if (!canDeleteDataRecords) {
+		$('#bulk-delete-btn').addClass('hidden');
+		return;
+	}
 	const selectedCount = selectedRecordIds.size;
 	const $bulkButton = $('#bulk-delete-btn');
 	if ($bulkButton.length === 0) {
@@ -417,14 +442,16 @@ function createDataTableElement() {
 	table.className = 'data-table data-records-table virtualized-table';
 	const thead = document.createElement('thead');
 	const headRow = document.createElement('tr');
-	const selectTh = document.createElement('th');
-	selectTh.className = 'select-column';
-	const selectAll = document.createElement('input');
-	selectAll.type = 'checkbox';
-	selectAll.id = 'select-all-records';
-	selectAll.setAttribute('aria-label', 'Select all records');
-	selectTh.appendChild(selectAll);
-	headRow.appendChild(selectTh);
+	if (canDeleteDataRecords) {
+		const selectTh = document.createElement('th');
+		selectTh.className = 'select-column';
+		const selectAll = document.createElement('input');
+		selectAll.type = 'checkbox';
+		selectAll.id = 'select-all-records';
+		selectAll.setAttribute('aria-label', 'Select all records');
+		selectTh.appendChild(selectAll);
+		headRow.appendChild(selectTh);
+	}
 
 	function createSortableHeader(column, label) {
 		const th = document.createElement('th');
@@ -443,9 +470,11 @@ function createDataTableElement() {
 	headRow.appendChild(createSortableHeader('id', 'ID'));
 	headRow.appendChild(createSortableHeader('title', 'Title'));
 	headRow.appendChild(createSortableHeader('description', 'Description'));
-	const actionsTh = document.createElement('th');
-	actionsTh.textContent = 'Actions';
-	headRow.appendChild(actionsTh);
+	if (canUpdateDataRecords || canDeleteDataRecords) {
+		const actionsTh = document.createElement('th');
+		actionsTh.textContent = 'Actions';
+		headRow.appendChild(actionsTh);
+	}
 	thead.appendChild(headRow);
 	table.appendChild(thead);
 	const tbody = document.createElement('tbody');
@@ -457,16 +486,18 @@ function createDataTableElement() {
 
 function createDataRowElement(item) {
 	const row = document.createElement('tr');
-	const selectTd = document.createElement('td');
-	selectTd.className = 'select-column';
-	const checkbox = document.createElement('input');
-	checkbox.type = 'checkbox';
-	checkbox.className = 'record-select-checkbox';
-	checkbox.setAttribute('data-id', String(item.id));
-	checkbox.setAttribute('aria-label', 'Select record ' + item.id);
-	checkbox.checked = selectedRecordIds.has(String(item.id));
-	selectTd.appendChild(checkbox);
-	row.appendChild(selectTd);
+	if (canDeleteDataRecords) {
+		const selectTd = document.createElement('td');
+		selectTd.className = 'select-column';
+		const checkbox = document.createElement('input');
+		checkbox.type = 'checkbox';
+		checkbox.className = 'record-select-checkbox';
+		checkbox.setAttribute('data-id', String(item.id));
+		checkbox.setAttribute('aria-label', 'Select record ' + item.id);
+		checkbox.checked = selectedRecordIds.has(String(item.id));
+		selectTd.appendChild(checkbox);
+		row.appendChild(selectTd);
+	}
 
 	const idTd = document.createElement('td');
 	idTd.textContent = item.id;
@@ -478,21 +509,46 @@ function createDataRowElement(item) {
 	descriptionTd.textContent = item.description;
 	row.appendChild(descriptionTd);
 
-	const actionsTd = document.createElement('td');
-	const editBtn = document.createElement('button');
-	editBtn.type = 'button';
-	editBtn.className = 'btn btn-sm btn-secondary edit-btn';
-	editBtn.setAttribute('data-id', String(item.id));
-	editBtn.textContent = 'Edit';
-	actionsTd.appendChild(editBtn);
-	const deleteBtn = document.createElement('button');
-	deleteBtn.type = 'button';
-	deleteBtn.className = 'btn btn-sm btn-danger delete-btn';
-	deleteBtn.setAttribute('data-id', String(item.id));
-	deleteBtn.textContent = 'Delete';
-	actionsTd.appendChild(deleteBtn);
-	row.appendChild(actionsTd);
+	if (canUpdateDataRecords || canDeleteDataRecords) {
+		const actionsTd = document.createElement('td');
+		if (canUpdateDataRecords) {
+			const editBtn = document.createElement('button');
+			editBtn.type = 'button';
+			editBtn.className = 'btn btn-sm btn-secondary edit-btn';
+			editBtn.setAttribute('data-id', String(item.id));
+			editBtn.textContent = 'Edit';
+			actionsTd.appendChild(editBtn);
+		}
+		if (canDeleteDataRecords) {
+			const deleteBtn = document.createElement('button');
+			deleteBtn.type = 'button';
+			deleteBtn.className = 'btn btn-sm btn-danger delete-btn';
+			deleteBtn.setAttribute('data-id', String(item.id));
+			deleteBtn.textContent = 'Delete';
+			actionsTd.appendChild(deleteBtn);
+		}
+		row.appendChild(actionsTd);
+	}
 	return row;
+}
+
+
+function applyDataPagePermissionVisibility() {
+	if (!canCreateDataRecords) {
+		$('#add-record-btn').addClass('hidden');
+		$('#import-csv-btn').addClass('hidden');
+		$('#csv-import-modal').remove();
+	}
+	if (!canCreateDataRecords && !canUpdateDataRecords) {
+		$('#record-modal').remove();
+	}
+	if (!canDeleteDataRecords) {
+		$('#bulk-delete-btn').addClass('hidden');
+	}
+	if (!canExportDataRecords) {
+		$('#export-filtered-pdf-btn').addClass('hidden');
+		$('#export-filtered-csv-btn').addClass('hidden');
+	}
 }
 
 

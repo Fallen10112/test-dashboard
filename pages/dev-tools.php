@@ -4,6 +4,7 @@ require_once __DIR__ . '/../includes/sql_helpers.php';
 
 startAuthSession();
 requireAuth();
+requirePagePermission('dev_tools', 'read');
 
 $authUser = $GLOBALS['auth_user'] ?? null;
 $currentUserId = (int)($authUser['id'] ?? 0);

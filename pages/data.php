@@ -1,5 +1,37 @@
+<?php
+require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/sql_helpers.php';
+startAuthSession();
+requireAuth();
+requirePagePermission('records', 'read');
+
+$dataPagePermissionFlags = [
+	'create' => false,
+	'update' => false,
+	'delete' => false,
+	'export' => false,
+];
+try {
+	$dataPageUser = $GLOBALS['auth_user'] ?? null;
+	$dataPageUserId = (int)($dataPageUser['id'] ?? 0);
+	if ($dataPageUserId > 0) {
+		$dataPagePdo = getDashboardPdo();
+		ensurePermissionsSchema($dataPagePdo);
+		$dataPagePermissionFlags['create'] = userHasPermission($dataPagePdo, $dataPageUserId, 'records', 'create');
+		$dataPagePermissionFlags['update'] = userHasPermission($dataPagePdo, $dataPageUserId, 'records', 'update');
+		$dataPagePermissionFlags['delete'] = userHasPermission($dataPagePdo, $dataPageUserId, 'records', 'delete');
+		$dataPagePermissionFlags['export'] = userHasPermission($dataPagePdo, $dataPageUserId, 'records', 'export');
+	}
+} catch (Throwable $e) {
+	$dataPagePermissionFlags = ['create' => false, 'update' => false, 'delete' => false, 'export' => false];
+}
+?>
 <?php include '../includes/header.php'; ?>
 <?php include '../includes/navigation.php'; ?>
+
+<script>
+	window.DASHBOARD_PAGE_PERMISSIONS = <?php echo json_encode($dataPagePermissionFlags, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
+</script>
 	
 	
 	<main class="main-content main-content-table-page">
@@ -9,15 +41,16 @@
 				<div class="search-container">
 					<input type="text" id="search-input" class="search-box" placeholder="Search by Title or Description...">
 				</div>
-				<button id="add-record-btn" class="btn btn-primary">+ Add New Record</button>
-				<button id="import-csv-btn" class="btn btn-info">Import CSV</button>
-				<button id="bulk-delete-btn" class="btn btn-danger" disabled>Delete Selected (0)</button>
-				<button id="export-filtered-pdf-btn" class="btn btn-info">Export filtered lines to PDF</button>
-				<button id="export-filtered-csv-btn" class="btn btn-info">Export filtered lines to CSV</button>
+				<?php if ($dataPagePermissionFlags['create']): ?><button id="add-record-btn" class="btn btn-primary">+ Add New Record</button><?php endif; ?>
+				<?php if ($dataPagePermissionFlags['create']): ?><button id="import-csv-btn" class="btn btn-info">Import CSV</button><?php endif; ?>
+				<?php if ($dataPagePermissionFlags['delete']): ?><button id="bulk-delete-btn" class="btn btn-danger" disabled>Delete Selected (0)</button><?php endif; ?>
+				<?php if ($dataPagePermissionFlags['export']): ?><button id="export-filtered-pdf-btn" class="btn btn-info">Export filtered lines to PDF</button><?php endif; ?>
+				<?php if ($dataPagePermissionFlags['export']): ?><button id="export-filtered-csv-btn" class="btn btn-info">Export filtered lines to CSV</button><?php endif; ?>
 			</div>
 			<div id="data-container">Loading data...</div>
 			
 			
+			<?php if ($dataPagePermissionFlags['create'] || $dataPagePermissionFlags['update']): ?>
 			<div id="record-modal" class="modal hidden">
 				<div class="modal-content">
 					<span class="modal-close">&times;</span>
@@ -39,7 +72,9 @@
 					</form>
 				</div>
 			</div>
+			<?php endif; ?>
 
+			<?php if ($dataPagePermissionFlags['create']): ?>
 			<div id="csv-import-modal" class="modal hidden">
 				<div class="modal-content modal-wide csv-import-modal-content">
 					<span class="modal-close">&times;</span>
@@ -62,6 +97,7 @@
 					</div>
 				</div>
 			</div>
+			<?php endif; ?>
 		</section>
 	</main>
 
