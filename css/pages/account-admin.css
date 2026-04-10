@@ -192,6 +192,10 @@
     border: 1px solid #dbe3ef;
     border-radius: 12px;
     background: linear-gradient(180deg, #ffffff 0%, #f6f9ff 100%);
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
 }
 
 .permissions-editor-summary-copy {
