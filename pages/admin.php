@@ -128,15 +128,15 @@ requirePagePermission('admin', 'read');
 				<p>Basic tabbed framework for future expansion.</p>
 
 				<div class="admin-tabs" role="tablist" aria-label="Admin sections">
-					<?php if ($adminTabPermissionFlags['user_management']): ?><button type="button" class="admin-tab-btn active" id="admin-tab-btn-1" role="tab" aria-selected="true" aria-controls="admin-tab-panel-1" data-admin-tab="1">User management</button><?php endif; ?>
-					<?php if ($adminTabPermissionFlags['role_management']): ?><button type="button" class="admin-tab-btn" id="admin-tab-btn-2" role="tab" aria-selected="false" aria-controls="admin-tab-panel-2" data-admin-tab="2">Role management</button><?php endif; ?>
-					<?php if ($adminTabPermissionFlags['database_management']): ?><button type="button" class="admin-tab-btn" id="admin-tab-btn-3" role="tab" aria-selected="false" aria-controls="admin-tab-panel-3" data-admin-tab="3">Database management</button><?php endif; ?>
-					<?php if ($adminTabPermissionFlags['application_management']): ?><button type="button" class="admin-tab-btn" id="admin-tab-btn-4" role="tab" aria-selected="false" aria-controls="admin-tab-panel-4" data-admin-tab="4">Application management</button><?php endif; ?>
-					<?php if ($adminTabPermissionFlags['notifications']): ?><button type="button" class="admin-tab-btn" id="admin-tab-btn-5" role="tab" aria-selected="false" aria-controls="admin-tab-panel-5" data-admin-tab="5">Notifications</button><?php endif; ?>
-					<?php if ($adminTabPermissionFlags['permissions']): ?><button type="button" class="admin-tab-btn" id="admin-tab-btn-6" role="tab" aria-selected="false" aria-controls="admin-tab-panel-6" data-admin-tab="6">Permissions</button><?php endif; ?>
+					<?php if ($adminTabPermissionFlags['user_management']): ?><button type="button" class="admin-tab-btn active" id="admin-tab-btn-user-management" role="tab" aria-selected="true" aria-controls="admin-tab-panel-user-management" data-admin-tab="user-management">User Management</button><?php endif; ?>
+					<?php if ($adminTabPermissionFlags['role_management']): ?><button type="button" class="admin-tab-btn" id="admin-tab-btn-role-management" role="tab" aria-selected="false" aria-controls="admin-tab-panel-role-management" data-admin-tab="role-management">Role Management</button><?php endif; ?>
+					<?php if ($adminTabPermissionFlags['permissions']): ?><button type="button" class="admin-tab-btn" id="admin-tab-btn-role-permissions" role="tab" aria-selected="false" aria-controls="admin-tab-panel-role-permissions" data-admin-tab="role-permissions">Role Permissions</button><?php endif; ?>
+					<?php if ($adminTabPermissionFlags['notifications']): ?><button type="button" class="admin-tab-btn" id="admin-tab-btn-notifications-management" role="tab" aria-selected="false" aria-controls="admin-tab-panel-notifications-management" data-admin-tab="notifications-management">Notifications Management</button><?php endif; ?>
+					<?php if ($adminTabPermissionFlags['application_management']): ?><button type="button" class="admin-tab-btn" id="admin-tab-btn-application-management" role="tab" aria-selected="false" aria-controls="admin-tab-panel-application-management" data-admin-tab="application-management">Application Management</button><?php endif; ?>
+					<?php if ($adminTabPermissionFlags['database_management']): ?><button type="button" class="admin-tab-btn" id="admin-tab-btn-database-management" role="tab" aria-selected="false" aria-controls="admin-tab-panel-database-management" data-admin-tab="database-management">Database Management</button><?php endif; ?>
 				</div>
 
-				<?php if ($adminTabPermissionFlags['user_management']): ?><div class="admin-tab-panel active" id="admin-tab-panel-1" role="tabpanel" aria-labelledby="admin-tab-btn-1">
+				<?php if ($adminTabPermissionFlags['user_management']): ?><div class="admin-tab-panel active" id="admin-tab-panel-user-management" role="tabpanel" aria-labelledby="admin-tab-btn-user-management">
 					<h4>User Management</h4>
 					<p>Create new users and update existing users details.</p>
 					<input type="hidden" id="dev-tools-current-user-id" value="<?php echo $adminCurrentUserId; ?>">
@@ -298,7 +298,7 @@ requirePagePermission('admin', 'read');
 					</div>
 				</div><?php endif; ?>
 
-				<?php if ($adminTabPermissionFlags['role_management']): ?><div class="admin-tab-panel" id="admin-tab-panel-2" role="tabpanel" aria-labelledby="admin-tab-btn-2" hidden>
+				<?php if ($adminTabPermissionFlags['role_management']): ?><div class="admin-tab-panel" id="admin-tab-panel-role-management" role="tabpanel" aria-labelledby="admin-tab-btn-role-management" hidden>
 					<h4>Role Management</h4>
 					<p>Create, update, and remove roles. Deleting a role will reassign affected users to the next lower role ID, or the next higher role ID if nothing exists below the deleted role.</p>
 
@@ -419,34 +419,7 @@ requirePagePermission('admin', 'read');
 					</div>
 				</div><?php endif; ?>
 
-				<?php if ($adminTabPermissionFlags['database_management']): ?><div class="admin-tab-panel" id="admin-tab-panel-3" role="tabpanel" aria-labelledby="admin-tab-btn-3" hidden>
-					<h4>Tab 3 Content</h4>
-					<ul>
-						<li>Placeholder item G</li>
-						<li>Placeholder item H</li>
-						<li>Placeholder item I</li>
-					</ul>
-				</div><?php endif; ?>
-
-				<?php if ($adminTabPermissionFlags['application_management']): ?><div class="admin-tab-panel" id="admin-tab-panel-4" role="tabpanel" aria-labelledby="admin-tab-btn-4" hidden>
-					<h4>Application management</h4>
-					<ul>
-						<li>Placeholder item G</li>
-						<li>Placeholder item H</li>
-						<li>Placeholder item I</li>
-					</ul>
-				</div><?php endif; ?>
-
-				<?php if ($adminTabPermissionFlags['notifications']): ?><div class="admin-tab-panel" id="admin-tab-panel-5" role="tabpanel" aria-labelledby="admin-tab-btn-5" hidden>
-					<h4>Notifications Content</h4>
-					<ul>
-						<li>Placeholder item J</li>
-						<li>Placeholder item K</li>
-						<li>Placeholder item L</li>
-					</ul>
-				</div><?php endif; ?>
-
-				<?php if ($adminTabPermissionFlags['permissions']): ?><div class="admin-tab-panel" id="admin-tab-panel-6" role="tabpanel" aria-labelledby="admin-tab-btn-6" hidden>
+				<?php if ($adminTabPermissionFlags['permissions']): ?><div class="admin-tab-panel" id="admin-tab-panel-role-permissions" role="tabpanel" aria-labelledby="admin-tab-btn-role-permissions" hidden>
 						<h4>Role Permissions</h4>
 						<p>Choose a role, then adjust access by section.</p>
 
@@ -477,6 +450,33 @@ requirePagePermission('admin', 'read');
 							<div id="admin-permissions-matrix" class="admin-permissions-matrix"></div>
 							<p id="admin-permissions-result" class="dev-tools-inline-result" hidden></p>
 						</div>
+				</div><?php endif; ?>
+
+				<?php if ($adminTabPermissionFlags['notifications']): ?><div class="admin-tab-panel" id="admin-tab-panel-notifications-management" role="tabpanel" aria-labelledby="admin-tab-btn-notifications-management" hidden>
+					<h4>Notifications Management</h4>
+					<ul>
+						<li>Placeholder item J</li>
+						<li>Placeholder item K</li>
+						<li>Placeholder item L</li>
+					</ul>
+				</div><?php endif; ?>
+
+				<?php if ($adminTabPermissionFlags['application_management']): ?><div class="admin-tab-panel" id="admin-tab-panel-application-management" role="tabpanel" aria-labelledby="admin-tab-btn-application-management" hidden>
+					<h4>Application Management</h4>
+					<ul>
+						<li>Placeholder item G</li>
+						<li>Placeholder item H</li>
+						<li>Placeholder item I</li>
+					</ul>
+				</div><?php endif; ?>
+
+				<?php if ($adminTabPermissionFlags['database_management']): ?><div class="admin-tab-panel" id="admin-tab-panel-database-management" role="tabpanel" aria-labelledby="admin-tab-btn-database-management" hidden>
+					<h4>Database Management</h4>
+					<ul>
+						<li>Placeholder item G</li>
+						<li>Placeholder item H</li>
+						<li>Placeholder item I</li>
+					</ul>
 				</div><?php endif; ?>
 			</div>
 		</section>
