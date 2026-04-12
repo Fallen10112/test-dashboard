@@ -34,6 +34,39 @@
     color: #007700;
 }
 
+.dev-tools-action-groups {
+    display: grid;
+    gap: 16px;
+}
+
+.dev-tools-action-group {
+    padding: 16px;
+    border: 1px solid #dbe3ef;
+    border-radius: 12px;
+    background: linear-gradient(180deg, #ffffff 0%, #f6f9ff 100%);
+}
+
+.dev-tools-action-group h4 {
+    margin: 0 0 8px;
+    color: #1f2f63;
+}
+
+.dev-tools-action-group p {
+    margin: 0 0 14px;
+    color: #5b6475;
+}
+
+.dev-tools-action-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 10px;
+}
+
+.dev-tools-action-grid .btn {
+    width: 100%;
+    min-height: 44px;
+}
+
 .account-form .form-group {
     margin-bottom: 14px;
 }
@@ -666,6 +699,14 @@
 
     .dev-tools-actions-row {
         max-width: none;
+    }
+
+    .dev-tools-action-group {
+        padding: 14px;
+    }
+
+    .dev-tools-action-grid {
+        grid-template-columns: 1fr;
     }
 }
 

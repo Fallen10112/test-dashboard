@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/sql_helpers.php';
+require_once __DIR__ . '/../includes/page_context.php';
 
 startAuthSession();
 requireAuth();
@@ -18,6 +19,130 @@ if ($currentDisplayName === '') {
 if ($currentDisplayName === '') {
 	$currentDisplayName = 'Current User';
 }
+
+$devToolsSampleSeedConfig = [
+	'record_count' => 150,
+	'activity_count' => 150,
+	'audit_count' => 150,
+	'user_count' => 10,
+	'seed_prefix' => 'devtools_sample',
+];
+
+$devToolsMaintenanceActions = [
+	[
+		'buttonId' => 'reset-activity-log-btn',
+		'action' => 'reset_activity_log',
+		'buttonClass' => 'btn btn-danger',
+		'label' => 'Reset Activity Log',
+		'confirmTitle' => 'Reset Activity Log?',
+		'confirmMessage' => 'This clears the activity_log table and resets its auto-increment key.',
+		'successTitle' => 'Activity Log Reset',
+		'successMessage' => 'The activity_log table has been reset and reseeded from 1.',
+	],
+	[
+		'buttonId' => 'reset-audit-log-btn',
+		'action' => 'reset_audit_log',
+		'buttonClass' => 'btn btn-danger',
+		'label' => 'Reset Audit Log',
+		'confirmTitle' => 'Reset Audit Log?',
+		'confirmMessage' => 'This clears the audit_log table and resets its auto-increment key.',
+		'successTitle' => 'Audit Log Reset',
+		'successMessage' => 'The audit_log table has been reset and reseeded from 1.',
+	],
+	[
+		'buttonId' => 'reset-records-btn',
+		'action' => 'reset_records',
+		'buttonClass' => 'btn btn-danger',
+		'label' => 'Reset Records',
+		'confirmTitle' => 'Reset Records?',
+		'confirmMessage' => 'This resets the records table back to 3 sample entries and resets its key.',
+		'successTitle' => 'Records Reset',
+		'successMessage' => 'The records table has been reset to 3 sample entries.',
+	],
+	[
+		'buttonId' => 'reset-data-tables-btn',
+		'action' => 'reset_data_tables',
+		'buttonClass' => 'btn btn-danger',
+		'label' => 'Reset Data Tables',
+		'confirmTitle' => 'Reset Data Tables?',
+		'confirmMessage' => 'This resets activity_log, audit_log, and records together.',
+		'successTitle' => 'Data Tables Reset',
+		'successMessage' => 'Activity log, audit log, and records were reset successfully.',
+	],
+	[
+		'buttonId' => 'reset-users-btn',
+		'action' => 'reset_users',
+		'buttonClass' => 'btn btn-danger',
+		'label' => 'Reset Users',
+		'confirmTitle' => 'Reset Users?',
+		'confirmMessage' => 'This deletes all users except your current account and clears related user data.',
+		'successTitle' => 'Users Reset',
+		'successMessage' => 'All users except the current account were deleted.',
+	],
+	[
+		'buttonId' => 'reset-notifications-btn',
+		'action' => 'reset_notifications_table',
+		'buttonClass' => 'btn btn-secondary',
+		'label' => 'Reset Notifications',
+		'confirmTitle' => 'Reset Notifications?',
+		'confirmMessage' => 'This clears the notifications table and resets its key.',
+		'successTitle' => 'Notifications Reset',
+		'successMessage' => 'The notifications table has been reset successfully.',
+	],
+	[
+		'buttonId' => 'reset-widget-prefs-btn',
+		'action' => 'reset_widget_prefs',
+		'buttonClass' => 'btn btn-info',
+		'label' => 'Reset Widget Prefs',
+		'confirmTitle' => 'Reset Widget Prefs?',
+		'confirmMessage' => 'This resets user_widget_preferences and reseeds default widgets for all users.',
+		'successTitle' => 'Widget Prefs Reset',
+		'successMessage' => 'Widget preferences have been reset to defaults for all users.',
+	],
+	[
+		'buttonId' => 'logout-all-users-btn',
+		'action' => 'logout_all_users',
+		'buttonClass' => 'btn btn-secondary',
+		'label' => 'Log out all users',
+		'confirmTitle' => 'Log out all users?',
+		'confirmMessage' => 'This revokes all sessions and forces every user to sign in again.',
+		'successTitle' => 'All Users Logged Out',
+		'successMessage' => 'All user sessions were reset successfully.',
+	],
+	[
+		'buttonId' => 'add-sample-data-btn',
+		'action' => 'add_sample_data',
+		'buttonClass' => 'btn btn-success',
+		'label' => 'Add Sample Data',
+		'confirmTitle' => 'Add Sample Data?',
+		'confirmMessage' => 'This creates 150 sample records, 150 activity log entries, 150 audit log entries, and 10 sample users.',
+		'successTitle' => 'Sample Data Added',
+		'successMessage' => 'Sample data has been seeded successfully and can be removed later by prefix.',
+		'requestPayload' => $devToolsSampleSeedConfig,
+	],
+];
+
+$devToolsMaintenanceGroups = [
+	[
+		'title' => 'Table resets',
+		'description' => 'Clear the tables used to validate record, activity, and audit flows.',
+		'actions' => ['reset-activity-log-btn', 'reset-audit-log-btn', 'reset-records-btn', 'reset-data-tables-btn'],
+	],
+	[
+		'title' => 'User and session resets',
+		'description' => 'Clear user-facing state without touching the signed-in account.',
+		'actions' => ['reset-users-btn', 'reset-notifications-btn', 'reset-widget-prefs-btn', 'logout-all-users-btn'],
+	],
+	[
+		'title' => 'Sample data',
+		'description' => 'Create a clearly prefixed dataset that can be removed later in one pass.',
+		'actions' => ['add-sample-data-btn'],
+	],
+];
+
+$devToolsMaintenanceActionsJson = dashboardJsonEncodeOrFallback($devToolsMaintenanceActions, '{"actions":[]}');
+$devToolsMaintenanceGroupsJson = dashboardJsonEncodeOrFallback($devToolsMaintenanceGroups, '{"groups":[]}');
+$devToolsSampleSeedConfigJson = dashboardJsonEncodeOrFallback($devToolsSampleSeedConfig, '{"record_count":150,"activity_count":150,"audit_count":150,"user_count":10,"seed_prefix":"devtools_sample"}');
 
 $csrfToken = getCsrfToken();
 
@@ -137,6 +262,12 @@ try {
 <?php require_once __DIR__ . '/../includes/header.php'; ?>
 <?php require_once __DIR__ . '/../includes/navigation.php'; ?>
 
+<script>
+	window.DEV_TOOLS_MAINTENANCE_ACTIONS = <?php echo $devToolsMaintenanceActionsJson; ?>;
+	window.DEV_TOOLS_MAINTENANCE_GROUPS = <?php echo $devToolsMaintenanceGroupsJson; ?>;
+	window.DEV_TOOLS_SAMPLE_SEED = <?php echo $devToolsSampleSeedConfigJson; ?>;
+</script>
+
 	<main class="main-content">
 		<section class="content-section active">
 			<h2>Dev Tools</h2>
@@ -224,7 +355,7 @@ try {
 
 			<div class="account-card dev-tool-module" data-dev-tool-category="system">
 				<h3>Maintenance Tools</h3>
-				<p>Run maintenance actions for targeted table resets.</p>
+				<p>Run local maintenance actions for targeted resets and disposable sample data.</p>
 							<?php if (defined('RESET_ON_INDEX_VISIT') && RESET_ON_INDEX_VISIT): ?>
 							<div class="dev-tools-warning dev-tools-warning--danger">
 								Reset_on_index_visit is currently TRUE - all data will be reset upon visiting the landing page.
@@ -234,26 +365,41 @@ try {
 								Application mode is in Demo mode - reset_on_index_visit is FALSE - all data will be preserved on visiting the landing page.
 							</div>
 							<?php endif; ?>
-				<div class="dev-tools-actions-row">
-					<button id="reset-activity-log-btn" class="btn btn-reset">Reset Activity Log</button>
-				</div>
-				<div class="dev-tools-actions-row">
-					<button id="reset-audit-log-btn" class="btn btn-reset">Reset Audit Log</button>
-				</div>
-				<div class="dev-tools-actions-row">
-					<button id="reset-records-btn" class="btn btn-reset">Reset Records</button>
-				</div>
-				<div class="dev-tools-actions-row">
-					<button id="reset-widget-prefs-btn" class="btn btn-reset">Reset Widget Prefs</button>
-				</div>
-				<div class="dev-tools-actions-row">
-					<button id="reset-notif-table-btn" class="btn btn-reset">Reset Notification Table</button>
-				</div>
-				<div class="dev-tools-actions-row">
-					<button id="logout-all-users-btn" class="btn btn-reset">Log out all users</button>
-				</div>
-				<div class="dev-tools-actions-row">
-					<button id="reset-all-btn" class="btn btn-reset">Reset all</button>
+				<div class="dev-tools-action-groups">
+					<?php foreach ($devToolsMaintenanceGroups as $maintenanceGroup): ?>
+						<section class="dev-tools-action-group">
+							<h4><?php echo htmlspecialchars((string)$maintenanceGroup['title'], ENT_QUOTES, 'UTF-8'); ?></h4>
+							<p><?php echo htmlspecialchars((string)$maintenanceGroup['description'], ENT_QUOTES, 'UTF-8'); ?></p>
+							<div class="dev-tools-action-grid">
+								<?php foreach ($maintenanceGroup['actions'] as $actionButtonId): ?>
+									<?php
+									$maintenanceAction = null;
+									foreach ($devToolsMaintenanceActions as $actionConfig) {
+										if (($actionConfig['buttonId'] ?? '') === $actionButtonId) {
+											$maintenanceAction = $actionConfig;
+											break;
+										}
+									}
+									if (!is_array($maintenanceAction)) {
+										continue;
+									}
+									?>
+									<button
+										type="button"
+										id="<?php echo htmlspecialchars((string)$maintenanceAction['buttonId'], ENT_QUOTES, 'UTF-8'); ?>"
+										class="<?php echo htmlspecialchars((string)$maintenanceAction['buttonClass'], ENT_QUOTES, 'UTF-8'); ?>"
+										data-maintenance-action="<?php echo htmlspecialchars((string)$maintenanceAction['action'], ENT_QUOTES, 'UTF-8'); ?>"
+										data-confirm-title="<?php echo htmlspecialchars((string)$maintenanceAction['confirmTitle'], ENT_QUOTES, 'UTF-8'); ?>"
+										data-confirm-message="<?php echo htmlspecialchars((string)$maintenanceAction['confirmMessage'], ENT_QUOTES, 'UTF-8'); ?>"
+										data-success-title="<?php echo htmlspecialchars((string)$maintenanceAction['successTitle'], ENT_QUOTES, 'UTF-8'); ?>"
+										data-success-message="<?php echo htmlspecialchars((string)$maintenanceAction['successMessage'], ENT_QUOTES, 'UTF-8'); ?>"
+									>
+										<?php echo htmlspecialchars((string)$maintenanceAction['label'], ENT_QUOTES, 'UTF-8'); ?>
+									</button>
+								<?php endforeach; ?>
+							</div>
+						</section>
+					<?php endforeach; ?>
 				</div>
 			</div>
 

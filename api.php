@@ -809,16 +809,8 @@ if ($method === 'POST') {
 
 	if ($postAction === 'reset_activity_log') {
 		requireApiPermission('dev_tools', 'read');
-		$userId = getApiAuthUserId();
 		try {
 			resetActivityLogTable($pdo);
-			writeAuditEvent($pdo, [
-				'record_type' => 'system',
-				'record_id' => null,
-				'action' => 'reset',
-				'details' => 'Activity log table reset',
-				'source_user_id' => $userId,
-			]);
 			respondJson(200, ['success' => true, 'message' => 'Activity log table reset successfully']);
 		} catch (Throwable $e) {
 			respondJson(500, ['success' => false, 'message' => 'Failed to reset activity log table']);
@@ -841,29 +833,33 @@ if ($method === 'POST') {
 			respondJson(500, ['success' => false, 'message' => 'Failed to reset records table']);
 		}
 
-		writeAuditEvent($pdo, [
-			'record_type' => 'record',
-			'record_id' => null,
-			'action' => 'reset',
-			'details' => 'Records table reset to 3 sample entries',
-			'source_user_id' => getApiAuthUserId(),
-		]);
-
 		respondJson(200, ['success' => true, 'message' => 'Records table reset successfully']);
+	}
+
+	if ($postAction === 'reset_data_tables') {
+		requireApiPermission('dev_tools', 'read');
+		try {
+			resetDevToolsDataTables($pdo);
+			respondJson(200, ['success' => true, 'message' => 'Data tables reset successfully']);
+		} catch (Throwable $e) {
+			respondJson(500, ['success' => false, 'message' => 'Failed to reset data tables']);
+		}
+	}
+
+	if ($postAction === 'reset_users') {
+		requireApiPermission('dev_tools', 'read');
+		$deletedCount = resetUsersExceptCurrentUser($pdo, getApiAuthUserId());
+		respondJson(200, [
+			'success' => true,
+			'message' => 'Users reset successfully',
+			'deleted_users' => $deletedCount,
+		]);
 	}
 
 	if ($postAction === 'reset_widget_prefs') {
 		requireApiPermission('dev_tools', 'read');
-		$userId = getApiAuthUserId();
 		try {
 			$seededCount = (int)resetUserWidgetPreferencesTable($pdo);
-			writeAuditEvent($pdo, [
-				'record_type' => 'users',
-				'record_id' => null,
-				'action' => 'reset',
-				'details' => 'user_widget_preferences reset and reseeded for ' . $seededCount . ' users',
-				'source_user_id' => $userId,
-			]);
 			respondJson(200, [
 				'success' => true,
 				'message' => 'Widget preferences reset to defaults for ' . $seededCount . ' users',
@@ -876,45 +872,12 @@ if ($method === 'POST') {
 
 	if ($postAction === 'logout_all_users') {
 		requireApiPermission('dev_tools', 'read');
-		$userId = getApiAuthUserId();
 		try {
-			writeAuditEvent($pdo, [
-				'record_type' => 'auth',
-				'record_id' => null,
-				'action' => 'reset',
-				'details' => 'All active user sessions were reset',
-				'source_user_id' => $userId,
-			]);
 			resetUserSessionsTable($pdo);
 			clearAuthSessionState();
 			respondJson(200, ['success' => true, 'message' => 'All users were logged out and sessions were reset']);
 		} catch (Throwable $e) {
 			respondJson(500, ['success' => false, 'message' => 'Failed to reset user sessions']);
-		}
-	}
-
-	if ($postAction === 'reset_all') {
-		requireApiPermission('dev_tools', 'read');
-		$userId = getApiAuthUserId();
-		try {
-			resetActivityLogTable($pdo);
-			resetAuditLogEntries($pdo);
-			if (!resetRecordsTableToSample($pdo)) {
-				respondJson(500, ['success' => false, 'message' => 'Failed to reset records table']);
-			}
-			$pdo->exec('TRUNCATE TABLE notifications');
-
-			writeAuditEvent($pdo, [
-				'record_type' => 'system',
-				'record_id' => null,
-				'action' => 'reset',
-				'details' => 'Reset all executed for activity_log, audit_log, records, and notifications',
-				'source_user_id' => $userId,
-			]);
-
-			respondJson(200, ['success' => true, 'message' => 'All target tables reset successfully']);
-		} catch (Throwable $e) {
-			respondJson(500, ['success' => false, 'message' => 'Failed to run reset all operation']);
 		}
 	}
 
@@ -925,17 +888,42 @@ if ($method === 'POST') {
 		}
 
 		if (resetDashboardSqlData($pdo)) {
-			writeAuditEvent($pdo, [
-				'record_type' => 'system',
-				'record_id' => null,
-				'action' => 'reset',
-				'details' => 'Dashboard data reset to seed state',
-				'source_user_id' => getApiAuthUserId(),
-			]);
 			respondJson(200, ['success' => true, 'message' => 'Data reset successfully']);
 		}
 
 		respondJson(500, ['success' => false, 'message' => 'Failed to reset data']);
+	}
+
+	if ($postAction === 'reset_notifications_table') {
+		requireApiPermission('dev_tools', 'read');
+		try {
+			resetNotificationsTable($pdo);
+			respondJson(200, ['success' => true, 'message' => 'Notifications table reset successfully']);
+		} catch (Throwable $e) {
+			respondJson(500, ['success' => false, 'message' => 'Failed to reset notifications table']);
+		}
+	}
+
+	if ($postAction === 'add_sample_data') {
+		requireApiPermission('dev_tools', 'read');
+		$sampleDataResult = seedDevToolsSampleData($pdo, [
+			'record_count' => (int)($data['record_count'] ?? 150),
+			'activity_count' => (int)($data['activity_count'] ?? 150),
+			'audit_count' => (int)($data['audit_count'] ?? 150),
+			'user_count' => (int)($data['user_count'] ?? 10),
+			'seed_prefix' => (string)($data['seed_prefix'] ?? 'devtools_sample'),
+			'actor_user_id' => getApiAuthUserId(),
+		]);
+
+		if (!($sampleDataResult['success'] ?? false)) {
+			respondJson(500, ['success' => false, 'message' => (string)($sampleDataResult['message'] ?? 'Failed to seed sample data')]);
+		}
+
+		respondJson(200, [
+			'success' => true,
+			'message' => 'Sample data added successfully',
+			'details' => $sampleDataResult,
+		]);
 	}
 
 	if ($postAction === 'admin_user_lookup') {
@@ -1385,23 +1373,6 @@ if ($method === 'POST') {
 			'user' => $targetUser,
 			'widgets' => $updated['widgets'] ?? getDefaultHeaderWidgetPreferences(),
 		]);
-	}
-
-	if ($postAction === 'reset_notifications_table') {
-		$userId = getApiAuthUserId();
-		try {
-			$pdo->exec('TRUNCATE TABLE notifications');
-			writeAuditEvent($pdo, [
-				'record_type' => 'notification',
-				'record_id' => null,
-				'action' => 'reset',
-				'details' => 'Notifications table truncated',
-				'source_user_id' => $userId,
-			]);
-			respondJson(200, ['success' => true, 'message' => 'Notifications table reset successfully']);
-		} catch (Throwable $e) {
-			respondJson(500, ['success' => false, 'message' => 'Failed to reset notifications table']);
-		}
 	}
 
 	if ($postAction === 'add_audit_entry') {

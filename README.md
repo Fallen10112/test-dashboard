@@ -152,7 +152,7 @@ Application behavior settings are loaded from the `app_settings` table (not from
 
 ### Dev Tools
 
-- System maintenance actions (logs/audit/records/widget prefs/notifications/reset-all)
+- Page-driven system maintenance actions for logs, records, users, widget prefs, notifications, and disposable sample data
 - User management actions (lookup/create/update/force delete/reset widget prefs)
 - Role management actions (list/lookup/create/update/delete with user reassignment)
 - Role deletion reassigns affected users to the next lower role ID when possible, otherwise to the next higher role ID
@@ -203,7 +203,7 @@ POST actions (`Content-Type: application/json`):
 - Audit write helpers: `add_audit_entry`, `add_audit_entries`
 - Notifications: `notification_create`, `notification_mark_read`, `notifications_mark_all_read`, `notification_delete`, `notifications_delete_all`
 - Widget preferences: `widget_preferences_update`
-- Dev tools/system: `reset_activity_log`, `reset_audit_log`, `reset_records`, `reset_widget_prefs`, `reset_notifications_table`, `reset_all`, `reset_data`, `logout_all_users`
+- Dev tools/system: `reset_activity_log`, `reset_audit_log`, `reset_records`, `reset_data_tables`, `reset_users`, `reset_widget_prefs`, `reset_notifications_table`, `reset_data`, `logout_all_users`, `add_sample_data`
 - Dev tools/users: `admin_user_lookup`, `admin_user_create`, `admin_user_update`, `admin_user_force_delete`, `admin_user_reset_widget_prefs`
 - Dev tools/roles: `admin_role_list`, `admin_role_lookup`, `admin_role_permissions`, `admin_role_permissions_update`, `admin_role_create`, `admin_role_update`, `admin_role_delete`
 

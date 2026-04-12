@@ -161,10 +161,16 @@ function forceDeleteUserHard(PDO $pdo, $targetUserId, $currentUserId) {
 			$pdo->prepare('DELETE FROM password_reset_tokens WHERE user_id = :id')->execute([':id' => $userId]);
 		}
 		if (dashboardTableExists($pdo, 'user_roles')) {
-			$pdo->prepare('DELETE FROM user_roles WHERE user_id = :id OR assigned_by_user_id = :id')->execute([':id' => $userId]);
+			$pdo->prepare('DELETE FROM user_roles WHERE user_id = :user_id OR assigned_by_user_id = :assigned_by_user_id')->execute([
+				':user_id' => $userId,
+				':assigned_by_user_id' => $userId,
+			]);
 		}
 		if (dashboardTableExists($pdo, 'user_permissions')) {
-			$pdo->prepare('DELETE FROM user_permissions WHERE user_id = :id OR granted_by_user_id = :id')->execute([':id' => $userId]);
+			$pdo->prepare('DELETE FROM user_permissions WHERE user_id = :user_id OR granted_by_user_id = :granted_by_user_id')->execute([
+				':user_id' => $userId,
+				':granted_by_user_id' => $userId,
+			]);
 		}
 		if (dashboardTableExists($pdo, 'user_widget_preferences')) {
 			$pdo->prepare('DELETE FROM user_widget_preferences WHERE user_id = :id')->execute([':id' => $userId]);
@@ -1860,6 +1866,56 @@ function resetUserSessionsTable(PDO $pdo) {
 	$pdo->exec('TRUNCATE TABLE user_sessions');
 }
 
+function resetNotificationsTable(PDO $pdo) {
+	if (!dashboardTableExists($pdo, 'notifications')) {
+		return true;
+	}
+
+	$pdo->exec('TRUNCATE TABLE notifications');
+	return true;
+}
+
+function resetDevToolsDataTables(PDO $pdo) {
+	resetActivityLogTable($pdo);
+	resetAuditLogEntries($pdo);
+	return resetRecordsTableToSample($pdo);
+}
+
+function resetUsersExceptCurrentUser(PDO $pdo, $keepUserId) {
+	$normalizedKeepUserId = (int)$keepUserId;
+	if ($normalizedKeepUserId < 1 || !dashboardTableExists($pdo, 'users')) {
+		return 0;
+	}
+
+	try {
+		$stmt = $pdo->prepare(
+			'SELECT id
+			 FROM users
+			 WHERE deleted_at IS NULL
+			   AND id <> :keep_user_id
+			 ORDER BY id ASC'
+		);
+		$stmt->execute([':keep_user_id' => $normalizedKeepUserId]);
+		$userRows = $stmt->fetchAll();
+	} catch (Throwable $e) {
+		return 0;
+	}
+
+	$deletedCount = 0;
+	foreach ($userRows as $row) {
+		$targetUserId = (int)($row['id'] ?? 0);
+		if ($targetUserId < 1) {
+			continue;
+		}
+		$result = forceDeleteUserHard($pdo, $targetUserId, $normalizedKeepUserId);
+		if (is_array($result) && ($result['success'] ?? false)) {
+			$deletedCount++;
+		}
+	}
+
+	return $deletedCount;
+}
+
 function resetRecordsTableToSample(PDO $pdo) {
 	$sampleItems = [
 		['title' => 'Sample Entry 1', 'description' => 'This is a test entry to demonstrate the system.'],
@@ -1920,6 +1976,385 @@ function resetRecordsTableToSample(PDO $pdo) {
 	} catch (Throwable $e) {
 		return false;
 	}
+}
+
+function seedDevToolsSampleData(PDO $pdo, array $options = []) {
+	$recordCount = max(1, (int)($options['record_count'] ?? 150));
+	$activityCount = max(1, (int)($options['activity_count'] ?? 150));
+	$auditCount = max(1, (int)($options['audit_count'] ?? 150));
+	$userCount = max(1, (int)($options['user_count'] ?? 10));
+	$seedPrefix = trim((string)($options['seed_prefix'] ?? 'devtools_sample'));
+	if ($seedPrefix === '') {
+		$seedPrefix = 'devtools_sample';
+	}
+	$seedPrefix = preg_replace('/[^a-zA-Z0-9_-]+/', '_', $seedPrefix);
+	if (!is_string($seedPrefix) || $seedPrefix === '') {
+		$seedPrefix = 'devtools_sample';
+	}
+	$seedRunId = date('YmdHis') . '_' . substr(bin2hex(random_bytes(4)), 0, 8);
+	$actorUserId = (int)($options['actor_user_id'] ?? 0);
+	$timelineNow = new DateTimeImmutable('now', new DateTimeZone(date_default_timezone_get()));
+	$buildSeedTimestamp = static function (int $index, int $total, int $startDaysAgo, int $endDaysAgo, int $offsetSeed = 0) use ($timelineNow) {
+		$safeTotal = max(1, $total);
+		$safeIndex = max(1, min($index, $safeTotal));
+		$progress = $safeTotal > 1 ? (($safeIndex - 1) / ($safeTotal - 1)) : 0.0;
+		$daysBack = (int)round($startDaysAgo - (($startDaysAgo - $endDaysAgo) * $progress));
+		$hoursBack = ($offsetSeed + ($safeIndex * 5)) % 24;
+		$minutesBack = ($offsetSeed + ($safeIndex * 13)) % 60;
+		$secondsBack = ($offsetSeed + ($safeIndex * 17)) % 60;
+		return $timelineNow->modify(sprintf('-%d days -%d hours -%d minutes -%d seconds', $daysBack, $hoursBack, $minutesBack, $secondsBack))->format('Y-m-d H:i:s');
+	};
+	$sampleUserIds = [];
+	$sampleRecordIds = [];
+	$sampleUsers = [];
+	$sampleRecords = [];
+	$samplePeople = [
+		['first_name' => 'Avery', 'last_name' => 'Collins', 'display_name' => 'Avery Collins'],
+		['first_name' => 'Jordan', 'last_name' => 'Lee', 'display_name' => 'Jordan Lee'],
+		['first_name' => 'Morgan', 'last_name' => 'Patel', 'display_name' => 'Morgan Patel'],
+		['first_name' => 'Casey', 'last_name' => 'Nguyen', 'display_name' => 'Casey Nguyen'],
+		['first_name' => 'Riley', 'last_name' => 'Turner', 'display_name' => 'Riley Turner'],
+		['first_name' => 'Taylor', 'last_name' => 'Brooks', 'display_name' => 'Taylor Brooks'],
+		['first_name' => 'Quinn', 'last_name' => 'Santos', 'display_name' => 'Quinn Santos'],
+		['first_name' => 'Parker', 'last_name' => 'Adams', 'display_name' => 'Parker Adams'],
+		['first_name' => 'Hayden', 'last_name' => 'Foster', 'display_name' => 'Hayden Foster'],
+		['first_name' => 'Emerson', 'last_name' => 'Reed', 'display_name' => 'Emerson Reed'],
+	];
+	$sampleRecordTemplates = [
+		['title' => 'Quarterly Access Review', 'description' => 'Review of current access assignments and pending approvals.'],
+		['title' => 'Invoice Dispute Follow-Up', 'description' => 'Notes from the latest review of a billing discrepancy and vendor response.'],
+		['title' => 'Client Onboarding Checklist', 'description' => 'Status update for onboarding tasks, ownership, and open action items.'],
+		['title' => 'Inventory Reconciliation', 'description' => 'Comparison of expected and counted stock levels with follow-up notes.'],
+		['title' => 'Support Escalation Review', 'description' => 'Summary of recent support cases that need manager review.'],
+		['title' => 'Training Completion Audit', 'description' => 'Current completion status for assigned training modules and overdue items.'],
+		['title' => 'Compliance Exception Log', 'description' => 'Documented exception review with resolution notes and next steps.'],
+		['title' => 'Scheduling Adjustment Request', 'description' => 'Requested shift changes and coverage updates for the current cycle.'],
+		['title' => 'Vendor Follow-Up Notes', 'description' => 'Summary of vendor communication, open questions, and agreed actions.'],
+		['title' => 'Operations Status Update', 'description' => 'General operational status notes for the current workstream.'],
+	];
+	$sampleNotificationTopics = [
+		'Quarterly access review reminder',
+		'Invoice follow-up reminder',
+		'Onboarding checklist review',
+		'Inventory reconciliation update',
+		'Support escalation status',
+		'Training completion reminder',
+		'Compliance exception follow-up',
+		'Scheduling adjustment notice',
+		'Vendor follow-up summary',
+		'Operations status check-in',
+	];
+
+	if (!dashboardTableExists($pdo, 'records') || !dashboardTableExists($pdo, 'activity_log') || !dashboardTableExists($pdo, 'audit_log') || !dashboardTableExists($pdo, 'users')) {
+		return ['success' => false, 'message' => 'Required tables are not available'];
+	}
+
+	$roles = getAvailableRoles($pdo);
+	$sampleRoles = array_values(array_filter($roles, static function($role) {
+		return strcasecmp((string)($role['name'] ?? ''), 'Guest') !== 0;
+	}));
+	if (empty($sampleRoles)) {
+		$sampleRoles = $roles;
+	}
+	if (empty($sampleRoles)) {
+		return ['success' => false, 'message' => 'No roles are available for sample users'];
+	}
+
+	try {
+		for ($index = 1; $index <= $userCount; $index++) {
+			$roleIndex = ($index - 1) % count($sampleRoles);
+			$roleId = (int)($sampleRoles[$roleIndex]['id'] ?? 0);
+			$person = $samplePeople[($index - 1) % count($samplePeople)];
+			$status = ($index % 4 === 0) ? 'disabled' : 'active';
+			$userSuffix = str_pad((string)$index, 2, '0', STR_PAD_LEFT);
+			$personSlug = strtolower($person['first_name'] . '.' . $person['last_name']);
+			$email = $personSlug . '.' . $seedRunId . '@example.test';
+			$username = $personSlug . '.' . substr($seedRunId, -8) . '.' . $userSuffix;
+			$createdAt = $buildSeedTimestamp($index, $userCount, 330, 220, 7);
+			$lastLoginAt = $buildSeedTimestamp($index, $userCount, 90, 4, 19);
+			$created = createDevToolsUser(
+				$pdo,
+				$email,
+				$username,
+				$person['display_name'],
+				$status,
+				$roleId,
+				$actorUserId > 0 ? $actorUserId : null
+			);
+			if (empty($created['success'])) {
+				throw new RuntimeException((string)($created['message'] ?? 'Failed to create sample users'));
+			}
+			$userId = (int)($created['user_id'] ?? 0);
+			$sampleUserIds[] = $userId;
+			$sampleUsers[] = [
+				'id' => $userId,
+				'email' => $email,
+				'username' => $username,
+				'display_name' => $person['display_name'],
+				'status' => $status,
+				'created_at' => $createdAt,
+				'last_login_at' => $lastLoginAt,
+			];
+			$updateSql = 'UPDATE users SET created_at = :created_at, updated_at = :updated_at';
+			$updateParams = [
+				':created_at' => $createdAt,
+				':updated_at' => $createdAt,
+				':id' => $userId,
+			];
+			if (doesTableColumnExist($pdo, 'users', 'last_login_at')) {
+				$updateSql .= ', last_login_at = :last_login_at';
+				$updateParams[':last_login_at'] = $lastLoginAt;
+			}
+			$updateSql .= ' WHERE id = :id';
+			$pdo->prepare($updateSql)->execute($updateParams);
+		}
+
+		if (empty($sampleUserIds)) {
+			return ['success' => false, 'message' => 'No sample users were created'];
+		}
+
+		$hasCreatedByUserId = doesTableColumnExist($pdo, 'records', 'created_by_user_id');
+		$hasUpdatedByUserId = doesTableColumnExist($pdo, 'records', 'updated_by_user_id');
+		$hasCreatedAt = doesTableColumnExist($pdo, 'records', 'created_at');
+		$hasUpdatedAt = doesTableColumnExist($pdo, 'records', 'updated_at');
+
+		$recordColumns = ['title', 'description'];
+		$recordPlaceholders = [':title', ':description'];
+		if ($hasCreatedByUserId) {
+			$recordColumns[] = 'created_by_user_id';
+			$recordPlaceholders[] = ':created_by_user_id';
+		}
+		if ($hasUpdatedByUserId) {
+			$recordColumns[] = 'updated_by_user_id';
+			$recordPlaceholders[] = ':updated_by_user_id';
+		}
+		if ($hasCreatedAt) {
+			$recordColumns[] = 'created_at';
+			$recordPlaceholders[] = ':created_at';
+		}
+		if ($hasUpdatedAt) {
+			$recordColumns[] = 'updated_at';
+			$recordPlaceholders[] = ':updated_at';
+		}
+
+		$insertRecordStmt = $pdo->prepare('INSERT INTO records (' . implode(', ', $recordColumns) . ') VALUES (' . implode(', ', $recordPlaceholders) . ')');
+		for ($index = 1; $index <= $recordCount; $index++) {
+			$template = $sampleRecordTemplates[($index - 1) % count($sampleRecordTemplates)];
+			$sampleUserId = $sampleUserIds[($index - 1) % count($sampleUserIds)];
+			$recordSuffix = str_pad((string)$index, 3, '0', STR_PAD_LEFT);
+			$recordCreatedAt = $buildSeedTimestamp($index, $recordCount, 310, 45, 11);
+			$recordUpdatedAt = $buildSeedTimestamp($index, $recordCount, 305, 6, 13);
+			$recordTitle = $template['title'] . ' ' . $recordSuffix;
+			$recordDescription = $template['description'];
+			$recordUpdatedTitle = $recordTitle . ' - Reviewed';
+			$recordUpdatedDescription = $recordDescription . ' Follow-up completed.';
+			$insertParams = [
+				':title' => $recordTitle,
+				':description' => $recordDescription,
+			];
+			if ($hasCreatedByUserId) {
+				$insertParams[':created_by_user_id'] = $sampleUserId;
+			}
+			if ($hasUpdatedByUserId) {
+				$insertParams[':updated_by_user_id'] = $sampleUserId;
+			}
+			if ($hasCreatedAt) {
+				$insertParams[':created_at'] = $recordCreatedAt;
+			}
+			if ($hasUpdatedAt) {
+				$insertParams[':updated_at'] = $recordUpdatedAt;
+			}
+			$insertRecordStmt->execute($insertParams);
+			$recordId = (int)$pdo->lastInsertId();
+			$sampleRecordIds[] = $recordId;
+			$sampleRecords[] = [
+				'id' => $recordId,
+				'title' => $recordTitle,
+				'description' => $recordDescription,
+				'updated_title' => $recordUpdatedTitle,
+				'updated_description' => $recordUpdatedDescription,
+				'created_by_user_id' => $sampleUserId,
+			];
+		}
+
+		$insertActivityStmt = $pdo->prepare(
+			'INSERT INTO activity_log (event_type, message, related_record_type, related_record_id, source_user_id, ip_address, created_at)
+			 VALUES (:event_type, :message, :related_record_type, :related_record_id, :source_user_id, :ip_address, :created_at)'
+		);
+		for ($index = 1; $index <= $activityCount; $index++) {
+			$sampleUser = $sampleUsers[($index - 1) % count($sampleUsers)];
+			$sampleRecord = $sampleRecords[($index - 1) % count($sampleRecords)];
+			$activityCreatedAt = $buildSeedTimestamp($index, $activityCount, 300, 2, 23);
+			$activityMode = ($index - 1) % 5;
+			$activityMessage = '';
+			$activityEventType = 'record_updated';
+			$activityRelatedRecordId = $sampleRecord['id'];
+			switch ($activityMode) {
+				case 0:
+					$activityEventType = 'record_created';
+					$activityMessage = 'A new entry has been added; ID ' . $sampleRecord['id'] . ' with title: "' . $sampleRecord['title'] . '", and description: "' . $sampleRecord['description'] . '"';
+					break;
+				case 1:
+					$activityEventType = 'record_updated';
+					$activityMessage = 'An entry has been edited; ID ' . $sampleRecord['id'] . ' with title: "' . $sampleRecord['updated_title'] . '", and description: "' . $sampleRecord['updated_description'] . '"';
+					break;
+				case 2:
+					$activityEventType = 'record_deleted';
+					$activityMessage = 'An entry has been deleted; ID ' . $sampleRecord['id'] . ' with title: "' . $sampleRecord['title'] . '", and description: "' . $sampleRecord['description'] . '"';
+					break;
+				case 3:
+					$activityEventType = 'record_bulk_created';
+					$bulkCreateCount = min(12, max(3, count($sampleRecords)));
+					$activityRelatedRecordId = null;
+					$activityMessage = 'Bulk CSV import completed for ' . $bulkCreateCount . ' records';
+					break;
+				case 4:
+					$activityEventType = 'record_bulk_deleted';
+					$activityRelatedRecordId = null;
+					$bulkIds = array_slice($sampleRecordIds, max(0, $index - 3), 3);
+					if (empty($bulkIds)) {
+						$bulkIds = array_slice($sampleRecordIds, 0, min(3, count($sampleRecordIds)));
+					}
+					$activityMessage = 'Bulk delete completed for ' . count($bulkIds) . ' records (IDs: ' . implode(', ', $bulkIds) . ')';
+					break;
+			}
+			$insertActivityStmt->execute([
+				':event_type' => $activityEventType,
+				':message' => $activityMessage,
+				':related_record_type' => 'record',
+				':related_record_id' => $activityRelatedRecordId,
+				':source_user_id' => $sampleUser['id'],
+				':ip_address' => '127.0.0.1',
+				':created_at' => $activityCreatedAt,
+			]);
+		}
+
+		$insertAuditStmt = $pdo->prepare(
+			'INSERT INTO audit_log (record_type, record_id, dataset, action, details, source_user_id, target_user_id, ip_address, user_agent, created_at)
+			 VALUES (:record_type, :record_id, :dataset, :action, :details, :source_user_id, :target_user_id, :ip_address, :user_agent, :created_at)'
+		);
+		for ($index = 1; $index <= $auditCount; $index++) {
+			$auditCreatedAt = $buildSeedTimestamp($index, $auditCount, 340, 1, 31);
+			$sampleUser = $sampleUsers[($index - 1) % count($sampleUsers)];
+			$targetUser = $sampleUsers[$index % count($sampleUsers)];
+			$sampleRecord = $sampleRecords[($index - 1) % count($sampleRecords)];
+			$auditMode = ($index - 1) % 10;
+			$recordType = 'record';
+			$recordId = $sampleRecord['id'];
+			$dataset = 'records';
+			$action = 'create';
+			$detail = '';
+			$sourceUserId = $sampleUser['id'];
+			$targetUserId = null;
+			switch ($auditMode) {
+				case 0:
+					$recordType = 'users';
+					$dataset = 'users';
+					$action = 'create';
+					$recordId = $sampleUser['id'];
+					$detail = 'Created user ' . $sampleUser['username'] . ' / ' . $sampleUser['display_name'] . ' with ID ' . $sampleUser['id'];
+					break;
+				case 1:
+					$recordType = 'record';
+					$dataset = 'records';
+					$action = 'create';
+					$detail = 'Title:  -> ' . $sampleRecord['title'] . ', Description:  -> ' . $sampleRecord['description'];
+					break;
+				case 2:
+					$recordType = 'record';
+					$dataset = 'records';
+					$action = 'update';
+					$detail = 'Title: ' . $sampleRecord['title'] . ' -> ' . $sampleRecord['updated_title'] . ', Description: ' . $sampleRecord['description'] . ' -> ' . $sampleRecord['updated_description'];
+					break;
+				case 3:
+					$recordType = 'record';
+					$dataset = 'records';
+					$action = 'delete';
+					$detail = 'Title: ' . $sampleRecord['title'] . ' -> (deleted), Description: ' . $sampleRecord['description'] . ' -> (deleted)';
+					break;
+				case 4:
+					$recordType = 'users';
+					$dataset = 'users';
+					$action = 'update';
+					$updatedEmail = preg_replace('/@example\.test$/', '.updated@example.test', $sampleUser['email']);
+					if (!is_string($updatedEmail) || $updatedEmail === '') {
+						$updatedEmail = $sampleUser['email'] . '.updated';
+					}
+					$updatedUsername = $sampleUser['username'] . '.reviewed';
+					$updatedDisplayName = $sampleUser['display_name'] . ' (Updated)';
+					$updatedStatus = $sampleUser['status'] === 'active' ? 'Disabled' : 'Active';
+					$detail = 'Updated user ID ' . $sampleUser['id'] . ' - Email: ' . $sampleUser['email'] . ' -> ' . $updatedEmail . '; Username: ' . $sampleUser['username'] . ' -> ' . $updatedUsername . '; Display Name: ' . $sampleUser['display_name'] . ' -> ' . $updatedDisplayName . '; Status: ' . ucfirst($sampleUser['status']) . ' -> ' . $updatedStatus . '; Password reset: No';
+					break;
+				case 5:
+					$recordType = 'auth';
+					$dataset = 'user_sessions';
+					$action = 'login';
+					$recordId = null;
+					$detail = 'Signed out -> Signed in successfully';
+					break;
+				case 6:
+					$recordType = 'auth';
+					$dataset = 'user_sessions';
+					$action = 'logout';
+					$recordId = null;
+					$detail = 'Signed in -> Signed out';
+					break;
+				case 7:
+					$recordType = 'notification';
+					$dataset = 'notifications';
+					$action = 'notification_sent';
+					$recordId = 10000 + $index;
+					$notificationTitle = $sampleNotificationTopics[($index - 1) % count($sampleNotificationTopics)];
+					$targetUserId = $targetUser['id'];
+					$detail = 'Notification (' . $notificationTitle . '): Sent by user #' . $sourceUserId . ' to user #' . $targetUserId;
+					break;
+				case 8:
+					$recordType = 'notification';
+					$dataset = 'notifications';
+					$action = 'notification_read';
+					$recordId = 10000 + $index;
+					$notificationTitle = $sampleNotificationTopics[($index - 1) % count($sampleNotificationTopics)];
+					$sourceUserId = $targetUser['id'];
+					$targetUserId = null;
+					$detail = 'Notification (' . $notificationTitle . '): Unread -> Read';
+					break;
+				case 9:
+					$recordType = 'notification';
+					$dataset = 'notifications';
+					$action = 'notification_deleted';
+					$recordId = 10000 + $index;
+					$notificationTitle = $sampleNotificationTopics[($index - 1) % count($sampleNotificationTopics)];
+					$sourceUserId = $targetUser['id'];
+					$targetUserId = null;
+					$detail = 'Notification (' . $notificationTitle . '): existed -> deleted';
+					break;
+			}
+			$insertAuditStmt->execute([
+				':record_type' => $recordType,
+				':record_id' => $recordId,
+				':dataset' => $dataset,
+				':action' => $action,
+				':details' => $detail,
+				':source_user_id' => $sourceUserId,
+				':target_user_id' => $targetUserId,
+				':ip_address' => '127.0.0.1',
+				':user_agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0 Safari/537.36',
+				':created_at' => $auditCreatedAt,
+			]);
+		}
+	} catch (Throwable $e) {
+		return ['success' => false, 'message' => 'Failed to seed sample data'];
+	}
+
+	return [
+		'success' => true,
+		'prefix' => $seedPrefix,
+		'run_id' => $seedRunId,
+		'users_created' => count($sampleUserIds),
+		'records_created' => count($sampleRecordIds),
+		'activity_entries_created' => $activityCount,
+		'audit_entries_created' => $auditCount,
+	];
 }
 
 function resetDashboardSqlData(PDO $pdo) {

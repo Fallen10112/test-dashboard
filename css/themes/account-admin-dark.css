@@ -122,6 +122,22 @@ body.dark-mode .dev-tools-user-section {
     border-color: rgba(203, 213, 225, 0.22);
     background: rgba(15, 23, 42, 0.35);
 }
+body.dark-mode .dev-tools-warning--danger {
+    color: #fca5a5;
+}
+body.dark-mode .dev-tools-warning--success {
+    color: #86efac;
+}
+body.dark-mode .dev-tools-action-group {
+    border-color: rgba(203, 213, 225, 0.18);
+    background: linear-gradient(180deg, rgba(17, 24, 39, 0.92) 0%, rgba(15, 23, 42, 0.82) 100%);
+}
+body.dark-mode .dev-tools-action-group h4 {
+    color: #f3f4f6;
+}
+body.dark-mode .dev-tools-action-group p {
+    color: #cbd5e1;
+}
 body.dark-mode .dev-tools-inline-result.is-success,
 body.dark-mode .admin-tools-inline-result.is-success {
     background: rgba(16, 185, 129, 0.1);

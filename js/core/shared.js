@@ -1212,12 +1212,13 @@ function toggleTheme() {
 
 
 function setupDevToolsMaintenanceHandlers() {
-	const resetActions = [
+	const pageActions = Array.isArray(window.DEV_TOOLS_MAINTENANCE_ACTIONS) ? window.DEV_TOOLS_MAINTENANCE_ACTIONS.slice() : [];
+	const resetActions = pageActions.length > 0 ? pageActions : [
 		{
 			buttonId: '#reset-activity-log-btn',
 			action: 'reset_activity_log',
 			confirmTitle: 'Reset Activity Log?',
-			confirmMessage: 'This will clear all entries from the activity_log table.',
+			confirmMessage: 'This will clear the activity_log table and reset its auto-increment key.',
 			successTitle: 'Activity Log Reset',
 			successMessage: 'The activity_log table has been reset successfully.'
 		},
@@ -1225,7 +1226,7 @@ function setupDevToolsMaintenanceHandlers() {
 			buttonId: '#reset-audit-log-btn',
 			action: 'reset_audit_log',
 			confirmTitle: 'Reset Audit Log?',
-			confirmMessage: 'This will clear all entries from the audit_log table.',
+			confirmMessage: 'This will clear the audit_log table and reset its auto-increment key.',
 			successTitle: 'Audit Log Reset',
 			successMessage: 'The audit_log table has been reset successfully.'
 		},
@@ -1233,9 +1234,33 @@ function setupDevToolsMaintenanceHandlers() {
 			buttonId: '#reset-records-btn',
 			action: 'reset_records',
 			confirmTitle: 'Reset Records?',
-			confirmMessage: 'This will reset the records table and restore 3 sample entries.',
+			confirmMessage: 'This will reset the records table back to 3 sample entries and reset its key.',
 			successTitle: 'Records Reset',
 			successMessage: 'The records table has been reset to 3 sample entries.'
+		},
+		{
+			buttonId: '#reset-data-tables-btn',
+			action: 'reset_data_tables',
+			confirmTitle: 'Reset Data Tables?',
+			confirmMessage: 'This will reset activity_log, audit_log, and records together.',
+			successTitle: 'Data Tables Reset',
+			successMessage: 'Activity log, audit log, and records were reset successfully.'
+		},
+		{
+			buttonId: '#reset-users-btn',
+			action: 'reset_users',
+			confirmTitle: 'Reset Users?',
+			confirmMessage: 'This will delete all users except your current account and clear related user data.',
+			successTitle: 'Users Reset',
+			successMessage: 'All users except the current account were deleted.'
+		},
+		{
+			buttonId: '#reset-notifications-btn',
+			action: 'reset_notifications_table',
+			confirmTitle: 'Reset Notifications?',
+			confirmMessage: 'This will clear the notifications table and reset its key.',
+			successTitle: 'Notifications Reset',
+			successMessage: 'The notifications table has been reset successfully.'
 		},
 		{
 			buttonId: '#reset-widget-prefs-btn',
@@ -1246,14 +1271,6 @@ function setupDevToolsMaintenanceHandlers() {
 			successMessage: 'Widget preferences have been reset to defaults for all users.'
 		},
 		{
-			buttonId: '#reset-notif-table-btn',
-			action: 'reset_notifications_table',
-			confirmTitle: 'Reset Notifications Table?',
-			confirmMessage: 'This will clear all entries from the notifications table.',
-			successTitle: 'Notifications Table Reset',
-			successMessage: 'The notifications table has been reset successfully.'
-		},
-		{
 			buttonId: '#logout-all-users-btn',
 			action: 'logout_all_users',
 			confirmTitle: 'Log out all users?',
@@ -1262,29 +1279,34 @@ function setupDevToolsMaintenanceHandlers() {
 			successMessage: 'All user sessions were reset successfully.'
 		},
 		{
-			buttonId: '#reset-all-btn',
-			action: 'reset_all',
-			confirmTitle: 'Reset all?',
-			confirmMessage: 'This will reset activity_log, audit_log, records (to 3 sample entries), and notifications tables.',
-			successTitle: 'Reset All Complete',
-			successMessage: 'All target tables were reset successfully.'
+			buttonId: '#add-sample-data-btn',
+			action: 'add_sample_data',
+			confirmTitle: 'Add Sample Data?',
+			confirmMessage: 'This will create 150 sample records, 150 activity log entries, 150 audit log entries, and 10 sample users.',
+			successTitle: 'Sample Data Added',
+			successMessage: 'Sample data has been seeded successfully.'
 		}
 	];
 
 	const hasAnyButtons = resetActions.some(function(cfg) {
-		return $(cfg.buttonId).length > 0;
+		const selector = typeof cfg.buttonId === 'string' && cfg.buttonId.charAt(0) === '#'
+			? cfg.buttonId
+			: '#' + String(cfg.buttonId || '');
+		return selector !== '#' && $(selector).length > 0;
 	});
 	if (!hasAnyButtons) {
 		return;
 	}
 
 	resetActions.forEach(function(cfg) {
-		const $button = $(cfg.buttonId);
+		const buttonSelector = typeof cfg.buttonId === 'string' && cfg.buttonId.charAt(0) === '#' ? cfg.buttonId : '#' + String(cfg.buttonId || '');
+		const $button = $(buttonSelector);
 		if ($button.length === 0) {
 			return;
 		}
 
 		$button.on('click', function() {
+			const payload = Object.assign({}, cfg.requestPayload || {});
 			showToast({
 				type: 'warning',
 				title: cfg.confirmTitle,
@@ -1301,7 +1323,7 @@ function setupDevToolsMaintenanceHandlers() {
 								type: 'POST',
 								contentType: 'application/json',
 								dataType: 'json',
-								data: JSON.stringify({ action: cfg.action }),
+								data: JSON.stringify(Object.assign({ action: cfg.action }, payload)),
 								success: function() {
 									if (typeof loadHeaderMetrics === 'function') {
 										loadHeaderMetrics();
