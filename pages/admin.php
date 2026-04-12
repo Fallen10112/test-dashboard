@@ -40,6 +40,11 @@ requirePagePermission('admin', 'read');
 		'notifications' => false,
 		'permissions' => false,
 	];
+	$adminRoleManagementFlags = [
+		'create' => false,
+		'update' => false,
+		'delete' => false,
+	];
 	$adminPdo = null;
 	try {
 		$adminPdo = getDashboardPdo();
@@ -106,12 +111,6 @@ requirePagePermission('admin', 'read');
 			}
 		}
 	} catch (Throwable $e) {
-		$adminPermissionEditScope = [
-			'mode' => 'none',
-			'label' => 'No editable roles',
-			'current_role_id' => null,
-			'max_role_id' => 0,
-		];
 		$adminTabPermissionFlags = [
 			'user_management' => false,
 			'role_management' => false,

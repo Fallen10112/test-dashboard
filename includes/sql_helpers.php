@@ -508,8 +508,12 @@ function getUserRoleIds(PDO $pdo, $userId) {
 		return [];
 	}
 
+	$orderByClause = doesTableColumnExist($pdo, 'user_roles', 'created_at')
+		? 'created_at ASC, role_id ASC'
+		: 'role_id ASC';
+
 	try {
-		$stmt = $pdo->prepare('SELECT role_id FROM user_roles WHERE user_id = :user_id ORDER BY created_at ASC, role_id ASC');
+		$stmt = $pdo->prepare('SELECT role_id FROM user_roles WHERE user_id = :user_id ORDER BY ' . $orderByClause);
 		$stmt->execute([':user_id' => $normalizedUserId]);
 		$rows = $stmt->fetchAll();
 	} catch (Throwable $e) {
