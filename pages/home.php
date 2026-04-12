@@ -5,13 +5,12 @@
 		<section class="content-section active home-page">
 			<div class="home-page-hero">
 				<div class="home-page-hero-copy">
-					<p class="page-kicker">Workspace overview</p>
-					<h2>Welcome to Dashboard Showcase</h2>
+					<h2>Welcome</h2>
 					<p class="page-lead">This dashboard helps you manage records, review audit history, and export reports quickly. It is designed for simple daily workflows with clear visibility and safe operations.</p>
 				</div>
 				<aside class="home-page-summary-card">
 					<h3>Built to scale</h3>
-					<p>The shell is split into reusable includes, modular stylesheets, and page-specific feature scripts so future additions stay predictable.</p>
+					<p>The project is split into reusable includes, modular stylesheets, and page-specific feature scripts so future additions stay predictable.</p>
 				</aside>
 			</div>
 
@@ -23,7 +22,7 @@
 						<li><strong>Track Changes</strong> - Review full Audit Trail history with timestamps and details</li>
 						<li><strong>Export Results</strong> - Download filtered data and generated reports as PDF/CSV</li>
 						<li><strong>Customize Your Header</strong> - Choose which top widgets are visible per user</li>
-						<li><strong>Use Admin Tools</strong> - Dev Tools supports maintenance resets and user utilities</li>
+						<li><strong>Use Admin Tools</strong> - Admin Tools that supports maintenance resets and user utilities</li>
 					</ul>
 				</section>
 
