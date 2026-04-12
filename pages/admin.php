@@ -353,17 +353,19 @@ requirePagePermission('admin', 'read');
 									<th>ID</th>
 									<th>Name</th>
 									<th>Description</th>
+									<th>Edit Role</th>
 								</tr>
 							</thead>
 							<tbody id="admin-role-table-body">
 								<?php if (empty($adminRoles)): ?>
-									<tr class="admin-role-empty-row"><td colspan="3">No roles found.</td></tr>
+									<tr class="admin-role-empty-row"><td colspan="4">No roles found.</td></tr>
 								<?php else: ?>
 									<?php foreach ($adminRoles as $adminRole): ?>
 										<tr>
 											<td><?php echo (int)($adminRole['id'] ?? 0); ?></td>
 											<td><?php echo htmlspecialchars($adminRole['name'] ?? '', ENT_QUOTES, 'UTF-8'); ?></td>
 											<td><?php echo htmlspecialchars($adminRole['description'] ?? '', ENT_QUOTES, 'UTF-8'); ?></td>
+											<td><button type="button" class="btn btn-secondary btn-sm admin-roles-edit-role-btn" data-role-id="<?php echo (int)($adminRole['id'] ?? 0); ?>">Edit Role</button></td>
 										</tr>
 									<?php endforeach; ?>
 								<?php endif; ?>

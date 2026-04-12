@@ -2037,6 +2037,35 @@ function setupAdminRoleManagementHandlers() {
 		return higherRoles.length > 0 ? higherRoles[0] : null;
 	};
 
+	const openUpdateRoleSection = function() {
+		const updateBody = document.getElementById('admin-accordion-body-role-update');
+		const updateHeader = document.querySelector('[aria-controls="admin-accordion-body-role-update"]');
+		if (updateBody) {
+			updateBody.hidden = false;
+		}
+		if (updateHeader) {
+			updateHeader.setAttribute('aria-expanded', 'true');
+		}
+	};
+
+	const populateUpdateRoleForm = function(role) {
+		const normalizedRole = normalizeRole(role);
+		if (!normalizedRole) {
+			return false;
+		}
+
+		updateTargetRoleId = normalizedRole.id;
+		updateDetectedLabel = roleLookupLabel(normalizedRole);
+		$('[id$="-roles-update-lookup"]').val(String(normalizedRole.id));
+		$('[id$="-roles-update-name"]').val(String(normalizedRole.name || ''));
+		$('[id$="-roles-update-description"]').val(String(normalizedRole.description || ''));
+		setRoleUpdateControlsEnabled(true);
+		setInlineResult('[id$="-roles-update-detected"]', updateDetectedLabel, false);
+		setInlineResult('[id$="-roles-update-result"]', '', false);
+		openUpdateRoleSection();
+		return true;
+	};
+
 	const renderRoleTable = function() {
 		const $tableBody = $('#admin-role-table-body');
 		if ($tableBody.length === 0) {
@@ -2048,7 +2077,7 @@ function setupAdminRoleManagementHandlers() {
 			const emptyRow = document.createElement('tr');
 			emptyRow.className = 'admin-role-empty-row';
 			const emptyCell = document.createElement('td');
-			emptyCell.colSpan = 3;
+			emptyCell.colSpan = 4;
 			emptyCell.textContent = 'No roles found.';
 			emptyRow.appendChild(emptyCell);
 			$tableBody.append(emptyRow);
@@ -2060,12 +2089,23 @@ function setupAdminRoleManagementHandlers() {
 			const idCell = document.createElement('td');
 			const nameCell = document.createElement('td');
 			const descriptionCell = document.createElement('td');
+			const actionCell = document.createElement('td');
+			const editButton = document.createElement('button');
 			idCell.textContent = String(role.id || '');
 			nameCell.textContent = String(role.name || '');
 			descriptionCell.textContent = String(role.description || '');
+			editButton.type = 'button';
+			editButton.className = 'btn btn-secondary btn-sm admin-roles-edit-role-btn';
+			editButton.textContent = 'Edit Role';
+			editButton.setAttribute('data-role-id', String(role.id || ''));
+			editButton.addEventListener('click', function() {
+				populateUpdateRoleForm(role);
+			});
+			actionCell.appendChild(editButton);
 			row.appendChild(idCell);
 			row.appendChild(nameCell);
 			row.appendChild(descriptionCell);
+			row.appendChild(actionCell);
 			$tableBody.append(row);
 		});
 	};
@@ -2233,6 +2273,18 @@ function setupAdminRoleManagementHandlers() {
 		setInlineResult('[id$="-roles-update-result"]', '', false);
 		$('[id$="-roles-update-name"]').val('');
 		$('[id$="-roles-update-description"]').val('');
+	});
+
+	$(document).on('click', '.admin-roles-edit-role-btn', function() {
+		const roleId = parseInt($(this).attr('data-role-id'), 10) || 0;
+		if (roleId < 1) {
+			return;
+		}
+		const role = getRoleByIdFromState(roleId);
+		if (!role) {
+			return;
+		}
+		populateUpdateRoleForm(role);
 	});
 
 	$deleteSelect.on('change', function() {
