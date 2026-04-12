@@ -697,9 +697,22 @@ function getPermissionEditorVisibleResources(PDO $pdo, $userId) {
 
 function getUserPermissionEditScope(PDO $pdo, $userId) {
 	$normalizedUserId = (int)$userId;
-	$primaryRole = getUserPrimaryRole($pdo, $normalizedUserId);
-	$primaryRoleId = (int)($primaryRole['id'] ?? 0);
-	$primaryRoleName = trim((string)($primaryRole['name'] ?? ''));
+	$roleIds = getUserRoleIds($pdo, $normalizedUserId);
+	$primaryRoleId = 0;
+	foreach ($roleIds as $roleIdCandidate) {
+		$roleIdCandidate = (int)$roleIdCandidate;
+		if ($roleIdCandidate > $primaryRoleId) {
+			$primaryRoleId = $roleIdCandidate;
+		}
+	}
+	$roleNames = [];
+	foreach ($roleIds as $roleIdCandidate) {
+		$role = getRoleById($pdo, (int)$roleIdCandidate);
+		$roleName = trim((string)($role['name'] ?? ''));
+		if ($roleName !== '') {
+			$roleNames[] = $roleName;
+		}
+	}
 	$defaultScope = [
 		'mode' => 'none',
 		'label' => 'No editable roles',
@@ -711,7 +724,7 @@ function getUserPermissionEditScope(PDO $pdo, $userId) {
 		return $defaultScope;
 	}
 
-	if ($primaryRoleName === 'Full Access') {
+	if (in_array('Full Access', $roleNames, true)) {
 		return [
 			'mode' => 'all',
 			'label' => 'All roles',
@@ -1063,7 +1076,13 @@ function getAvailableRoles(PDO $pdo) {
 	}
 
 	try {
-		$stmt = $pdo->query('SELECT id, name, description FROM roles ORDER BY id ASC');
+		$selectColumns = ['id', 'name'];
+		if (doesTableColumnExist($pdo, 'roles', 'description')) {
+			$selectColumns[] = 'description';
+		} else {
+			$selectColumns[] = "'' AS description";
+		}
+		$stmt = $pdo->query('SELECT ' . implode(', ', $selectColumns) . ' FROM roles ORDER BY id ASC');
 		$rows = $stmt ? $stmt->fetchAll() : [];
 	} catch (Throwable $e) {
 		return [];
@@ -1089,10 +1108,16 @@ function getRoleByLookup(PDO $pdo, $lookup) {
 	}
 
 	$idCandidate = ctype_digit($query) ? (int)$query : 0;
+	$selectColumns = ['id', 'name'];
+	if (doesTableColumnExist($pdo, 'roles', 'description')) {
+		$selectColumns[] = 'description';
+	} else {
+		$selectColumns[] = "'' AS description";
+	}
 
 	try {
 		$stmt = $pdo->prepare(
-			'SELECT id, name, description
+			'SELECT ' . implode(', ', $selectColumns) . '
 			 FROM roles
 			 WHERE id = :id_candidate OR name = :name_candidate
 			 LIMIT 1'
@@ -1125,8 +1150,14 @@ function getRoleReplacementForDeletion(PDO $pdo, $deletedRoleId) {
 	}
 
 	try {
+		$selectColumns = ['id', 'name'];
+		if (doesTableColumnExist($pdo, 'roles', 'description')) {
+			$selectColumns[] = 'description';
+		} else {
+			$selectColumns[] = "'' AS description";
+		}
 		$stmt = $pdo->prepare(
-			'SELECT id, name, description
+			'SELECT ' . implode(', ', $selectColumns) . '
 			 FROM roles
 			 WHERE id < :id
 			 ORDER BY id DESC
@@ -1135,8 +1166,14 @@ function getRoleReplacementForDeletion(PDO $pdo, $deletedRoleId) {
 		$stmt->execute([':id' => $normalizedRoleId]);
 		$row = $stmt->fetch();
 		if (!$row) {
+			$selectColumns = ['id', 'name'];
+			if (doesTableColumnExist($pdo, 'roles', 'description')) {
+				$selectColumns[] = 'description';
+			} else {
+				$selectColumns[] = "'' AS description";
+			}
 			$stmt = $pdo->prepare(
-				'SELECT id, name, description
+				'SELECT ' . implode(', ', $selectColumns) . '
 				 FROM roles
 				 WHERE id > :id
 				 ORDER BY id ASC
@@ -1420,7 +1457,14 @@ function getRoleById(PDO $pdo, $roleId) {
 		return null;
 	}
 
-	$stmt = $pdo->prepare('SELECT id, name, description FROM roles WHERE id = :id LIMIT 1');
+	$selectColumns = ['id', 'name'];
+	if (doesTableColumnExist($pdo, 'roles', 'description')) {
+		$selectColumns[] = 'description';
+	} else {
+		$selectColumns[] = "'' AS description";
+	}
+
+	$stmt = $pdo->prepare('SELECT ' . implode(', ', $selectColumns) . ' FROM roles WHERE id = :id LIMIT 1');
 	$stmt->execute([':id' => $normalizedRoleId]);
 	$row = $stmt->fetch();
 	if (!$row) {
@@ -1441,13 +1485,23 @@ function getUserPrimaryRole(PDO $pdo, $userId) {
 		return null;
 	}
 
+	$roleSelectColumns = ['r.id', 'r.name'];
+	if (doesTableColumnExist($pdo, 'roles', 'description')) {
+		$roleSelectColumns[] = 'r.description';
+	} else {
+		$roleSelectColumns[] = "'' AS description";
+	}
+	$orderByClause = doesTableColumnExist($pdo, 'user_roles', 'created_at')
+		? 'ur.created_at ASC, ur.role_id ASC'
+		: 'ur.role_id ASC';
+
 	try {
 		$stmt = $pdo->prepare(
-			'SELECT r.id, r.name, r.description
+			'SELECT ' . implode(', ', $roleSelectColumns) . '
 			 FROM user_roles ur
 			 JOIN roles r ON r.id = ur.role_id
 			 WHERE ur.user_id = :user_id
-			 ORDER BY ur.created_at ASC, ur.role_id ASC
+			 ORDER BY ' . $orderByClause . '
 			 LIMIT 1'
 		);
 		$stmt->execute([':user_id' => $normalizedUserId]);

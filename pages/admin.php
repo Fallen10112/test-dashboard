@@ -40,31 +40,78 @@ requirePagePermission('admin', 'read');
 		'notifications' => false,
 		'permissions' => false,
 	];
+	$adminPdo = null;
 	try {
 		$adminPdo = getDashboardPdo();
 		ensurePermissionsSchema($adminPdo);
 		$adminRoles = getAvailableRoles($adminPdo);
-		$adminPermissionEditorPayload = getRolePermissionsEditorPayload($adminPdo, $adminCurrentUserId);
-		$adminUserListPayload = getAdminUserListPayload($adminPdo, 'all');
-		if ($adminCurrentUserId > 0) {
-			$adminPermissionEditScope = getUserPermissionEditScope($adminPdo, $adminCurrentUserId);
-			$adminEditableRoles = getEditableRolesForPermissionScope($adminRoles, $adminPermissionEditScope);
-			$adminTabPermissionFlags = dashboardBuildPermissionFlags($adminPdo, $adminCurrentUserId, [
-				'user_management' => ['admin', 'admin_user_management'],
-				'role_management' => ['admin', 'admin_role_management'],
-				'database_management' => ['admin', 'admin_database_management'],
-				'application_management' => ['admin', 'admin_application_management'],
-				'notifications' => ['admin', 'admin_notifications_management'],
-				'permissions' => ['admin', 'admin_permissions_management'],
-			], $adminTabPermissionFlags);
-			$adminRoleManagementFlags = dashboardBuildPermissionFlags($adminPdo, $adminCurrentUserId, [
-				'create' => ['admin', 'admin_role_create'],
-				'update' => ['admin', 'admin_role_update'],
-				'delete' => ['admin', 'admin_role_delete'],
-			], $adminRoleManagementFlags);
-		}
 	} catch (Throwable $e) {
 		$adminRoles = [];
+		$adminPdo = null;
+	}
+	try {
+		if ($adminPdo instanceof PDO) {
+			$adminUserListPayload = getAdminUserListPayload($adminPdo, 'all');
+		}
+	} catch (Throwable $e) {
+		$adminUserListPayload = [
+			'success' => true,
+			'users' => [],
+			'status_filter' => 'all',
+		];
+	}
+	try {
+		if ($adminPdo instanceof PDO) {
+			$adminPermissionEditorPayload = getRolePermissionsEditorPayload($adminPdo, $adminCurrentUserId);
+		}
+	} catch (Throwable $e) {
+		$adminPermissionEditorPayload = [
+			'roles' => [],
+			'resources' => [],
+			'permissions' => [],
+			'role_permissions' => [],
+			'allowed_permissions_by_resource' => [],
+		];
+	}
+	try {
+		if ($adminPdo instanceof PDO && $adminCurrentUserId > 0) {
+			$adminPermissionEditScope = getUserPermissionEditScope($adminPdo, $adminCurrentUserId);
+			$adminEditableRoles = getEditableRolesForPermissionScope($adminRoles, $adminPermissionEditScope);
+		}
+	} catch (Throwable $e) {
+		$adminPermissionEditScope = [
+			'mode' => 'none',
+			'label' => 'No editable roles',
+			'current_role_id' => null,
+			'max_role_id' => 0,
+		];
+		$adminEditableRoles = [];
+	}
+	try {
+		if ($adminPdo instanceof PDO) {
+			if ($adminCurrentUserId > 0) {
+				$adminTabPermissionFlags = dashboardBuildPermissionFlags($adminPdo, $adminCurrentUserId, [
+					'user_management' => ['admin', 'admin_user_management'],
+					'role_management' => ['admin', 'admin_role_management'],
+					'database_management' => ['admin', 'admin_database_management'],
+					'application_management' => ['admin', 'admin_application_management'],
+					'notifications' => ['admin', 'admin_notifications_management'],
+					'permissions' => ['admin', 'admin_permissions_management'],
+				], $adminTabPermissionFlags);
+				$adminRoleManagementFlags = dashboardBuildPermissionFlags($adminPdo, $adminCurrentUserId, [
+					'create' => ['admin', 'admin_role_create'],
+					'update' => ['admin', 'admin_role_update'],
+					'delete' => ['admin', 'admin_role_delete'],
+				], $adminRoleManagementFlags);
+			}
+		}
+	} catch (Throwable $e) {
+		$adminPermissionEditScope = [
+			'mode' => 'none',
+			'label' => 'No editable roles',
+			'current_role_id' => null,
+			'max_role_id' => 0,
+		];
 		$adminTabPermissionFlags = [
 			'user_management' => false,
 			'role_management' => false,
@@ -325,7 +372,6 @@ requirePagePermission('admin', 'read');
 					</div>
 
 					<div class="admin-accordion">
-						<?php if (!empty($adminRoleManagementFlags['create'])): ?>
 						<div class="admin-accordion-section">
 							<button type="button" class="admin-accordion-header" aria-expanded="false" aria-controls="admin-accordion-body-role-create">
 								<span>Add New Role</span>
@@ -348,9 +394,7 @@ requirePagePermission('admin', 'read');
 								</div>
 							</div>
 						</div>
-						<?php endif; ?>
 
-						<?php if (!empty($adminRoleManagementFlags['update'])): ?>
 						<div class="admin-accordion-section">
 							<button type="button" class="admin-accordion-header" aria-expanded="false" aria-controls="admin-accordion-body-role-update">
 								<span>Update Role</span>
@@ -384,9 +428,7 @@ requirePagePermission('admin', 'read');
 								</div>
 							</div>
 						</div>
-						<?php endif; ?>
 
-						<?php if (!empty($adminRoleManagementFlags['delete'])): ?>
 						<div class="admin-accordion-section">
 							<button type="button" class="admin-accordion-header" aria-expanded="false" aria-controls="admin-accordion-body-role-delete">
 								<span>Delete Role and Reassign Users</span>
@@ -412,7 +454,6 @@ requirePagePermission('admin', 'read');
 								</div>
 							</div>
 						</div>
-					<?php endif; ?>
 					</div>
 				</div><?php endif; ?>
 
