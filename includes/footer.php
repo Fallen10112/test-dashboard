@@ -1,9 +1,9 @@
 	
-	<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+	<script src="../js/vendor/jquery-3.6.0.min.js"></script>
 	<?php require_once __DIR__ . '/page_context.php'; ?>
 	<?php if (isCurrentPage('reports.php') || isCurrentPage('data.php')): ?>
 	
-	<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+	<script src="../js/vendor/html2pdf.bundle.min.js"></script>
 	<?php endif; ?>
 	<script>
 		window.DASHBOARD_APP_MODE = <?php echo json_encode((string)APP_MODE, JSON_UNESCAPED_SLASHES); ?>;

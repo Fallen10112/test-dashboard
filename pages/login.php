@@ -90,7 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		</div>
 	</div>
 
-	<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+	<script src="../js/vendor/jquery-3.6.0.min.js"></script>
 	<script src="../js/core/shared.js"></script>
 	<?php if (is_array($flashToast)): ?>
 	<script>

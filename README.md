@@ -82,9 +82,9 @@ test-dashboard/
 ## Tech Stack
 
 - Backend: PHP 7+ with PDO (MySQL)
-- Frontend: jQuery + vanilla JS modules
+- Frontend: locally vendored jQuery + vanilla JS modules
 - Database: MySQL/MariaDB
-- Exports: html2pdf.js for client-side PDF generation
+- Exports: locally vendored html2pdf.js for client-side PDF generation
 
 ## Authentication and Security
 
