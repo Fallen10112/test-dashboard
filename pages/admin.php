@@ -494,11 +494,44 @@ requirePagePermission('admin', 'read');
 
 				<?php if ($adminTabPermissionFlags['notifications']): ?><div class="admin-tab-panel" id="admin-tab-panel-notifications-management" role="tabpanel" aria-labelledby="admin-tab-btn-notifications-management" hidden>
 					<h4>Notifications Management</h4>
-					<ul>
-						<li>Placeholder item J</li>
-						<li>Placeholder item K</li>
-						<li>Placeholder item L</li>
-					</ul>
+					<p>Look up a user by id, username, or e-mail address, then review the notifications they have received and sent.</p>
+
+					<div class="admin-notifications-shell">
+						<section class="admin-notifications-search-card">
+							<form id="admin-notifications-form" class="account-form" autocomplete="off">
+								<div class="form-group">
+									<label for="admin-notifications-lookup">Lookup (id, username, or e-mail)</label>
+									<input type="text" id="admin-notifications-lookup" maxlength="255" placeholder="e.g. 12, johndoe, or user@example.com">
+								</div>
+								<div class="form-actions">
+									<button id="admin-notifications-detect-btn" type="submit" class="btn btn-secondary">Load Notifications</button>
+								</div>
+								<p id="admin-notifications-detected" class="admin-tools-inline-result" hidden></p>
+							</form>
+						</section>
+
+						<section class="admin-notifications-table-section">
+							<div class="admin-notifications-table-wrap">
+								<table class="data-table admin-notifications-table" id="admin-notifications-table">
+									<thead>
+										<tr>
+											<th>Date created</th>
+											<th>Sent/Received</th>
+											<th>Notification type</th>
+											<th>Title</th>
+											<th>Message</th>
+											<th>Read</th>
+										</tr>
+									</thead>
+									<tbody id="admin-notifications-table-body">
+										<tr class="admin-notifications-empty-row">
+											<td colspan="6">Look up a user to view sent and received notifications.</td>
+										</tr>
+									</tbody>
+								</table>
+							</div>
+						</section>
+					</div>
 				</div><?php endif; ?>
 
 				<?php if ($adminTabPermissionFlags['application_management']): ?><div class="admin-tab-panel" id="admin-tab-panel-application-management" role="tabpanel" aria-labelledby="admin-tab-btn-application-management" hidden>

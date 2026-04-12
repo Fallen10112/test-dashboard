@@ -166,29 +166,6 @@ function mapAuditActionToChangeType($action, $fieldName = '') {
 	return strtoupper((string)$action);
 }
 
-function ensureNotificationsTable(PDO $pdo) {
-	$pdo->exec(
-		'CREATE TABLE IF NOT EXISTS notifications (
-			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-			user_id BIGINT UNSIGNED NOT NULL,
-			sent_by_user_id BIGINT UNSIGNED NULL,
-			title VARCHAR(160) NOT NULL,
-			message TEXT NOT NULL,
-			notification_type VARCHAR(50) NOT NULL DEFAULT "info",
-			is_read TINYINT(1) NOT NULL DEFAULT 0,
-			read_at DATETIME NULL,
-			created_at DATETIME NOT NULL,
-			PRIMARY KEY (id),
-			KEY idx_notifications_user_created (user_id, created_at),
-			KEY idx_notifications_user_read (user_id, is_read),
-			KEY idx_notifications_sent_by (sent_by_user_id),
-			CONSTRAINT fk_notifications_sent_by_user FOREIGN KEY (sent_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
-			CONSTRAINT fk_notifications_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
-	);
-}
-
-
 function getNotificationsPayload(PDO $pdo, $userId, $limit = 25) {
 	ensureNotificationsTable($pdo);
 
@@ -941,6 +918,18 @@ if ($method === 'POST') {
 			'message' => 'User found',
 			'user' => $user,
 		]);
+	}
+
+	if ($postAction === 'admin_notifications_lookup') {
+		requireApiPermission('admin', 'admin_notifications_management');
+		$userId = getApiAuthUserId();
+		enforceApiRateLimit('admin_notifications_lookup_' . $userId, 60, 60);
+		$payload = getAdminNotificationsManagementPayload($pdo, $data['lookup'] ?? '', isset($data['limit']) ? (int)$data['limit'] : 100);
+		if (!($payload['success'] ?? false)) {
+			respondJson((int)($payload['http_status'] ?? 400), $payload);
+		}
+
+		respondJson(200, $payload);
 	}
 
 	if ($postAction === 'admin_role_list') {

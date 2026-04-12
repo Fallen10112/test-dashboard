@@ -449,3 +449,219 @@ function setupAdminPermissionManagementHandlers() {
 	renderMatrix();
 	syncWidgetCustomizeDependency();
 }
+
+
+function setupAdminNotificationsManagementHandlers() {
+	var form = document.getElementById('admin-notifications-form');
+	var lookupInput = document.getElementById('admin-notifications-lookup');
+	var detectButton = document.getElementById('admin-notifications-detect-btn');
+	var resultElement = document.getElementById('admin-notifications-detected');
+	var tableBody = document.getElementById('admin-notifications-table-body');
+
+	if (!form || !lookupInput || !detectButton || !resultElement || !tableBody) {
+		return;
+	}
+
+	function escapeHtml(value) {
+		return String(value || '').replace(/[&<>"']/g, function(character) {
+			return ({
+				'&': '&amp;',
+				'<': '&lt;',
+				'>': '&gt;',
+				'"': '&quot;',
+				"'": '&#39;'
+			})[character] || character;
+		});
+	}
+
+	function setInlineResult(message, isError) {
+		var text = String(message || '').trim();
+		resultElement.classList.remove('is-error', 'is-success');
+		if (text === '') {
+			resultElement.textContent = '';
+			resultElement.setAttribute('hidden', 'hidden');
+			return;
+		}
+
+		resultElement.textContent = text;
+		resultElement.classList.add(isError ? 'is-error' : 'is-success');
+		resultElement.removeAttribute('hidden');
+	}
+
+	function setEmptyState(message) {
+		tableBody.innerHTML = '';
+		var row = document.createElement('tr');
+		row.className = 'admin-notifications-empty-row';
+		var cell = document.createElement('td');
+		cell.colSpan = 6;
+		cell.textContent = message;
+		row.appendChild(cell);
+		tableBody.appendChild(row);
+	}
+
+	function apiPost(action, payload) {
+		var requestPayload = Object.assign({ action: action }, payload || {});
+		return $.ajax({
+			url: '../api.php',
+			type: 'POST',
+			contentType: 'application/json',
+			dataType: 'json',
+			data: JSON.stringify(requestPayload)
+		});
+	}
+
+	function normalizeType(value) {
+		var normalized = String(value || '').toLowerCase();
+		if (normalized === 'warn') {
+			normalized = 'warning';
+		}
+		if (['info', 'success', 'warning', 'error'].indexOf(normalized) === -1) {
+			normalized = 'info';
+		}
+		return normalized;
+	}
+
+	function getTypeLabel(value) {
+		var normalized = normalizeType(value);
+		return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+	}
+
+	function getTypeClass(value) {
+		return 'admin-notification-pill--' + normalizeType(value);
+	}
+
+	function getDirectionLabel(value) {
+		var normalized = String(value || '').toLowerCase();
+		if (normalized === 'sent') {
+			return 'Sent';
+		}
+		return 'Received';
+	}
+
+	function getDirectionClass(value) {
+		var normalized = String(value || '').toLowerCase();
+		if (normalized === 'sent') {
+			return 'admin-notification-pill--blue';
+		}
+		return 'admin-notification-pill--green';
+	}
+
+	function renderNotificationRows(notifications) {
+		tableBody.innerHTML = '';
+		if (!Array.isArray(notifications) || notifications.length === 0) {
+			setEmptyState('No notifications found for this user.');
+			return;
+		}
+
+		notifications.forEach(function(notification) {
+			var row = document.createElement('tr');
+
+			var createdCell = document.createElement('td');
+			createdCell.textContent = String(notification.created_at || '');
+
+			var directionCell = document.createElement('td');
+			var directionBadge = document.createElement('span');
+			directionBadge.className = 'admin-notification-pill ' + getDirectionClass(notification.direction);
+			directionBadge.textContent = getDirectionLabel(notification.direction);
+			directionCell.appendChild(directionBadge);
+
+			var typeCell = document.createElement('td');
+			var typeBadge = document.createElement('span');
+			typeBadge.className = 'admin-notification-pill ' + getTypeClass(notification.notification_type);
+			typeBadge.textContent = getTypeLabel(notification.notification_type);
+			typeCell.appendChild(typeBadge);
+
+			var titleCell = document.createElement('td');
+			titleCell.className = 'notification-title-cell';
+			titleCell.textContent = String(notification.title || '');
+
+			var messageCell = document.createElement('td');
+			messageCell.className = 'notification-message-cell';
+			messageCell.textContent = String(notification.message || '');
+
+			var readCell = document.createElement('td');
+			readCell.className = 'notification-read-cell';
+			var readLabel = notification.is_read ? 'Yes' : 'No';
+			var readAt = String(notification.read_at || '').trim();
+			readCell.textContent = readLabel + ' - ' + readAt;
+
+			row.appendChild(createdCell);
+			row.appendChild(directionCell);
+			row.appendChild(typeCell);
+			row.appendChild(titleCell);
+			row.appendChild(messageCell);
+			row.appendChild(readCell);
+			tableBody.appendChild(row);
+		});
+	}
+
+	function userLabel(user) {
+		if (!user || typeof user !== 'object') {
+			return '';
+		}
+
+		var id = String(user.id || '');
+		var displayName = String(user.display_name || '').trim();
+		var username = String(user.username || '').trim();
+		var email = String(user.email || '').trim();
+		var label = '#' + id;
+		if (displayName !== '') {
+			label += ' ' + displayName;
+		} else if (username !== '') {
+			label += ' ' + username;
+		} else if (email !== '') {
+			label += ' ' + email;
+		}
+		return label;
+	}
+
+	function loadNotifications() {
+		var lookup = String(lookupInput.value || '').trim();
+		setInlineResult('', false);
+
+		if (lookup === '') {
+			setEmptyState('Look up a user to view sent and received notifications.');
+			setInlineResult('Enter a user id, username, or email address first.', true);
+			return;
+		}
+
+		detectButton.disabled = true;
+		setInlineResult('Loading notifications...', false);
+
+		apiPost('admin_notifications_lookup', { lookup: lookup, limit: 100 })
+			.done(function(response) {
+				if (!response || !response.success) {
+					setEmptyState('Look up a user to view sent and received notifications.');
+					setInlineResult((response && response.message) ? response.message : 'Failed to load notifications.', true);
+					return;
+				}
+
+				var user = response.user || {};
+				var notifications = Array.isArray(response.notifications) ? response.notifications : [];
+				setInlineResult('Loaded ' + String(notifications.length) + ' notification(s) for ' + userLabel(user) + '.', false);
+				renderNotificationRows(notifications);
+			})
+			.fail(function(xhr) {
+				setEmptyState('Look up a user to view sent and received notifications.');
+				var message = xhr && xhr.responseJSON && xhr.responseJSON.message
+					? xhr.responseJSON.message
+					: 'Failed to load notifications.';
+				setInlineResult(message, true);
+			})
+			.always(function() {
+				detectButton.disabled = false;
+			});
+	}
+
+	form.addEventListener('submit', function(event) {
+		event.preventDefault();
+		loadNotifications();
+	});
+
+	lookupInput.addEventListener('input', function() {
+		setInlineResult('', false);
+		setEmptyState('Look up a user to view sent and received notifications.');
+	});
+
+	setEmptyState('Look up a user to view sent and received notifications.');
+}

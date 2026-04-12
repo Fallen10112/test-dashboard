@@ -241,6 +241,109 @@
     min-width: 92px;
 }
 
+.admin-notifications-shell {
+    display: grid;
+    gap: 16px;
+}
+
+.admin-notifications-search-card {
+    border: 1px solid #dbe3ef;
+    border-radius: 12px;
+    background: linear-gradient(180deg, #ffffff 0%, #f6f9ff 100%);
+    padding: 16px 18px;
+}
+
+.admin-notifications-table-wrap {
+    overflow: auto;
+    max-height: 520px;
+    border: 1px solid #dbe3ef;
+    border-radius: 12px;
+    background: #ffffff;
+}
+
+.admin-notifications-table {
+    min-width: 1100px;
+    table-layout: auto;
+}
+
+.admin-notifications-table th,
+.admin-notifications-table td {
+    vertical-align: top;
+}
+
+.admin-notifications-table th:first-child,
+.admin-notifications-table td:first-child {
+    white-space: nowrap;
+}
+
+.admin-notifications-table th:nth-child(2),
+.admin-notifications-table td:nth-child(2),
+.admin-notifications-table th:nth-child(3),
+.admin-notifications-table td:nth-child(3),
+.admin-notifications-table th:last-child,
+.admin-notifications-table td:last-child {
+    white-space: nowrap;
+}
+
+.admin-notifications-table .notification-title-cell,
+.admin-notifications-table .notification-message-cell {
+    white-space: normal;
+    word-break: break-word;
+}
+
+.admin-notifications-table .notification-read-cell {
+    min-width: 190px;
+}
+
+.admin-notifications-empty-row td {
+    text-align: center;
+    color: #6b7280;
+}
+
+.admin-notification-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 24px;
+    padding: 4px 10px;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    font-size: 0.76rem;
+    font-weight: 700;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.admin-notification-pill--blue {
+    color: #1d4ed8;
+    background: #dbeafe;
+    border-color: #93c5fd;
+}
+
+.admin-notification-pill--green {
+    color: #166534;
+    background: #dcfce7;
+    border-color: #86efac;
+}
+
+.admin-notification-pill--yellow {
+    color: #92400e;
+    background: #fef3c7;
+    border-color: #fcd34d;
+}
+
+.admin-notification-pill--red {
+    color: #b91c1c;
+    background: #fee2e2;
+    border-color: #fca5a5;
+}
+
+.admin-notification-pill--slate {
+    color: #334155;
+    background: #e2e8f0;
+    border-color: #cbd5e1;
+}
+
 .admin-role-table {
     table-layout: auto;
 }
@@ -678,6 +781,14 @@
 
     .admin-user-list-wrap {
         max-height: 300px;
+    }
+
+    .admin-notifications-table-wrap {
+        max-height: 360px;
+    }
+
+    .admin-notifications-table {
+        min-width: 980px;
     }
 
     .admin-user-list-table {

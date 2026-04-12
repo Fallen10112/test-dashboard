@@ -135,6 +135,29 @@ function ensureActivityLogSchema(PDO $pdo) {
 	}
 }
 
+
+function ensureNotificationsTable(PDO $pdo) {
+	$pdo->exec(
+		'CREATE TABLE IF NOT EXISTS notifications (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			user_id BIGINT UNSIGNED NOT NULL,
+			sent_by_user_id BIGINT UNSIGNED NULL,
+			title VARCHAR(160) NOT NULL,
+			message TEXT NOT NULL,
+			notification_type VARCHAR(50) NOT NULL DEFAULT "info",
+			is_read TINYINT(1) NOT NULL DEFAULT 0,
+			read_at DATETIME NULL,
+			created_at DATETIME NOT NULL,
+			PRIMARY KEY (id),
+			KEY idx_notifications_user_created (user_id, created_at),
+			KEY idx_notifications_user_read (user_id, is_read),
+			KEY idx_notifications_sent_by (sent_by_user_id),
+			CONSTRAINT fk_notifications_sent_by_user FOREIGN KEY (sent_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
+			CONSTRAINT fk_notifications_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+	);
+}
+
 function forceDeleteUserHard(PDO $pdo, $targetUserId, $currentUserId) {
 	$userId = (int)$targetUserId;
 	$actorId = (int)$currentUserId;
@@ -1604,6 +1627,97 @@ function getUserByIdOrUsername(PDO $pdo, $lookupQuery) {
 		'role_id' => isset($primaryRole['id']) ? (int)$primaryRole['id'] : null,
 		'role_name' => isset($primaryRole['name']) ? (string)$primaryRole['name'] : '',
 		'role_description' => isset($primaryRole['description']) ? (string)$primaryRole['description'] : '',
+	];
+}
+
+
+function getAdminNotificationsManagementPayload(PDO $pdo, $lookupQuery, $limit = 100) {
+	ensureNotificationsTable($pdo);
+
+	$query = normalizeDevToolsUserLookupQuery($lookupQuery);
+	if ($query === '') {
+		return [
+			'success' => false,
+			'http_status' => 400,
+			'message' => 'Enter a user id, username, or email address.',
+			'user' => null,
+			'notifications' => [],
+		];
+	}
+
+	$user = getUserByIdOrUsername($pdo, $query);
+	if (!$user) {
+		return [
+			'success' => false,
+			'http_status' => 404,
+			'message' => 'User not found.',
+			'user' => null,
+			'notifications' => [],
+		];
+	}
+
+	$safeLimit = (int)$limit;
+	if ($safeLimit < 1) {
+		$safeLimit = 100;
+	}
+	if ($safeLimit > 100) {
+		$safeLimit = 100;
+	}
+
+	$stmt = $pdo->prepare(
+		'SELECT n.id,
+		        n.user_id,
+		        n.sent_by_user_id,
+		        n.title,
+		        n.message,
+		        n.notification_type,
+		        n.is_read,
+		        DATE_FORMAT(n.created_at, "%Y-%m-%d %H:%i:%s") AS created_at_label,
+		        DATE_FORMAT(n.read_at, "%Y-%m-%d %H:%i:%s") AS read_at_label,
+		        COALESCE(NULLIF(su.display_name, ""), NULLIF(su.username, ""), su.email, "System") AS sent_by_display_name,
+		        COALESCE(NULLIF(ru.display_name, ""), NULLIF(ru.username, ""), ru.email) AS recipient_display_name
+		 FROM notifications n
+		 LEFT JOIN users su ON su.id = n.sent_by_user_id
+		 LEFT JOIN users ru ON ru.id = n.user_id
+		 WHERE n.user_id = :lookup_user_id OR n.sent_by_user_id = :lookup_user_id_2
+		 ORDER BY n.created_at DESC, n.id DESC
+		 LIMIT :limit'
+	);
+	$stmt->bindValue(':lookup_user_id', (int)$user['id'], PDO::PARAM_INT);
+	$stmt->bindValue(':lookup_user_id_2', (int)$user['id'], PDO::PARAM_INT);
+	$stmt->bindValue(':limit', $safeLimit, PDO::PARAM_INT);
+	$stmt->execute();
+	$rows = $stmt->fetchAll();
+
+	$notifications = [];
+	foreach ($rows as $row) {
+		$userId = (int)($row['user_id'] ?? 0);
+		$sentByUserId = isset($row['sent_by_user_id']) ? (int)$row['sent_by_user_id'] : null;
+		$direction = 'received';
+		if ($sentByUserId === (int)$user['id']) {
+			$direction = 'sent';
+		}
+
+		$notifications[] = [
+			'id' => (int)($row['id'] ?? 0),
+			'created_at' => (string)($row['created_at_label'] ?? ''),
+			'direction' => $direction,
+			'notification_type' => (string)($row['notification_type'] ?? 'info'),
+			'title' => (string)($row['title'] ?? ''),
+			'message' => (string)($row['message'] ?? ''),
+			'is_read' => ((int)($row['is_read'] ?? 0)) === 1,
+			'read_at' => (string)($row['read_at_label'] ?? ''),
+			'sent_by_user_id' => $sentByUserId,
+			'sent_by_display_name' => (string)($row['sent_by_display_name'] ?? ''),
+			'recipient_display_name' => (string)($row['recipient_display_name'] ?? ''),
+		];
+	}
+
+	return [
+		'success' => true,
+		'user' => $user,
+		'notifications' => $notifications,
+		'notification_count' => count($notifications),
 	];
 }
 

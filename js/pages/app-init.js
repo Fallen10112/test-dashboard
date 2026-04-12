@@ -62,6 +62,9 @@ $(document).ready(function() {
 	if ($('#admin-container').length > 0 && typeof setupAdminPageHandlers === 'function') {
 		setupAdminPageHandlers();
 	}
+	if ($('#admin-container').length > 0 && typeof setupAdminNotificationsManagementHandlers === 'function') {
+		setupAdminNotificationsManagementHandlers();
+	}
 	if ($('#admin-container').length > 0 && typeof setupAdminRoleManagementHandlers === 'function') {
 		setupAdminRoleManagementHandlers();
 	}
