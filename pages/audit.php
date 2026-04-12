@@ -5,8 +5,8 @@ startAuthSession();
 requireAuth();
 requirePagePermission('audit_log', 'read');
 ?>
-<?php include '../includes/header.php'; ?>
-<?php include '../includes/navigation.php'; ?>
+<?php require_once __DIR__ . '/../includes/header.php'; ?>
+<?php require_once __DIR__ . '/../includes/navigation.php'; ?>
 
 	
 	<main class="main-content main-content-table-page">
@@ -52,5 +52,5 @@ requirePagePermission('audit_log', 'read');
 	
 	<button id="scroll-to-top" class="scroll-to-top" title="Back to top">↑ Top</button>
 
-	<?php include '../includes/footer.php'; ?>
+	<?php require_once __DIR__ . '/../includes/footer.php'; ?>
 

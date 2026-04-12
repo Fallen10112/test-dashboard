@@ -5,8 +5,8 @@ startAuthSession();
 requireAuth();
 requirePagePermission('widgets', 'customize');
 ?>
-<?php include '../includes/header.php'; ?>
-<?php include '../includes/navigation.php'; ?>
+<?php require_once __DIR__ . '/../includes/header.php'; ?>
+<?php require_once __DIR__ . '/../includes/navigation.php'; ?>
 
 	<main class="main-content">
 		<section class="content-section active" id="ui-customization-container">
@@ -53,4 +53,4 @@ requirePagePermission('widgets', 'customize');
 		</section>
 	</main>
 
-<?php include '../includes/footer.php'; ?>
+<?php require_once __DIR__ . '/../includes/footer.php'; ?>

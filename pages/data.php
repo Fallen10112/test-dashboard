@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/sql_helpers.php';
+require_once __DIR__ . '/../includes/page_context.php';
 startAuthSession();
 requireAuth();
 requirePagePermission('records', 'read');
@@ -17,20 +18,22 @@ try {
 	if ($dataPageUserId > 0) {
 		$dataPagePdo = getDashboardPdo();
 		ensurePermissionsSchema($dataPagePdo);
-		$dataPagePermissionFlags['create'] = userHasPermission($dataPagePdo, $dataPageUserId, 'records', 'create');
-		$dataPagePermissionFlags['update'] = userHasPermission($dataPagePdo, $dataPageUserId, 'records', 'update');
-		$dataPagePermissionFlags['delete'] = userHasPermission($dataPagePdo, $dataPageUserId, 'records', 'delete');
-		$dataPagePermissionFlags['export'] = userHasPermission($dataPagePdo, $dataPageUserId, 'records', 'export');
+		$dataPagePermissionFlags = dashboardBuildPermissionFlags($dataPagePdo, $dataPageUserId, [
+			'create' => ['records', 'create'],
+			'update' => ['records', 'update'],
+			'delete' => ['records', 'delete'],
+			'export' => ['records', 'export'],
+		], $dataPagePermissionFlags);
 	}
 } catch (Throwable $e) {
 	$dataPagePermissionFlags = ['create' => false, 'update' => false, 'delete' => false, 'export' => false];
 }
 ?>
-<?php include '../includes/header.php'; ?>
-<?php include '../includes/navigation.php'; ?>
+<?php require_once __DIR__ . '/../includes/header.php'; ?>
+<?php require_once __DIR__ . '/../includes/navigation.php'; ?>
 
 <script>
-	window.DASHBOARD_PAGE_PERMISSIONS = <?php echo json_encode($dataPagePermissionFlags, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
+	window.DASHBOARD_PAGE_PERMISSIONS = <?php echo dashboardJsonEncodeOrFallback($dataPagePermissionFlags, '{"create":false,"update":false,"delete":false,"export":false}'); ?>;
 </script>
 	
 	
@@ -103,5 +106,5 @@ try {
 
 	<button id="scroll-to-top" class="scroll-to-top" title="Back to top">↑ Top</button>
 
-<?php include '../includes/footer.php'; ?>
+	<?php require_once __DIR__ . '/../includes/footer.php'; ?>
 

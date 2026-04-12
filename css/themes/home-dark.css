@@ -1,0 +1,35 @@
+/* Dark-mode overrides for pages/home.css */
+
+body.dark-mode .home-page-hero-copy,
+body.dark-mode .home-page-summary-card,
+body.dark-mode .home-page-card {
+	background: #1f2937;
+	border-color: #374151;
+	box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+}
+
+body.dark-mode .home-page-summary-card {
+	background: linear-gradient(180deg, #1b2331 0%, #172131 100%);
+}
+
+body.dark-mode .page-kicker {
+	color: #9fb1ff;
+}
+
+body.dark-mode .home-page-hero-copy h2,
+body.dark-mode .home-page-summary-card h3,
+body.dark-mode .home-page-card h3 {
+	color: #f3f4f6;
+}
+
+body.dark-mode .page-lead,
+body.dark-mode .home-page-summary-card p,
+body.dark-mode .home-feature-list,
+body.dark-mode .home-step-list {
+	color: #c7d2e5;
+}
+
+body.dark-mode .home-feature-list strong,
+body.dark-mode .home-step-list strong {
+	color: #f9fafb;
+}

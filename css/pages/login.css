@@ -111,3 +111,26 @@
     transform: translateY(0);
 }
 
+@media (max-width: 520px) {
+    .login-wrapper {
+        padding: 16px 12px;
+    }
+
+    .login-card {
+        padding: 28px 20px 24px;
+        border-radius: 10px;
+    }
+
+    .login-header {
+        margin-bottom: 22px;
+    }
+
+    .login-header h1 {
+        font-size: 1.35em;
+    }
+
+    .btn-login {
+        padding: 10px 12px;
+    }
+}
+

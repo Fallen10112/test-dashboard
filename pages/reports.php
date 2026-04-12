@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/sql_helpers.php';
+require_once __DIR__ . '/../includes/page_context.php';
 startAuthSession();
 requireAuth();
 requirePagePermission('reports', 'read');
@@ -14,17 +15,19 @@ try {
 	if ($reportsPageUserId > 0) {
 		$reportsPagePdo = getDashboardPdo();
 		ensurePermissionsSchema($reportsPagePdo);
-		$reportsPagePermissionFlags['export'] = userHasPermission($reportsPagePdo, $reportsPageUserId, 'reports', 'export');
+		$reportsPagePermissionFlags = dashboardBuildPermissionFlags($reportsPagePdo, $reportsPageUserId, [
+			'export' => ['reports', 'export'],
+		], $reportsPagePermissionFlags);
 	}
 } catch (Throwable $e) {
 	$reportsPagePermissionFlags = ['export' => false];
 }
 ?>
-<?php include '../includes/header.php'; ?>
-<?php include '../includes/navigation.php'; ?>
+<?php require_once __DIR__ . '/../includes/header.php'; ?>
+<?php require_once __DIR__ . '/../includes/navigation.php'; ?>
 
 <script>
-	window.DASHBOARD_PAGE_PERMISSIONS = <?php echo json_encode($reportsPagePermissionFlags, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
+	window.DASHBOARD_PAGE_PERMISSIONS = <?php echo dashboardJsonEncodeOrFallback($reportsPagePermissionFlags, '{"export":false}'); ?>;
 </script>
 	
 	
@@ -49,5 +52,5 @@ try {
 
 	<button id="scroll-to-top" class="scroll-to-top" title="Back to top">↑ Top</button>
 
-<?php include '../includes/footer.php'; ?>
+<?php require_once __DIR__ . '/../includes/footer.php'; ?>
 

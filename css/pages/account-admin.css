@@ -21,6 +21,19 @@
     color: #6b7280;
 }
 
+.dev-tools-warning {
+    margin-bottom: 1rem;
+    font-weight: 700;
+}
+
+.dev-tools-warning--danger {
+    color: #b00;
+}
+
+.dev-tools-warning--success {
+    color: #007700;
+}
+
 .account-form .form-group {
     margin-bottom: 14px;
 }
@@ -607,6 +620,52 @@
 
     .permissions-editor-controls {
         justify-self: stretch;
+    }
+
+    .admin-tabs {
+        padding-left: 0;
+        gap: 6px;
+    }
+
+    .admin-tab-btn {
+        flex: 1 1 100%;
+        min-width: 0;
+        border-radius: 10px;
+        padding: 10px 12px;
+    }
+
+    .admin-tab-btn.active {
+        top: 0;
+        border-bottom-color: #667eea;
+    }
+
+    .admin-tab-panel {
+        padding: 12px;
+    }
+
+    .admin-user-list-wrap {
+        max-height: 300px;
+    }
+
+    .admin-user-list-table {
+        min-width: 640px;
+    }
+
+    .permissions-editor-summary {
+        padding: 14px;
+        gap: 14px;
+    }
+
+    .permissions-editor-metrics {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .dev-tool-module[data-dev-tool-category="users"] {
+        grid-template-columns: 1fr;
+    }
+
+    .dev-tools-actions-row {
+        max-width: none;
     }
 }
 

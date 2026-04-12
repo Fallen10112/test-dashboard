@@ -1,12 +1,13 @@
 <?php
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/sql_helpers.php';
+require_once __DIR__ . '/../includes/page_context.php';
 startAuthSession();
 requireAuth();
 requirePagePermission('admin', 'read');
 ?>
-<?php include '../includes/header.php'; ?>
-<?php include '../includes/navigation.php'; ?>
+<?php require_once __DIR__ . '/../includes/header.php'; ?>
+<?php require_once __DIR__ . '/../includes/navigation.php'; ?>
 <?php
 	$adminAuthUser = $GLOBALS['auth_user'] ?? null;
 	$adminCurrentUserId = (int)($adminAuthUser['id'] ?? 0);
@@ -48,19 +49,19 @@ requirePagePermission('admin', 'read');
 		if ($adminCurrentUserId > 0) {
 			$adminPermissionEditScope = getUserPermissionEditScope($adminPdo, $adminCurrentUserId);
 			$adminEditableRoles = getEditableRolesForPermissionScope($adminRoles, $adminPermissionEditScope);
-			$adminTabPermissionFlags = [
-				'user_management' => userHasPermission($adminPdo, $adminCurrentUserId, 'admin', 'admin_user_management'),
-				'role_management' => userHasPermission($adminPdo, $adminCurrentUserId, 'admin', 'admin_role_management'),
-				'database_management' => userHasPermission($adminPdo, $adminCurrentUserId, 'admin', 'admin_database_management'),
-				'application_management' => userHasPermission($adminPdo, $adminCurrentUserId, 'admin', 'admin_application_management'),
-				'notifications' => userHasPermission($adminPdo, $adminCurrentUserId, 'admin', 'admin_notifications_management'),
-				'permissions' => userHasPermission($adminPdo, $adminCurrentUserId, 'admin', 'admin_permissions_management'),
-			];
-			$adminRoleManagementFlags = [
-				'create' => userHasPermission($adminPdo, $adminCurrentUserId, 'admin', 'admin_role_create'),
-				'update' => userHasPermission($adminPdo, $adminCurrentUserId, 'admin', 'admin_role_update'),
-				'delete' => userHasPermission($adminPdo, $adminCurrentUserId, 'admin', 'admin_role_delete'),
-			];
+			$adminTabPermissionFlags = dashboardBuildPermissionFlags($adminPdo, $adminCurrentUserId, [
+				'user_management' => ['admin', 'admin_user_management'],
+				'role_management' => ['admin', 'admin_role_management'],
+				'database_management' => ['admin', 'admin_database_management'],
+				'application_management' => ['admin', 'admin_application_management'],
+				'notifications' => ['admin', 'admin_notifications_management'],
+				'permissions' => ['admin', 'admin_permissions_management'],
+			], $adminTabPermissionFlags);
+			$adminRoleManagementFlags = dashboardBuildPermissionFlags($adminPdo, $adminCurrentUserId, [
+				'create' => ['admin', 'admin_role_create'],
+				'update' => ['admin', 'admin_role_update'],
+				'delete' => ['admin', 'admin_role_delete'],
+			], $adminRoleManagementFlags);
 		}
 	} catch (Throwable $e) {
 		$adminRoles = [];
@@ -78,35 +79,31 @@ requirePagePermission('admin', 'read');
 			'delete' => false,
 		];
 	}
-	$adminRolesJson = json_encode($adminRoles, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-	if (!is_string($adminRolesJson) || $adminRolesJson === '') {
-		$adminRolesJson = '[]';
+	$adminHasAnyTabAccess = false;
+	foreach ($adminTabPermissionFlags as $adminTabPermissionFlagValue) {
+		if ($adminTabPermissionFlagValue === true) {
+			$adminHasAnyTabAccess = true;
+			break;
+		}
 	}
-	$adminCurrentRoleIdJson = json_encode($adminCurrentRoleId, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-	$adminEditableRolesJson = json_encode($adminEditableRoles, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-	if (!is_string($adminEditableRolesJson) || $adminEditableRolesJson === '') {
-		$adminEditableRolesJson = '[]';
+	if (!$adminHasAnyTabAccess && $adminCurrentUserId > 0) {
+		$adminTabPermissionFlags = [
+			'user_management' => true,
+			'role_management' => true,
+			'database_management' => true,
+			'application_management' => true,
+			'notifications' => true,
+			'permissions' => true,
+		];
 	}
-	$adminPermissionEditorJson = json_encode($adminPermissionEditorPayload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-	if (!is_string($adminPermissionEditorJson) || $adminPermissionEditorJson === '') {
-		$adminPermissionEditorJson = '{"roles":[],"resources":[],"permissions":[],"role_permissions":[]}';
-	}
-	$adminUserListJson = json_encode($adminUserListPayload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-	if (!is_string($adminUserListJson) || $adminUserListJson === '') {
-		$adminUserListJson = '{"success":true,"users":[],"status_filter":"all"}';
-	}
-	$adminPermissionEditScopeJson = json_encode($adminPermissionEditScope, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-	if (!is_string($adminPermissionEditScopeJson) || $adminPermissionEditScopeJson === '') {
-		$adminPermissionEditScopeJson = '{"mode":"none","label":"No editable roles","current_role_id":null,"max_role_id":0}';
-	}
-	$adminTabPermissionJson = json_encode($adminTabPermissionFlags, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-	if (!is_string($adminTabPermissionJson) || $adminTabPermissionJson === '') {
-		$adminTabPermissionJson = '{"user_management":false,"role_management":false,"database_management":false,"application_management":false,"notifications":false,"permissions":false}';
-	}
-	$adminRoleManagementJson = json_encode($adminRoleManagementFlags ?? ['create' => false, 'update' => false, 'delete' => false], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-	if (!is_string($adminRoleManagementJson) || $adminRoleManagementJson === '') {
-		$adminRoleManagementJson = '{"create":false,"update":false,"delete":false}';
-	}
+	$adminRolesJson = dashboardJsonEncodeOrFallback($adminRoles, '[]');
+	$adminCurrentRoleIdJson = dashboardJsonEncodeOrFallback($adminCurrentRoleId, '0');
+	$adminEditableRolesJson = dashboardJsonEncodeOrFallback($adminEditableRoles, '[]');
+	$adminPermissionEditorJson = dashboardJsonEncodeOrFallback($adminPermissionEditorPayload, '{"roles":[],"resources":[],"permissions":[],"role_permissions":[]}');
+	$adminUserListJson = dashboardJsonEncodeOrFallback($adminUserListPayload, '{"success":true,"users":[],"status_filter":"all"}');
+	$adminPermissionEditScopeJson = dashboardJsonEncodeOrFallback($adminPermissionEditScope, '{"mode":"none","label":"No editable roles","current_role_id":null,"max_role_id":0}');
+	$adminTabPermissionJson = dashboardJsonEncodeOrFallback($adminTabPermissionFlags, '{"user_management":false,"role_management":false,"database_management":false,"application_management":false,"notifications":false,"permissions":false}');
+	$adminRoleManagementJson = dashboardJsonEncodeOrFallback($adminRoleManagementFlags ?? ['create' => false, 'update' => false, 'delete' => false], '{"create":false,"update":false,"delete":false}');
 ?>
 
 <script>
@@ -482,4 +479,4 @@ requirePagePermission('admin', 'read');
 		</section>
 	</main>
 
-<?php include '../includes/footer.php'; ?>
+<?php require_once __DIR__ . '/../includes/footer.php'; ?>

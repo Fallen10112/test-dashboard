@@ -1,9 +1,12 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/auth.php';
+require_once __DIR__ . '/page_context.php';
 requireAuth();
 header('Content-Type: text/html; charset=utf-8');
 $pageTitle = "Dashboard Showcase";
+$headerPageSlug = getCurrentPageSlug();
+$headerBodyClass = 'app-shell page-' . pathinfo($headerPageSlug, PATHINFO_FILENAME);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -13,7 +16,8 @@ $pageTitle = "Dashboard Showcase";
 	<title><?php echo $pageTitle; ?></title>
 	<link rel="stylesheet" href="../css/style.css">
 </head>
-<body>
+
+<body class="<?php echo htmlspecialchars($headerBodyClass, ENT_QUOTES, 'UTF-8'); ?>">
 	
 	<?php
 	$_headerUser = $GLOBALS['auth_user'] ?? null;
@@ -52,10 +56,7 @@ $pageTitle = "Dashboard Showcase";
 			'allowed_keys' => [],
 		];
 	}
-	$_headerWidgetPermissionsJson = json_encode($_headerWidgetPermissions, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-	if (!is_string($_headerWidgetPermissionsJson) || $_headerWidgetPermissionsJson === '') {
-		$_headerWidgetPermissionsJson = '{"can_view":false,"can_customize":false,"allowed_keys":[]}';
-	}
+	$_headerWidgetPermissionsJson = dashboardJsonEncodeOrFallback($_headerWidgetPermissions, '{"can_view":false,"can_customize":false,"allowed_keys":[]}');
 	$_headerEmail = htmlspecialchars($_headerUser['email'] ?? '', ENT_QUOTES, 'UTF-8');
 	$_words = preg_split('/\s+/', trim($_headerDisplay));
 	$_initials = '';

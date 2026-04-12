@@ -134,8 +134,8 @@ try {
 	$error = 'Unable to load dev tools right now.';
 }
 ?>
-<?php include '../includes/header.php'; ?>
-<?php include '../includes/navigation.php'; ?>
+<?php require_once __DIR__ . '/../includes/header.php'; ?>
+<?php require_once __DIR__ . '/../includes/navigation.php'; ?>
 
 	<main class="main-content">
 		<section class="content-section active">
@@ -226,11 +226,11 @@ try {
 				<h3>Maintenance Tools</h3>
 				<p>Run maintenance actions for targeted table resets.</p>
 							<?php if (defined('RESET_ON_INDEX_VISIT') && RESET_ON_INDEX_VISIT): ?>
-							<div class="dev-tools-warning" style="color:#b00;font-weight:bold;margin-bottom:1em;">
+							<div class="dev-tools-warning dev-tools-warning--danger">
 								Reset_on_index_visit is currently TRUE - all data will be reset upon visiting the landing page.
 							</div>
 							<?php elseif (defined('APP_MODE') && APP_MODE === 'demo' && defined('RESET_ON_INDEX_VISIT') && !RESET_ON_INDEX_VISIT): ?>
-							<div class="dev-tools-warning" style="color:#007700;font-weight:bold;margin-bottom:1em;">
+							<div class="dev-tools-warning dev-tools-warning--success">
 								Application mode is in Demo mode - reset_on_index_visit is FALSE - all data will be preserved on visiting the landing page.
 							</div>
 							<?php endif; ?>
@@ -301,4 +301,4 @@ try {
 			</section>
 		</main>
 
-<?php include '../includes/footer.php'; ?>
+<?php require_once __DIR__ . '/../includes/footer.php'; ?>

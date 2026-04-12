@@ -1,3 +1,4 @@
+
 $(document).ready(function() {
 	initializeTheme();
 	setupDevToolsMaintenanceHandlers();
@@ -67,15 +68,20 @@ $(document).ready(function() {
 	if ($('#admin-container').length > 0 && typeof setupAdminPermissionManagementHandlers === 'function') {
 		setupAdminPermissionManagementHandlers();
 	}
-});
 
-
-$(document).ready(function() {
 	const scrollTopBtn = $('#scroll-to-top');
 	const scrollThreshold = 300;
+	const $mainContent = $('.main-content');
 
-	$(window).scroll(function() {
-		if ($('.main-content').scrollTop() > scrollThreshold) {
+	function getScrollPosition() {
+		if ($mainContent.length > 0) {
+			return $mainContent.scrollTop();
+		}
+		return $(window).scrollTop();
+	}
+
+	$(window).on('scroll', function() {
+		if (getScrollPosition() > scrollThreshold) {
 			scrollTopBtn.addClass('show');
 		} else {
 			scrollTopBtn.removeClass('show');
@@ -84,6 +90,10 @@ $(document).ready(function() {
 
 	scrollTopBtn.on('click', function(e) {
 		e.preventDefault();
-		$('.main-content').animate({ scrollTop: 0 }, 'smooth');
+		if ($mainContent.length > 0 && $mainContent[0].scrollHeight > $mainContent.innerHeight()) {
+			$mainContent.animate({ scrollTop: 0 }, 250);
+			return;
+		}
+		$('html, body').animate({ scrollTop: 0 }, 250);
 	});
 });
