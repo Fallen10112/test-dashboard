@@ -16,7 +16,7 @@ let headerUnreadNotificationCount = 0;
 let hasNotificationBaselineLoaded = false;
 let knownNotificationIds = new Set();
 let localTimeWidgetTimerId = null;
-const SUPPORTED_HEADER_WIDGET_KEYS = ['total_entries', 'total_edits', 'adds_today', 'deletes_today', 'local_time'];
+const SUPPORTED_HEADER_WIDGET_KEYS = ['total_entries', 'total_edits', 'adds_today', 'deletes_today', 'local_time', 'login_updates'];
 
 function escapeHtml(value) {
 	return String(value == null ? '' : value)
@@ -47,7 +47,8 @@ function getDefaultHeaderWidgetPreferences() {
 		total_edits: true,
 		adds_today: true,
 		deletes_today: true,
-		local_time: true
+		local_time: true,
+		login_updates: true
 	};
 }
 

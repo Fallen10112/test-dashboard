@@ -13,7 +13,7 @@ function setupUiCustomizationPageHandlers() {
 		? widgetPermissions.allowed_keys
 		: [];
 	const canCustomizeWidgets = widgetPermissions.can_customize === true;
-	const widgetKeys = ['total_entries', 'total_edits', 'adds_today', 'deletes_today', 'local_time'];
+	const widgetKeys = ['total_entries', 'total_edits', 'adds_today', 'deletes_today', 'local_time', 'login_updates'];
 
 	function setStatus(message, isError) {
 		if (!$status.length) {
@@ -56,6 +56,7 @@ function setupUiCustomizationPageHandlers() {
 		$('#widget-adds-today').prop('checked', !!normalized.adds_today);
 		$('#widget-deletes-today').prop('checked', !!normalized.deletes_today);
 		$('#widget-local-time').prop('checked', !!normalized.local_time);
+		$('#widget-login-updates').prop('checked', !!normalized.login_updates);
 	}
 
 	function loadPreferences() {

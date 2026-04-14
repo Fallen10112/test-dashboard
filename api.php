@@ -220,7 +220,7 @@ function getNotificationsPayload(PDO $pdo, $userId, $limit = 25) {
 }
 
 function getSupportedHeaderWidgetKeys() {
-	return ['total_entries', 'total_edits', 'adds_today', 'deletes_today', 'local_time'];
+	return ['total_entries', 'total_edits', 'adds_today', 'deletes_today', 'local_time', 'login_updates'];
 }
 
 

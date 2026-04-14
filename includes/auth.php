@@ -197,7 +197,15 @@ function loginUser(string $identifier, string $password): bool {
 			$statsWindowStart = trim((string)($user['created_at'] ?? ''));
 		}
 		try {
-			if ($statsWindowStart !== '') {
+			$loginUpdateNotificationsEnabled = true;
+			if (function_exists('getStoredHeaderWidgetPreferences')) {
+				$widgets = getStoredHeaderWidgetPreferences($pdo, (int)$user['id']);
+				if (array_key_exists('login_updates', $widgets)) {
+					$loginUpdateNotificationsEnabled = ((bool)$widgets['login_updates']);
+				}
+			}
+
+			if ($statsWindowStart !== '' && $loginUpdateNotificationsEnabled) {
 				$summary = getLoginUpdateNotificationSummary($pdo, $statsWindowStart, $loginAt);
 				$summaryParts = [
 					'<strong>Entries added:</strong> ' . number_format((int)($summary['entries_added'] ?? 0)),

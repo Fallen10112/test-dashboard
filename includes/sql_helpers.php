@@ -320,7 +320,7 @@ function getPermissionResourceDefinitions() {
 	return [
 		'home' => ['display_name' => 'Home', 'description' => 'Landing page access'],
 		'records' => ['display_name' => 'Data', 'description' => 'Records page and CRUD actions'],
-		'widgets' => ['display_name' => 'Widgets', 'description' => 'Header widgets and customization controls'],
+		'widgets' => ['display_name' => 'Widgets', 'description' => 'Header widgets, notification preferences, and customization controls'],
 		'reports' => ['display_name' => 'Reports', 'description' => 'Reports page and exports'],
 		'audit_log' => ['display_name' => 'Audit Trail', 'description' => 'Audit trail page access'],
 		'admin' => ['display_name' => 'Admin', 'description' => 'Admin workspace access'],
@@ -341,6 +341,7 @@ function getPermissionActionDefinitions() {
 		'adds_today' => ['display_name' => 'Adds Today Widget', 'description' => 'Show the adds today widget in the header'],
 		'deletes_today' => ['display_name' => 'Deletes Today Widget', 'description' => 'Show the deletes today widget in the header'],
 		'local_time' => ['display_name' => 'Local Time Widget', 'description' => 'Show the local time widget in the header'],
+		'login_updates' => ['display_name' => 'Login Update Notifications', 'description' => 'Show the login update notification after sign in'],
 		'manage_users' => ['display_name' => 'Manage Users', 'description' => 'Create and edit users'],
 		'manage_permissions' => ['display_name' => 'Manage Permissions', 'description' => 'Edit role and user permissions'],
 		'admin_role_create' => ['display_name' => 'Admin Role Create', 'description' => 'Add new roles'],
@@ -644,11 +645,11 @@ function getAllPermissionActions(PDO $pdo) {
 function getDefaultRolePermissionTemplates() {
 	return [
 		'Guest' => ['home' => ['read']],
-		'Administrator' => ['home' => ['read'], 'records' => ['read', 'create', 'update'], 'widgets' => ['read', 'customize', 'total_entries', 'total_edits', 'adds_today', 'deletes_today', 'local_time']],
-		'Coordinator' => ['home' => ['read'], 'records' => ['read', 'create', 'update', 'delete'], 'widgets' => ['read', 'customize', 'total_entries', 'total_edits', 'adds_today', 'deletes_today', 'local_time']],
-		'Team Leader' => ['home' => ['read'], 'records' => ['read', 'create', 'update', 'delete', 'export'], 'reports' => ['read', 'export'], 'widgets' => ['read', 'customize', 'total_entries', 'total_edits', 'adds_today', 'deletes_today', 'local_time']],
-		'Manager' => ['home' => ['read'], 'records' => ['read', 'create', 'update', 'delete', 'export'], 'reports' => ['read', 'export'], 'audit_log' => ['read'], 'widgets' => ['read', 'customize', 'total_entries', 'total_edits', 'adds_today', 'deletes_today', 'local_time'], 'admin' => ['read', 'manage_users', 'manage_permissions', 'admin_user_management', 'admin_role_management', 'admin_notifications_management', 'admin_permissions_management', 'admin_role_create', 'admin_role_update', 'admin_permissions_edit_lower']],
-		'Director' => ['home' => ['read'], 'records' => ['read', 'create', 'update', 'delete', 'export'], 'reports' => ['read', 'export'], 'audit_log' => ['read'], 'widgets' => ['read', 'customize', 'total_entries', 'total_edits', 'adds_today', 'deletes_today', 'local_time'], 'admin' => ['read', 'manage_users', 'manage_permissions', 'admin_user_management', 'admin_role_management', 'admin_database_management', 'admin_application_management', 'admin_notifications_management', 'admin_permissions_management', 'admin_role_create', 'admin_role_update', 'admin_permissions_edit_self']],
+		'Administrator' => ['home' => ['read'], 'records' => ['read', 'create', 'update'], 'widgets' => ['read', 'customize', 'total_entries', 'total_edits', 'adds_today', 'deletes_today', 'local_time', 'login_updates']],
+		'Coordinator' => ['home' => ['read'], 'records' => ['read', 'create', 'update', 'delete'], 'widgets' => ['read', 'customize', 'total_entries', 'total_edits', 'adds_today', 'deletes_today', 'local_time', 'login_updates']],
+		'Team Leader' => ['home' => ['read'], 'records' => ['read', 'create', 'update', 'delete', 'export'], 'reports' => ['read', 'export'], 'widgets' => ['read', 'customize', 'total_entries', 'total_edits', 'adds_today', 'deletes_today', 'local_time', 'login_updates']],
+		'Manager' => ['home' => ['read'], 'records' => ['read', 'create', 'update', 'delete', 'export'], 'reports' => ['read', 'export'], 'audit_log' => ['read'], 'widgets' => ['read', 'customize', 'total_entries', 'total_edits', 'adds_today', 'deletes_today', 'local_time', 'login_updates'], 'admin' => ['read', 'manage_users', 'manage_permissions', 'admin_user_management', 'admin_role_management', 'admin_notifications_management', 'admin_permissions_management', 'admin_role_create', 'admin_role_update', 'admin_permissions_edit_lower']],
+		'Director' => ['home' => ['read'], 'records' => ['read', 'create', 'update', 'delete', 'export'], 'reports' => ['read', 'export'], 'audit_log' => ['read'], 'widgets' => ['read', 'customize', 'total_entries', 'total_edits', 'adds_today', 'deletes_today', 'local_time', 'login_updates'], 'admin' => ['read', 'manage_users', 'manage_permissions', 'admin_user_management', 'admin_role_management', 'admin_database_management', 'admin_application_management', 'admin_notifications_management', 'admin_permissions_management', 'admin_role_create', 'admin_role_update', 'admin_permissions_edit_self']],
 		'Full Access' => ['__all__' => ['__all__']],
 	];
 }
@@ -666,7 +667,7 @@ function getPermissionEditorResourceActionMap() {
 	return [
 		'home' => ['read'],
 		'records' => ['read', 'create', 'update', 'delete', 'export'],
-		'widgets' => ['read', 'customize', 'total_entries', 'total_edits', 'adds_today', 'deletes_today', 'local_time'],
+		'widgets' => ['read', 'customize', 'total_entries', 'total_edits', 'adds_today', 'deletes_today', 'local_time', 'login_updates'],
 		'reports' => ['read', 'export'],
 		'audit_log' => ['read'],
 		'admin' => ['read', 'manage_users', 'manage_permissions', 'admin_user_management', 'admin_role_management', 'admin_role_create', 'admin_role_update', 'admin_role_delete', 'admin_database_management', 'admin_application_management', 'admin_notifications_management', 'admin_permissions_management'],
@@ -676,7 +677,7 @@ function getPermissionEditorResourceActionMap() {
 
 function getHeaderWidgetPermissionState(PDO $pdo, $userId) {
 	$normalizedUserId = (int)$userId;
-	$widgetKeys = ['total_entries', 'total_edits', 'adds_today', 'deletes_today', 'local_time'];
+	$widgetKeys = ['total_entries', 'total_edits', 'adds_today', 'deletes_today', 'local_time', 'login_updates'];
 	$canView = $normalizedUserId > 0 && userHasPermission($pdo, $normalizedUserId, 'widgets', 'read');
 	$allowedKeys = [];
 	if ($canView) {
@@ -694,6 +695,40 @@ function getHeaderWidgetPermissionState(PDO $pdo, $userId) {
 		'can_customize' => $canCustomize,
 		'allowed_keys' => $allowedKeys,
 	];
+}
+
+
+function getStoredHeaderWidgetPreferences(PDO $pdo, $userId) {
+	ensureUserWidgetPreferencesSchema($pdo);
+	$tableName = 'user_widget_preferences';
+	$stmt = $pdo->prepare(
+		'SELECT widgets_json
+		 FROM ' . $tableName . '
+		 WHERE user_id = :user_id'
+	);
+	$stmt->execute([':user_id' => (int)$userId]);
+	$row = $stmt->fetch();
+	$defaults = [
+		'total_entries' => true,
+		'total_edits' => true,
+		'adds_today' => true,
+		'deletes_today' => true,
+		'local_time' => true,
+		'login_updates' => true,
+	];
+	$decoded = json_decode((string)($row['widgets_json'] ?? ''), true);
+	if (!is_array($decoded)) {
+		return $defaults;
+	}
+
+	$normalized = $defaults;
+	foreach ($defaults as $key => $defaultValue) {
+		if (array_key_exists($key, $decoded)) {
+			$normalized[$key] = !empty($decoded[$key]);
+		}
+	}
+
+	return $normalized;
 }
 
 function getPermissionEditorVisibleResources(PDO $pdo, $userId) {

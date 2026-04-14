@@ -12,8 +12,8 @@ requirePagePermission('widgets', 'customize');
 		<section class="content-section active" id="ui-customization-container">
 			<h2>UI Customization</h2>
 			<div class="account-card ui-customization-card">
-				<h3>Header Metrics Visibility</h3>
-				<p>Select which metric widgets are shown in the top-right header. Preferences are saved to your account and sync across devices.</p>
+				<h3>Widget Visibility</h3>
+				<p>Select which widgets and login update notifications are enabled for your account.</p>
 
 				<div id="ui-customization-status" hidden aria-live="polite"></div>
 
@@ -42,6 +42,11 @@ requirePagePermission('widgets', 'customize');
 						<label class="widget-option-item" for="widget-local-time">
 							<input type="checkbox" id="widget-local-time" name="local_time" checked>
 							<span class="widget-option-label">Local Time</span>
+						</label>
+
+						<label class="widget-option-item" for="widget-login-updates">
+							<input type="checkbox" id="widget-login-updates" name="login_updates" checked>
+							<span class="widget-option-label">Login Update Notifications</span>
 						</label>
 					</div>
 
