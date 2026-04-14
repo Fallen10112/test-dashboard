@@ -69,6 +69,35 @@ function getAuthUser(): ?array {
 	}
 }
 
+function getApiAuthUserDisplayName(): string {
+	startAuthSession();
+	$authUser = $GLOBALS['auth_user'] ?? null;
+	if (!is_array($authUser)) {
+		$authUser = getAuthUser();
+	}
+
+	if (!is_array($authUser)) {
+		return 'User';
+	}
+
+	$displayName = trim((string)($authUser['display_name'] ?? ''));
+	if ($displayName !== '') {
+		return $displayName;
+	}
+
+	$username = trim((string)($authUser['username'] ?? ''));
+	if ($username !== '') {
+		return $username;
+	}
+
+	$email = trim((string)($authUser['email'] ?? ''));
+	if ($email !== '') {
+		return $email;
+	}
+
+	return 'User';
+}
+
 function requireAuth(): void {
 	startAuthSession();
 	$user = getAuthUser();

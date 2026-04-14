@@ -720,3 +720,185 @@ function setupAdminNotificationsManagementHandlers() {
 
 	setEmptyState('Look up a user to view sent and received notifications.');
 }
+
+
+function setupAdminApplicationManagementHandlers() {
+	var panel = document.getElementById('admin-tab-panel-application-management');
+	var currentApiKeyInput = document.getElementById('admin-app-api-key-current');
+	var apiKeyToggleButton = document.getElementById('admin-app-api-key-toggle');
+	var newApiKeyInput = document.getElementById('admin-app-api-key-new');
+	var apiKeySaveButton = document.getElementById('admin-app-api-key-save');
+	var apiKeyResultElement = document.getElementById('admin-app-api-key-result');
+	var timezoneSelect = document.getElementById('admin-app-timezone');
+	var modeSelect = document.getElementById('admin-app-mode');
+	var resetSelect = document.getElementById('admin-app-reset-on-index-visit');
+	var settingsSaveButton = document.getElementById('admin-app-settings-save');
+	var settingsResultElement = document.getElementById('admin-app-settings-result');
+	var appSettingsData = window.ADMIN_APP_SETTINGS || {};
+	var currentSettings = appSettingsData.settings && typeof appSettingsData.settings === 'object'
+		? appSettingsData.settings
+		: {};
+	var apiKeyVisible = false;
+
+	if (!panel || !currentApiKeyInput || !apiKeyToggleButton || !newApiKeyInput || !apiKeySaveButton || !apiKeyResultElement || !timezoneSelect || !modeSelect || !resetSelect || !settingsSaveButton || !settingsResultElement) {
+		return;
+	}
+
+	function apiPost(action, payload) {
+		var requestPayload = Object.assign({ action: action }, payload || {});
+		return fetch('../api.php', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify(requestPayload)
+		}).then(function(response) {
+			return response.json();
+		});
+	}
+
+	function setInlineResult(element, message, isError) {
+		if (!message) {
+			element.textContent = '';
+			element.setAttribute('hidden', 'hidden');
+			element.classList.remove('is-error', 'is-success');
+			return;
+		}
+
+		element.textContent = String(message);
+		element.classList.remove('is-error', 'is-success');
+		element.classList.add(isError ? 'is-error' : 'is-success');
+		element.removeAttribute('hidden');
+	}
+
+	function setApiKeyVisibility(isVisible) {
+		apiKeyVisible = !!isVisible;
+		currentApiKeyInput.type = apiKeyVisible ? 'text' : 'password';
+		apiKeyToggleButton.setAttribute('aria-pressed', apiKeyVisible ? 'true' : 'false');
+		apiKeyToggleButton.setAttribute('aria-label', apiKeyVisible ? 'Hide API key' : 'Show API key');
+		apiKeyToggleButton.setAttribute('title', apiKeyVisible ? 'Hide API key' : 'Show API key');
+		apiKeyToggleButton.classList.toggle('is-visible', apiKeyVisible);
+	}
+
+	function setCurrentValues(values) {
+		if (!values || typeof values !== 'object') {
+			return;
+		}
+
+		if (Object.prototype.hasOwnProperty.call(values, 'app_api_key')) {
+			currentApiKeyInput.value = String(values.app_api_key || '');
+		} else if (Object.prototype.hasOwnProperty.call(values, 'api_key')) {
+			currentApiKeyInput.value = String(values.api_key || '');
+		}
+		if (Object.prototype.hasOwnProperty.call(values, 'app_timezone')) {
+			timezoneSelect.value = String(values.app_timezone || timezoneSelect.value);
+		}
+		if (Object.prototype.hasOwnProperty.call(values, 'app_mode')) {
+			modeSelect.value = String(values.app_mode || modeSelect.value);
+		}
+		if (Object.prototype.hasOwnProperty.call(values, 'reset_on_index_visit')) {
+			resetSelect.value = values.reset_on_index_visit ? 'true' : 'false';
+		}
+	}
+
+	function getBoolFromSelect(selectElement) {
+		return String(selectElement.value || '').toLowerCase() === 'true';
+	}
+
+	setCurrentValues(currentSettings);
+	setApiKeyVisibility(false);
+	setInlineResult(apiKeyResultElement, '', false);
+	setInlineResult(settingsResultElement, '', false);
+
+	apiKeyToggleButton.addEventListener('click', function() {
+		setApiKeyVisibility(!apiKeyVisible);
+	});
+
+	newApiKeyInput.addEventListener('input', function() {
+		setInlineResult(apiKeyResultElement, '', false);
+	});
+
+	timezoneSelect.addEventListener('change', function() {
+		setInlineResult(settingsResultElement, '', false);
+	});
+
+	modeSelect.addEventListener('change', function() {
+		setInlineResult(settingsResultElement, '', false);
+	});
+
+	resetSelect.addEventListener('change', function() {
+		setInlineResult(settingsResultElement, '', false);
+	});
+
+	apiKeySaveButton.addEventListener('click', function() {
+		var newApiKey = String(newApiKeyInput.value || '').trim();
+		if (newApiKey === '') {
+			setInlineResult(apiKeyResultElement, 'Enter a new API key first.', true);
+			return;
+		}
+
+		apiKeySaveButton.disabled = true;
+		setInlineResult(apiKeyResultElement, 'Updating API key...', false);
+
+		apiPost('admin_application_settings_update_key', {
+			app_api_key: newApiKey
+		}).then(function(response) {
+			if (!response || !response.success) {
+				setInlineResult(apiKeyResultElement, (response && response.message) ? response.message : 'Failed to update API key.', true);
+				return;
+			}
+
+			if (response.settings && typeof response.settings === 'object') {
+				currentSettings = response.settings;
+				if (window.ADMIN_APP_SETTINGS) {
+					window.ADMIN_APP_SETTINGS.settings = currentSettings;
+				}
+				setCurrentValues(currentSettings);
+			}
+			newApiKeyInput.value = '';
+			setInlineResult(apiKeyResultElement, response.message || 'API key updated successfully.', false);
+		}).catch(function() {
+			setInlineResult(apiKeyResultElement, 'Failed to update API key.', true);
+		}).finally(function() {
+			apiKeySaveButton.disabled = false;
+		});
+	});
+
+	settingsSaveButton.addEventListener('click', function() {
+		var timezoneValue = String(timezoneSelect.value || '').trim();
+		var modeValue = String(modeSelect.value || '').trim();
+		var resetValue = getBoolFromSelect(resetSelect);
+
+		if (timezoneValue === '' || modeValue === '') {
+			setInlineResult(settingsResultElement, 'Choose a timezone and app mode first.', true);
+			return;
+		}
+
+		settingsSaveButton.disabled = true;
+		setInlineResult(settingsResultElement, 'Updating application settings...', false);
+
+		apiPost('admin_application_settings_update', {
+			app_timezone: timezoneValue,
+			app_mode: modeValue,
+			reset_on_index_visit: resetValue
+		}).then(function(response) {
+			if (!response || !response.success) {
+				setInlineResult(settingsResultElement, (response && response.message) ? response.message : 'Failed to update application settings.', true);
+				return;
+			}
+
+			if (response.settings && typeof response.settings === 'object') {
+				currentSettings = response.settings;
+				if (window.ADMIN_APP_SETTINGS) {
+					window.ADMIN_APP_SETTINGS.settings = currentSettings;
+				}
+				setCurrentValues(currentSettings);
+			}
+			setInlineResult(settingsResultElement, response.message || 'Application settings updated successfully.', false);
+		}).catch(function() {
+			setInlineResult(settingsResultElement, 'Failed to update application settings.', true);
+		}).finally(function() {
+			settingsSaveButton.disabled = false;
+		});
+	});
+}

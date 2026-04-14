@@ -31,6 +31,7 @@ Recommended defaults:
 - activity_log: Readable operational events table.
 - notifications: Per-user notification inbox with read state.
 - user_widget_preferences: Per-user header widget visibility preferences.
+- app_settings: App-wide runtime configuration and API key storage.
 - user_sessions: Login session tracking.
 - password_reset_tokens: Password reset flow support.
 
@@ -312,6 +313,22 @@ Recommended indexes:
 
 - UNIQUE INDEX uniq_widget_pref_user (user_id)
 - INDEX idx_widget_pref_user (user_id)
+
+---
+
+## 15) app_settings
+
+Purpose:
+
+Stores dashboard-wide runtime settings that are loaded during bootstrap and maintained from the Admin page.
+
+Columns:
+
+- id (BIGINT UNSIGNED, PK, AUTO_INCREMENT): Setting row ID.
+- setting_key (VARCHAR(100), NOT NULL, UNIQUE): Stable setting name such as `api_key`, `app_timezone`, `app_mode`, or `reset_on_index_visit`.
+- setting_value (LONGTEXT, NOT NULL): Stored setting value.
+- created_at (DATETIME, NOT NULL): Row creation time.
+- updated_at (DATETIME, NOT NULL): Last update timestamp.
 
 ---
 

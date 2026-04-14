@@ -201,6 +201,36 @@ function loadHeaderWidgetPreferences() {
 }
 
 
+function loadHeaderMetrics() {
+	if (document.querySelector('.header-metrics') === null) {
+		return $.Deferred().resolve().promise();
+	}
+
+	return $.ajax({
+		url: '../api.php?action=header_metrics',
+		type: 'GET',
+		dataType: 'json'
+	}).done(function(response) {
+		if (!response || response.success !== true) {
+			return;
+		}
+
+		setMetricValue('#metric-total-entries', Number(response.total_entries || 0));
+		setMetricValue('#metric-total-edits', Number(response.total_edits || 0));
+		setMetricValue('#metric-adds-today', Number(response.adds_today || 0));
+		setMetricValue('#metric-deletes-today', Number(response.deletes_today || 0));
+	}).fail(function(xhr) {
+		handleSessionAuthFailure(xhr);
+	}).always(function() {
+		const container = document.querySelector('.header-metrics');
+		if (container) {
+			container.style.visibility = 'visible';
+			container.classList.remove('header-metrics--loading');
+		}
+	});
+}
+
+
 window.DashboardHeaderWidgets = {
 	getDefaults: getDefaultHeaderWidgetPreferences,
 	normalize: normalizeHeaderWidgetPreferences,

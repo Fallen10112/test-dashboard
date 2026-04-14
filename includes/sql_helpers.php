@@ -31,6 +31,111 @@ function getDashboardSqlTimestamp() {
 	return (new DateTimeImmutable('now', new DateTimeZone(date_default_timezone_get())))->format('Y-m-d H:i:s');
 }
 
+function ensureAppSettingsSchema(PDO $pdo) {
+	$pdo->exec(
+		'CREATE TABLE IF NOT EXISTS app_settings (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			setting_key VARCHAR(100) NOT NULL,
+			setting_value LONGTEXT NOT NULL,
+			created_at DATETIME NULL DEFAULT NULL,
+			updated_at DATETIME NULL DEFAULT NULL,
+			PRIMARY KEY (id),
+			UNIQUE KEY uniq_app_setting_key (setting_key)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+	);
+
+	if (!doesTableColumnExist($pdo, 'app_settings', 'setting_key')) {
+		$pdo->exec('ALTER TABLE app_settings ADD COLUMN setting_key VARCHAR(100) NOT NULL AFTER id');
+	}
+	if (!doesTableColumnExist($pdo, 'app_settings', 'setting_value')) {
+		$pdo->exec('ALTER TABLE app_settings ADD COLUMN setting_value LONGTEXT NOT NULL AFTER setting_key');
+	}
+	if (!doesTableColumnExist($pdo, 'app_settings', 'created_at')) {
+		$pdo->exec('ALTER TABLE app_settings ADD COLUMN created_at DATETIME NULL DEFAULT NULL AFTER setting_value');
+	}
+	if (!doesTableColumnExist($pdo, 'app_settings', 'updated_at')) {
+		$pdo->exec('ALTER TABLE app_settings ADD COLUMN updated_at DATETIME NULL DEFAULT NULL AFTER created_at');
+	}
+	if (!doesTableIndexExist($pdo, 'app_settings', 'uniq_app_setting_key')) {
+		$pdo->exec('ALTER TABLE app_settings ADD UNIQUE INDEX uniq_app_setting_key (setting_key)');
+	}
+}
+
+function getAppSettingsTableName() {
+	return 'app_settings';
+}
+
+function getStoredAppSettings(PDO $pdo) {
+	ensureAppSettingsSchema($pdo);
+	$tableName = getAppSettingsTableName();
+	$stmt = $pdo->query('SELECT setting_key, setting_value FROM ' . $tableName . ' ORDER BY setting_key ASC');
+	$settings = [];
+	foreach ($stmt->fetchAll() as $row) {
+		$key = trim((string)($row['setting_key'] ?? ''));
+		if ($key === '') {
+			continue;
+		}
+		$settings[$key] = (string)($row['setting_value'] ?? '');
+	}
+	return $settings;
+}
+
+function getAppSettingValue(PDO $pdo, $settingKey, $default = '') {
+	$key = trim((string)$settingKey);
+	if ($key === '') {
+		return $default;
+	}
+
+	$settings = getStoredAppSettings($pdo);
+	return array_key_exists($key, $settings) ? $settings[$key] : $default;
+}
+
+function upsertAppSetting(PDO $pdo, $settingKey, $settingValue) {
+	$key = trim((string)$settingKey);
+	if ($key === '') {
+		return false;
+	}
+
+	ensureAppSettingsSchema($pdo);
+	$tableName = getAppSettingsTableName();
+	$timestamp = getDashboardSqlTimestamp();
+	$stmt = $pdo->prepare(
+		'INSERT INTO ' . $tableName . ' (setting_key, setting_value, created_at, updated_at)
+		 VALUES (:setting_key, :setting_value, :created_at, :updated_at)
+		 ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value), updated_at = VALUES(updated_at)'
+	);
+	return $stmt->execute([
+		':setting_key' => $key,
+		':setting_value' => (string)$settingValue,
+		':created_at' => $timestamp,
+		':updated_at' => $timestamp,
+	]);
+}
+
+function getApplicationManagementSettingsPayload(PDO $pdo) {
+	ensureAppSettingsSchema($pdo);
+	$currentApiKey = trim((string)getAppSettingValue($pdo, 'api_key', ''));
+	if ($currentApiKey === '') {
+		$currentApiKey = trim((string)getAppSettingValue($pdo, 'app_api_key', ''));
+	}
+	if ($currentApiKey === '') {
+		$currentApiKey = 'ak_' . bin2hex(random_bytes(32));
+		upsertAppSetting($pdo, 'api_key', $currentApiKey);
+		upsertAppSetting($pdo, 'app_api_key', $currentApiKey);
+	}
+
+	return [
+		'success' => true,
+		'settings' => [
+			'api_key' => $currentApiKey,
+			'app_api_key' => $currentApiKey,
+			'app_timezone' => (string)getAppSettingValue($pdo, 'app_timezone', APP_TIMEZONE),
+			'app_mode' => strtolower((string)getAppSettingValue($pdo, 'app_mode', APP_MODE)),
+			'reset_on_index_visit' => envToBool(getAppSettingValue($pdo, 'reset_on_index_visit', RESET_ON_INDEX_VISIT ? 'true' : 'false')),
+		],
+	];
+}
+
 function normalizeDevToolsUserLookupQuery($value) {
 	return trim((string)$value);
 }

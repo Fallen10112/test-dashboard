@@ -52,6 +52,32 @@ body.dark-mode .admin-tab-panel {
 body.dark-mode .admin-tab-panel h4 {
     color: #e5e7eb;
 }
+body.dark-mode .admin-app-summary {
+    background: linear-gradient(180deg, #20283a 0%, #1a2130 100%);
+    border-color: #3e4b66;
+}
+body.dark-mode .admin-app-summary h5 {
+    color: #f3f4f6;
+}
+body.dark-mode .admin-app-summary code {
+    background: rgba(127, 147, 255, 0.12);
+    color: #f3f4f6;
+}
+body.dark-mode .admin-api-key-toggle {
+    background: #242c3a;
+    border-color: #3e4b66;
+    color: #dbe4f3;
+}
+body.dark-mode .admin-api-key-toggle:hover {
+    background: #2c3850;
+    border-color: #5a6f98;
+}
+body.dark-mode .admin-api-key-toggle.is-visible {
+    color: #f5f7ff;
+}
+body.dark-mode .admin-app-note {
+    color: #c5d0e3;
+}
 body.dark-mode .admin-tab-panel ul li {
     color: #d1d5db;
 }

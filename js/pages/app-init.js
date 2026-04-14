@@ -71,6 +71,9 @@ $(document).ready(function() {
 	if ($('#admin-container').length > 0 && typeof setupAdminPermissionManagementHandlers === 'function') {
 		setupAdminPermissionManagementHandlers();
 	}
+	if ($('#admin-container').length > 0 && typeof setupAdminApplicationManagementHandlers === 'function') {
+		setupAdminApplicationManagementHandlers();
+	}
 
 	const scrollTopBtn = $('#scroll-to-top');
 	const scrollThreshold = 300;

@@ -702,6 +702,7 @@ function getDataPayload(PDO $pdo) {
 }
 
 
+
 $method = $_SERVER['REQUEST_METHOD'];
 
 if ($method === 'OPTIONS') {
@@ -716,6 +717,7 @@ try {
 	ensureActivityLogSchema($pdo);
 	ensureAuditLogSchema($pdo);
 	ensureUserWidgetPreferencesSchema($pdo);
+	ensureAppSettingsSchema($pdo);
 	ensurePermissionsSchema($pdo);
 } catch (Throwable $e) {
 	respondJson(500, ['success' => false, 'message' => 'Database connection failed']);
@@ -879,6 +881,79 @@ if ($method === 'POST') {
 		}
 
 		respondJson(200, $payload);
+	}
+
+	if ($postAction === 'admin_application_settings_update_key') {
+		requireApiPermission('admin', 'admin_application_management');
+		$actorUserId = getApiAuthUserId();
+		enforceApiRateLimit('admin_application_settings_update_key_' . $actorUserId, 20, 60);
+		$newApiKey = trim((string)($data['app_api_key'] ?? ''));
+		if ($newApiKey === '') {
+			respondJson(400, ['success' => false, 'message' => 'A new API key is required']);
+		}
+		if (getNormalizedStringLength($newApiKey) > 512) {
+			respondJson(400, ['success' => false, 'message' => 'The API key is too long']);
+		}
+
+		if (!upsertAppSetting($pdo, 'app_api_key', $newApiKey)) {
+			respondJson(500, ['success' => false, 'message' => 'Failed to update API key']);
+		}
+		upsertAppSetting($pdo, 'api_key', $newApiKey);
+
+		try {
+			writeAuditEvent($pdo, [
+				'record_type' => 'app_settings',
+				'record_id' => null,
+				'action' => 'update',
+				'details' => 'Updated application API key',
+				'source_user_id' => $actorUserId,
+			]);
+		} catch (Throwable $e) {
+		}
+
+		respondJson(200, array_merge(['message' => 'API key updated successfully'], getApplicationManagementSettingsPayload($pdo)));
+	}
+
+	if ($postAction === 'admin_application_settings_update') {
+		requireApiPermission('admin', 'admin_application_management');
+		$actorUserId = getApiAuthUserId();
+		enforceApiRateLimit('admin_application_settings_update_' . $actorUserId, 20, 60);
+		$validTimezones = array_flip(DateTimeZone::listIdentifiers());
+		$newTimezone = trim((string)($data['app_timezone'] ?? ''));
+		$newMode = strtolower(trim((string)($data['app_mode'] ?? '')));
+		$rawReset = $data['reset_on_index_visit'] ?? false;
+		$resetOnIndexVisit = filter_var($rawReset, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+		if ($newTimezone === '' || !isset($validTimezones[$newTimezone])) {
+			respondJson(400, ['success' => false, 'message' => 'Please select a valid timezone']);
+		}
+		if (!in_array($newMode, ['demo', 'production'], true)) {
+			respondJson(400, ['success' => false, 'message' => 'Please select a valid app mode']);
+		}
+		if ($resetOnIndexVisit === null) {
+			respondJson(400, ['success' => false, 'message' => 'Please select a valid reset option']);
+		}
+
+		$updateResults = [
+			upsertAppSetting($pdo, 'app_timezone', $newTimezone),
+			upsertAppSetting($pdo, 'app_mode', $newMode),
+			upsertAppSetting($pdo, 'reset_on_index_visit', $resetOnIndexVisit ? 'true' : 'false'),
+		];
+		if (in_array(false, $updateResults, true)) {
+			respondJson(500, ['success' => false, 'message' => 'Failed to update application settings']);
+		}
+
+		try {
+			writeAuditEvent($pdo, [
+				'record_type' => 'app_settings',
+				'record_id' => null,
+				'action' => 'update',
+				'details' => 'Updated app timezone to ' . $newTimezone . '; app mode to ' . $newMode . '; reset on index visit to ' . ($resetOnIndexVisit ? 'true' : 'false'),
+				'source_user_id' => $actorUserId,
+			]);
+		} catch (Throwable $e) {
+		}
+
+		respondJson(200, array_merge(['message' => 'Application settings updated successfully'], getApplicationManagementSettingsPayload($pdo)));
 	}
 
 	if ($postAction === 'admin_role_list') {

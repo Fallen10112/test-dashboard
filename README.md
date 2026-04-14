@@ -12,6 +12,7 @@ The app includes:
 - In-app notifications
 - Dev tools for resets and user operations
 - Per-user header widget preferences
+- App-wide settings management from the Admin page (`app_settings`)
 
 ## Project Structure
 
@@ -207,6 +208,7 @@ POST actions (`Content-Type: application/json`):
 - Dev tools/system: `reset_activity_log`, `reset_audit_log`, `reset_records`, `reset_data_tables`, `reset_users`, `reset_widget_prefs`, `reset_notifications_table`, `reset_data`, `logout_all_users`, `add_sample_data`
 - Dev tools/users: `admin_user_lookup`, `admin_user_create`, `admin_user_update`, `admin_user_force_delete`, `admin_user_reset_widget_prefs`
 - Dev tools/roles: `admin_role_list`, `admin_role_lookup`, `admin_role_permissions`, `admin_role_permissions_update`, `admin_role_create`, `admin_role_update`, `admin_role_delete`
+- Admin/app settings: `admin_application_settings_update_key`, `admin_application_settings_update`
 
 ## Setup
 

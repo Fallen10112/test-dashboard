@@ -45,6 +45,20 @@ requirePagePermission('admin', 'read');
 		'update' => false,
 		'delete' => false,
 	];
+	$adminAppSettingsPayload = [
+		'success' => true,
+		'settings' => [
+			'app_api_key' => '',
+			'app_timezone' => defined('APP_TIMEZONE') ? APP_TIMEZONE : 'UTC',
+			'app_mode' => defined('APP_MODE') ? APP_MODE : 'demo',
+			'reset_on_index_visit' => defined('RESET_ON_INDEX_VISIT') ? RESET_ON_INDEX_VISIT : false,
+		],
+	];
+	$adminTimezoneOptions = timezone_identifiers_list();
+	if (!in_array('UTC', $adminTimezoneOptions, true)) {
+		array_unshift($adminTimezoneOptions, 'UTC');
+	}
+	sort($adminTimezoneOptions);
 	$adminPdo = null;
 	try {
 		$adminPdo = getDashboardPdo();
@@ -125,6 +139,21 @@ requirePagePermission('admin', 'read');
 			'delete' => false,
 		];
 	}
+	try {
+		if ($adminPdo instanceof PDO) {
+			$adminAppSettingsPayload = getApplicationManagementSettingsPayload($adminPdo);
+		}
+	} catch (Throwable $e) {
+		$adminAppSettingsPayload = [
+			'success' => true,
+			'settings' => [
+				'app_api_key' => '',
+				'app_timezone' => defined('APP_TIMEZONE') ? APP_TIMEZONE : 'UTC',
+				'app_mode' => defined('APP_MODE') ? APP_MODE : 'demo',
+				'reset_on_index_visit' => defined('RESET_ON_INDEX_VISIT') ? RESET_ON_INDEX_VISIT : false,
+			],
+		];
+	}
 	$adminHasAnyTabAccess = false;
 	foreach ($adminTabPermissionFlags as $adminTabPermissionFlagValue) {
 		if ($adminTabPermissionFlagValue === true) {
@@ -150,6 +179,7 @@ requirePagePermission('admin', 'read');
 	$adminPermissionEditScopeJson = dashboardJsonEncodeOrFallback($adminPermissionEditScope, '{"mode":"none","label":"No editable roles","current_role_id":null,"max_role_id":0}');
 	$adminTabPermissionJson = dashboardJsonEncodeOrFallback($adminTabPermissionFlags, '{"user_management":false,"role_management":false,"database_management":false,"application_management":false,"notifications":false,"permissions":false}');
 	$adminRoleManagementJson = dashboardJsonEncodeOrFallback($adminRoleManagementFlags ?? ['create' => false, 'update' => false, 'delete' => false], '{"create":false,"update":false,"delete":false}');
+	$adminAppSettingsJson = dashboardJsonEncodeOrFallback($adminAppSettingsPayload, '{"success":true,"settings":{"app_api_key":"","app_timezone":"UTC","app_mode":"demo","reset_on_index_visit":false}}');
 ?>
 
 <script>
@@ -161,6 +191,7 @@ requirePagePermission('admin', 'read');
 	window.ADMIN_PERMISSION_EDIT_SCOPE = <?php echo $adminPermissionEditScopeJson; ?>;
 	window.ADMIN_PAGE_PERMISSIONS = <?php echo $adminTabPermissionJson; ?>;
 	window.ADMIN_ROLE_MANAGEMENT_FLAGS = <?php echo $adminRoleManagementJson; ?>;
+	window.ADMIN_APP_SETTINGS = <?php echo $adminAppSettingsJson; ?>;
 </script>
 
 	<main class="main-content">
@@ -540,11 +571,85 @@ requirePagePermission('admin', 'read');
 
 				<?php if ($adminTabPermissionFlags['application_management']): ?><div class="admin-tab-panel" id="admin-tab-panel-application-management" role="tabpanel" aria-labelledby="admin-tab-btn-application-management" hidden>
 					<h4>Application Management</h4>
-					<ul>
-						<li>Placeholder item G</li>
-						<li>Placeholder item H</li>
-						<li>Placeholder item I</li>
-					</ul>
+					<p>Update the dashboard-wide values stored in <strong>app_settings</strong>.</p>
+
+					<div class="admin-app-shell">
+						<div class="admin-app-summary">
+							<p class="permissions-editor-kicker">Application configuration</p>
+							<h5>Manage the secret API key and runtime defaults from one place.</h5>
+							<div class="form-group admin-app-current-key-group">
+								<label for="admin-app-api-key-current">Current API key</label>
+								<div class="admin-api-key-field">
+									<input type="password" id="admin-app-api-key-current" readonly value="<?php echo htmlspecialchars((string)($adminAppSettingsPayload['settings']['api_key'] ?? ($adminAppSettingsPayload['settings']['app_api_key'] ?? '')), ENT_QUOTES, 'UTF-8'); ?>">
+									<button type="button" class="admin-api-key-toggle" id="admin-app-api-key-toggle" aria-pressed="false" aria-label="Show API key" title="Show API key">
+										<svg class="admin-api-key-toggle-icon admin-api-key-toggle-icon--show" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5c5.5 0 9.9 4.1 11 7-1.1 2.9-5.5 7-11 7S2.1 14.9 1 12c1.1-2.9 5.5-7 11-7Zm0 2C8 7 4.6 9.7 3.5 12 4.6 14.3 8 17 12 17s7.4-2.7 8.5-5C19.4 9.7 16 7 12 7Zm0 1.8A3.2 3.2 0 1 1 12 15.2a3.2 3.2 0 0 1 0-6.4Zm0 2A1.2 1.2 0 1 0 12 13.2a1.2 1.2 0 0 0 0-2.4Z"/></svg>
+										<svg class="admin-api-key-toggle-icon admin-api-key-toggle-icon--hide" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 4L20 20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+									</button>
+								</div>
+							</div>
+							<p class="permissions-editor-copy">These values are read by <code>config.php</code> on every request, so changes take effect immediately for new page loads.</p>
+						</div>
+
+						<div class="admin-accordion">
+							<div class="admin-accordion-section admin-app-section">
+								<button type="button" class="admin-accordion-header" aria-expanded="false" aria-controls="admin-accordion-body-app-key">
+									<span>API Key</span>
+									<svg class="admin-accordion-chevron" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+								</button>
+								<div class="admin-accordion-body" id="admin-accordion-body-app-key" hidden>
+									<div class="account-form" autocomplete="off">
+										<div class="form-group">
+											<label for="admin-app-api-key-new">New API key</label>
+											<input type="text" id="admin-app-api-key-new" maxlength="512" placeholder="Paste a new API key to replace the current one">
+										</div>
+										<div class="form-actions">
+											<button id="admin-app-api-key-save" type="button" class="btn btn-primary">Update API Key</button>
+										</div>
+										<p class="admin-app-note">The current key is displayed as read-only. Use the eye icon to reveal or hide it, then enter a replacement key below if you need to rotate it.</p>
+										<p id="admin-app-api-key-result" class="admin-tools-inline-result" hidden></p>
+									</div>
+								</div>
+							</div>
+
+							<div class="admin-accordion-section admin-app-section">
+								<button type="button" class="admin-accordion-header" aria-expanded="false" aria-controls="admin-accordion-body-app-runtime">
+									<span>Runtime Defaults</span>
+									<svg class="admin-accordion-chevron" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+								</button>
+								<div class="admin-accordion-body" id="admin-accordion-body-app-runtime" hidden>
+									<div class="account-form" autocomplete="off">
+										<div class="form-group">
+											<label for="admin-app-timezone">app_timezone</label>
+											<select id="admin-app-timezone">
+												<?php foreach ($adminTimezoneOptions as $adminTimezoneOption): ?>
+													<option value="<?php echo htmlspecialchars($adminTimezoneOption, ENT_QUOTES, 'UTF-8'); ?>"<?php echo (($adminAppSettingsPayload['settings']['app_timezone'] ?? '') === $adminTimezoneOption) ? ' selected' : ''; ?>><?php echo htmlspecialchars($adminTimezoneOption, ENT_QUOTES, 'UTF-8'); ?></option>
+												<?php endforeach; ?>
+											</select>
+										</div>
+										<div class="form-group">
+											<label for="admin-app-mode">app_mode</label>
+											<select id="admin-app-mode">
+												<option value="demo"<?php echo (($adminAppSettingsPayload['settings']['app_mode'] ?? '') === 'demo') ? ' selected' : ''; ?>>Demo</option>
+												<option value="production"<?php echo (($adminAppSettingsPayload['settings']['app_mode'] ?? '') === 'production') ? ' selected' : ''; ?>>Production</option>
+											</select>
+										</div>
+										<div class="form-group">
+											<label for="admin-app-reset-on-index-visit">reset_on_index_visit</label>
+											<select id="admin-app-reset-on-index-visit">
+												<option value="true"<?php echo !empty($adminAppSettingsPayload['settings']['reset_on_index_visit']) ? ' selected' : ''; ?>>True</option>
+												<option value="false"<?php echo empty($adminAppSettingsPayload['settings']['reset_on_index_visit']) ? ' selected' : ''; ?>>False</option>
+											</select>
+										</div>
+										<div class="form-actions">
+											<button id="admin-app-settings-save" type="button" class="btn btn-primary">Save Application Settings</button>
+										</div>
+										<p class="admin-app-note">Timezone, mode, and reset behavior are stored together so the runtime defaults stay aligned with the dashboard configuration.</p>
+										<p id="admin-app-settings-result" class="admin-tools-inline-result" hidden></p>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
 				</div><?php endif; ?>
 
 				<?php if ($adminTabPermissionFlags['database_management']): ?><div class="admin-tab-panel" id="admin-tab-panel-database-management" role="tabpanel" aria-labelledby="admin-tab-btn-database-management" hidden>
