@@ -136,6 +136,197 @@ function getApplicationManagementSettingsPayload(PDO $pdo) {
 	];
 }
 
+function dashboardQuoteIdentifier($identifier) {
+	$name = trim((string)$identifier);
+	if ($name === '') {
+		return '``';
+	}
+
+	return '`' . str_replace('`', '``', $name) . '`';
+}
+
+function dashboardFormatBytes($bytes) {
+	$value = max(0, (float)$bytes);
+	$units = ['B', 'KB', 'MB', 'GB', 'TB'];
+	$unitIndex = 0;
+	while ($value >= 1024 && $unitIndex < count($units) - 1) {
+		$value /= 1024;
+		$unitIndex++;
+	}
+
+	$formattedValue = $unitIndex === 0 ? number_format($value, 0) : rtrim(rtrim(number_format($value, 2, '.', ''), '0'), '.');
+	return $formattedValue . ' ' . $units[$unitIndex];
+}
+
+function dashboardHumanizeTableName($tableName) {
+	$label = trim(str_replace(['_', '-'], ' ', (string)$tableName));
+	return $label === '' ? 'Table' : ucwords($label);
+}
+
+function getDatabaseManagementPayload(PDO $pdo) {
+	$databaseName = trim((string)$pdo->query('SELECT DATABASE()')->fetchColumn());
+	if ($databaseName === '') {
+		return [
+			'success' => false,
+			'message' => 'No database is currently selected.',
+			'database_name' => '',
+			'summary' => [
+				'table_count' => 0,
+				'total_rows' => 0,
+				'healthy_tables' => 0,
+				'needs_review_tables' => 0,
+				'empty_tables' => 0,
+				'data_size_bytes' => 0,
+				'index_size_bytes' => 0,
+			],
+			'tables' => [],
+		];
+	}
+
+	$tableStmt = $pdo->prepare(
+		'SELECT TABLE_NAME, ENGINE, TABLE_COLLATION, TABLE_ROWS, DATA_LENGTH, INDEX_LENGTH, DATA_FREE, AUTO_INCREMENT, CREATE_TIME, UPDATE_TIME, TABLE_COMMENT
+		 FROM information_schema.TABLES
+		 WHERE TABLE_SCHEMA = DATABASE()
+		   AND TABLE_TYPE = "BASE TABLE"
+		 ORDER BY TABLE_NAME ASC'
+	);
+	$tableStmt->execute();
+
+	$columnCountStmt = $pdo->prepare(
+		'SELECT COUNT(*)
+		 FROM information_schema.COLUMNS
+		 WHERE TABLE_SCHEMA = DATABASE()
+		   AND TABLE_NAME = :table_name'
+	);
+	$primaryKeyStmt = $pdo->prepare(
+		'SELECT COLUMN_NAME
+		 FROM information_schema.STATISTICS
+		 WHERE TABLE_SCHEMA = DATABASE()
+		   AND TABLE_NAME = :table_name
+		   AND INDEX_NAME = "PRIMARY"
+		 ORDER BY SEQ_IN_INDEX ASC'
+	);
+
+	$summary = [
+		'table_count' => 0,
+		'total_rows' => 0,
+		'healthy_tables' => 0,
+		'needs_review_tables' => 0,
+		'empty_tables' => 0,
+		'data_size_bytes' => 0,
+		'index_size_bytes' => 0,
+	];
+	$tables = [];
+
+	foreach ($tableStmt->fetchAll() as $row) {
+		$tableName = (string)($row['TABLE_NAME'] ?? '');
+		if ($tableName === '') {
+			continue;
+		}
+
+		$rowCount = 0;
+		$rowCountError = null;
+		try {
+			$countSql = 'SELECT COUNT(*) FROM ' . dashboardQuoteIdentifier($tableName);
+			$rowCount = (int)$pdo->query($countSql)->fetchColumn();
+		} catch (Throwable $e) {
+			$rowCountError = 'Unable to count rows';
+		}
+
+		$columnCountStmt->execute([':table_name' => $tableName]);
+		$columnCount = (int)$columnCountStmt->fetchColumn();
+
+		$primaryKeyStmt->execute([':table_name' => $tableName]);
+		$primaryKeyColumns = [];
+		foreach ($primaryKeyStmt->fetchAll() as $primaryKeyRow) {
+			$columnName = trim((string)($primaryKeyRow['COLUMN_NAME'] ?? ''));
+			if ($columnName !== '') {
+				$primaryKeyColumns[] = $columnName;
+			}
+		}
+
+		$engine = trim((string)($row['ENGINE'] ?? ''));
+		$collation = trim((string)($row['TABLE_COLLATION'] ?? ''));
+		$dataLength = (int)($row['DATA_LENGTH'] ?? 0);
+		$indexLength = (int)($row['INDEX_LENGTH'] ?? 0);
+		$dataFree = (int)($row['DATA_FREE'] ?? 0);
+		$autoIncrement = isset($row['AUTO_INCREMENT']) ? (int)$row['AUTO_INCREMENT'] : null;
+		$createTime = isset($row['CREATE_TIME']) && $row['CREATE_TIME'] !== null ? (string)$row['CREATE_TIME'] : null;
+		$updateTime = isset($row['UPDATE_TIME']) && $row['UPDATE_TIME'] !== null ? (string)$row['UPDATE_TIME'] : null;
+		$tableComment = trim((string)($row['TABLE_COMMENT'] ?? ''));
+		$estimatedRows = (int)($row['TABLE_ROWS'] ?? 0);
+
+		$healthKey = 'healthy';
+		$healthLabel = 'Healthy';
+		$healthDetail = 'InnoDB with a primary key';
+
+		if ($rowCountError !== null) {
+			$healthKey = 'error';
+			$healthLabel = 'Error';
+			$healthDetail = $rowCountError;
+		} elseif ($rowCount === 0) {
+			$healthKey = 'empty';
+			$healthLabel = 'Empty';
+			$healthDetail = 'No rows yet';
+		} elseif ($engine !== '' && strtolower($engine) !== 'innodb') {
+			$healthKey = 'warning';
+			$healthLabel = 'Review';
+			$healthDetail = 'Uses ' . $engine . ' instead of InnoDB';
+		} elseif (count($primaryKeyColumns) === 0) {
+			$healthKey = 'warning';
+			$healthLabel = 'Review';
+			$healthDetail = 'No primary key defined';
+		} elseif ($dataFree > 0) {
+			$healthKey = 'info';
+			$healthLabel = 'Healthy';
+			$healthDetail = 'Operational, with free space available';
+		}
+
+		$summary['table_count']++;
+		$summary['total_rows'] += $rowCount;
+		$summary['data_size_bytes'] += $dataLength;
+		$summary['index_size_bytes'] += $indexLength;
+		if ($healthKey === 'healthy' || $healthKey === 'info') {
+			$summary['healthy_tables']++;
+		} elseif ($healthKey === 'empty') {
+			$summary['empty_tables']++;
+		} else {
+			$summary['needs_review_tables']++;
+		}
+
+		$tables[] = [
+			'name' => $tableName,
+			'display_name' => dashboardHumanizeTableName($tableName),
+			'engine' => $engine,
+			'collation' => $collation,
+			'row_count' => $rowCount,
+			'estimated_row_count' => $estimatedRows,
+			'column_count' => $columnCount,
+			'primary_key_columns' => $primaryKeyColumns,
+			'data_length_bytes' => $dataLength,
+			'index_length_bytes' => $indexLength,
+			'total_size_bytes' => $dataLength + $indexLength,
+			'data_free_bytes' => $dataFree,
+			'auto_increment' => $autoIncrement,
+			'create_time' => $createTime,
+			'update_time' => $updateTime,
+			'table_comment' => $tableComment,
+			'health' => [
+				'key' => $healthKey,
+				'label' => $healthLabel,
+				'detail' => $healthDetail,
+			],
+		];
+	}
+
+	return [
+		'success' => true,
+		'database_name' => $databaseName,
+		'summary' => $summary,
+		'tables' => $tables,
+	];
+}
+
 function normalizeDevToolsUserLookupQuery($value) {
 	return trim((string)$value);
 }

@@ -2,6 +2,8 @@ function setupAdminPageHandlers() {
 	const tabs = Array.prototype.slice.call(document.querySelectorAll('.admin-tab-btn[data-admin-tab]'));
 	const panels = Array.prototype.slice.call(document.querySelectorAll('.admin-tab-panel'));
 	const accordionHeaders = Array.prototype.slice.call(document.querySelectorAll('.admin-accordion-header'));
+	const databaseAccordionContainer = document.getElementById('admin-tab-panel-database-management');
+	const databaseToggleButtons = Array.prototype.slice.call(document.querySelectorAll('[data-admin-db-toggle-all]'));
 	const tabStorageKey = 'admin-page-active-tab';
 
 	if (tabs.length === 0 || panels.length === 0) {
@@ -47,6 +49,21 @@ function setupAdminPageHandlers() {
 		}
 	}
 
+	function setDatabaseAccordionState(isExpanded) {
+		if (!databaseAccordionContainer) {
+			return;
+		}
+		const databaseHeaders = Array.prototype.slice.call(databaseAccordionContainer.querySelectorAll('.admin-accordion-header'));
+		databaseHeaders.forEach(function(header) {
+			const bodyId = header.getAttribute('aria-controls');
+			const body = bodyId ? document.getElementById(bodyId) : null;
+			header.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+			if (body) {
+				body.hidden = !isExpanded;
+			}
+		});
+	}
+
 	tabs.forEach(function(tabBtn) {
 		tabBtn.addEventListener('click', function() {
 			activateTab(tabBtn.getAttribute('data-admin-tab'));
@@ -75,6 +92,13 @@ function setupAdminPageHandlers() {
 			if (body) {
 				body.hidden = expanded;
 			}
+		});
+	});
+
+	databaseToggleButtons.forEach(function(toggleButton) {
+		toggleButton.addEventListener('click', function() {
+			var action = String(toggleButton.getAttribute('data-admin-db-toggle-all') || '').trim();
+			setDatabaseAccordionState(action === 'open');
 		});
 	});
 }

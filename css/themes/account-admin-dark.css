@@ -81,6 +81,38 @@ body.dark-mode .admin-app-note {
 body.dark-mode .admin-tab-panel ul li {
     color: #d1d5db;
 }
+body.dark-mode .admin-db-toolbar {
+    background: linear-gradient(180deg, #20283a 0%, #1a2130 100%);
+    border-color: #3e4b66;
+}
+body.dark-mode .admin-db-toolbar-copy {
+    color: #d9e2f0;
+}
+body.dark-mode .admin-db-summary-card,
+body.dark-mode .admin-db-stat {
+    background: #1e2636;
+    border-color: #3e4b66;
+}
+body.dark-mode .admin-db-summary-card span,
+body.dark-mode .admin-db-summary-note,
+body.dark-mode .admin-db-table-header-copy span,
+body.dark-mode .admin-db-table-rowcount,
+body.dark-mode .admin-db-stat span,
+body.dark-mode .admin-db-table-note,
+body.dark-mode .admin-db-table-meta {
+    color: #aab7cc;
+}
+body.dark-mode .admin-db-summary-card strong,
+body.dark-mode .admin-db-stat strong,
+body.dark-mode .admin-db-table-header-copy strong {
+    color: #f3f4f6;
+}
+body.dark-mode .admin-db-table-rowcount {
+    color: #aab7cc;
+}
+body.dark-mode .admin-db-table-header-meta {
+    color: #f3f4f6;
+}
 body.dark-mode .admin-notifications-search-card {
     background: linear-gradient(180deg, #20283a 0%, #1a2130 100%);
     border-color: #3e4b66;
