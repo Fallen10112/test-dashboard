@@ -212,7 +212,7 @@ POST actions (`Content-Type: application/json`):
 
 ## Setup
 
-1. Place the project in your web root (for example XAMPP `htdocs`).
+1. Place the project in your web root.
 2. Configure DB credentials in `config/.env`.
 3. For a new deployment, open `pages/install.php` and complete the first-time installer. It will create the schema, seed permissions, create the first full-access account, and remove itself.
 4. If you are not on a fresh install, ensure required SQL schema/tables exist (see `SQL_SETUP.md`).
