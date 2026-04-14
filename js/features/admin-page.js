@@ -1,6 +1,7 @@
 function setupAdminPageHandlers() {
 	const tabs = Array.prototype.slice.call(document.querySelectorAll('.admin-tab-btn[data-admin-tab]'));
 	const panels = Array.prototype.slice.call(document.querySelectorAll('.admin-tab-panel'));
+	const accordionHeaders = Array.prototype.slice.call(document.querySelectorAll('.admin-accordion-header'));
 	const tabStorageKey = 'admin-page-active-tab';
 
 	if (tabs.length === 0 || panels.length === 0) {
@@ -30,6 +31,15 @@ function setupAdminPageHandlers() {
 			panel.hidden = !shouldShow;
 		});
 
+		accordionHeaders.forEach(function(header) {
+			const bodyId = header.getAttribute('aria-controls');
+			const body = bodyId ? document.getElementById(bodyId) : null;
+			header.setAttribute('aria-expanded', 'false');
+			if (body) {
+				body.hidden = true;
+			}
+		});
+
 		try {
 			localStorage.setItem(tabStorageKey, normalizedTabKey);
 		} catch (error) {
@@ -56,7 +66,6 @@ function setupAdminPageHandlers() {
 	}
 	activateTab(initialTab);
 
-	var accordionHeaders = Array.prototype.slice.call(document.querySelectorAll('.admin-accordion-header'));
 	accordionHeaders.forEach(function(header) {
 		header.addEventListener('click', function() {
 			var expanded = header.getAttribute('aria-expanded') === 'true';
