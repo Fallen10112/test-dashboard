@@ -483,11 +483,11 @@ requirePagePermission('admin', 'read');
 									<div class="form-actions permissions-editor-actions">
 										<button id="admin-permissions-save-btn" type="button" class="btn btn-primary">Save Permissions</button>
 									</div>
+									<p id="admin-permissions-result" class="admin-tools-inline-result" hidden></p>
 								</div>
 							</div>
 
 							<div id="admin-permissions-matrix" class="admin-permissions-matrix"></div>
-							<p id="admin-permissions-result" class="admin-tools-inline-result" hidden></p>
 						</div>
 				</div><?php endif; ?>
 
