@@ -358,7 +358,7 @@ try {
 				<p>Run local maintenance actions for targeted resets and disposable sample data.</p>
 							<?php if (defined('RESET_ON_INDEX_VISIT') && RESET_ON_INDEX_VISIT): ?>
 							<div class="dev-tools-warning dev-tools-warning--danger">
-								Reset_on_index_visit is currently TRUE - all data will be reset upon visiting the landing page.
+								Reset_on_index_visit is currently TRUE - all records/audit/log data will be reset upon visiting the landing page.
 							</div>
 							<?php elseif (defined('APP_MODE') && APP_MODE === 'demo' && defined('RESET_ON_INDEX_VISIT') && !RESET_ON_INDEX_VISIT): ?>
 							<div class="dev-tools-warning dev-tools-warning--success">
