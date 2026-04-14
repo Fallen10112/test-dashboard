@@ -1,5 +1,6 @@
 /* Pages layer entrypoint */
 @import url("./login.css");
+@import url("./install.css");
 @import url("./account-admin.css");
 @import url("./home.css");
 
