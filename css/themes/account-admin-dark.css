@@ -95,6 +95,15 @@ body.dark-mode .permissions-editor-summary {
     background: linear-gradient(180deg, #20283a 0%, #1a2130 100%);
     border-color: #3e4b66;
 }
+body.dark-mode .admin-permissions-summary-pin {
+    color: #9fb1ff;
+}
+body.dark-mode .admin-permissions-summary-pin:hover {
+    color: #f3f4f6;
+}
+body.dark-mode .permissions-editor-summary.permissions-editor-summary--sticky .admin-permissions-summary-pin {
+    color: #f3f4f6;
+}
 body.dark-mode .permissions-editor-summary-copy {
     color: #d9e2f0;
 }

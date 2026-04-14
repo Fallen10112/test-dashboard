@@ -84,6 +84,8 @@ function setupAdminPermissionManagementHandlers() {
 	var matrixContainer = document.getElementById('admin-permissions-matrix');
 	var saveButton = document.getElementById('admin-permissions-save-btn');
 	var resultElement = document.getElementById('admin-permissions-result');
+	var summaryCard = document.getElementById('admin-permissions-summary');
+	var pinButton = document.getElementById('admin-permissions-summary-pin');
 	var editorData = window.ADMIN_ROLE_PERMISSION_EDITOR || {};
 	var roles = Array.isArray(editorData.roles) ? editorData.roles.slice() : [];
 	var resources = Array.isArray(editorData.resources) ? editorData.resources.slice() : [];
@@ -146,10 +148,38 @@ function setupAdminPermissionManagementHandlers() {
 			keys: ['dev_tools']
 		}
 	];
+	var stickyStorageKey = 'admin-role-permissions-summary-sticky';
 
-	if (!roleSelect || !matrixContainer || !saveButton || !resultElement) {
+	if (!roleSelect || !matrixContainer || !saveButton || !resultElement || !summaryCard || !pinButton) {
 		return;
 	}
+
+	function isStickyEnabled() {
+		try {
+			return localStorage.getItem(stickyStorageKey) === 'true';
+		} catch (error) {
+			return false;
+		}
+	}
+
+	function setStickyState(isSticky) {
+		summaryCard.classList.toggle('permissions-editor-summary--sticky', isSticky);
+		summaryCard.setAttribute('data-sticky', isSticky ? 'true' : 'false');
+		pinButton.setAttribute('aria-pressed', isSticky ? 'true' : 'false');
+		pinButton.setAttribute('aria-label', isSticky ? 'Unpin Role Permissions card' : 'Pin Role Permissions card');
+		pinButton.setAttribute('title', isSticky ? 'Unpin Role Permissions card' : 'Pin Role Permissions card');
+	}
+
+	setStickyState(isStickyEnabled());
+	pinButton.addEventListener('click', function() {
+		var nextStickyState = !summaryCard.classList.contains('permissions-editor-summary--sticky');
+		try {
+			localStorage.setItem(stickyStorageKey, nextStickyState ? 'true' : 'false');
+		} catch (error) {
+			// Ignore storage failures.
+		}
+		setStickyState(nextStickyState);
+	});
 
 	if (roles.length === 0 || permissions.length === 0) {
 		matrixContainer.innerHTML = '<p>No permission metadata is available yet.</p>';

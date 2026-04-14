@@ -463,7 +463,12 @@ requirePagePermission('admin', 'read');
 						<p>Choose a role, then adjust access by section.</p>
 
 						<div class="permissions-editor-shell">
-							<div class="permissions-editor-summary">
+							<div class="permissions-editor-summary" id="admin-permissions-summary" data-sticky="false">
+								<button type="button" class="admin-permissions-summary-pin" id="admin-permissions-summary-pin" aria-pressed="false" aria-label="Pin Role Permissions card" title="Pin Role Permissions card">
+									<svg class="admin-permissions-summary-pin-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+										<path d="M14.7 2.5l6.8 6.8-1.8 1.8-2-2-3.1 3.1 2.8 2.8-1.2 1.2-4.7-4.7-4.2 4.2-1.7-1.7 4.2-4.2-4.7-4.7 1.2-1.2 2.8 2.8 3.1-3.1-2-2 1.8-1.8z"></path>
+									</svg>
+								</button>
 								<div class="permissions-editor-summary-copy">
 									<p class="permissions-editor-kicker">Role-based access</p>
 									<h5>Pick a role to review its grants</h5>
