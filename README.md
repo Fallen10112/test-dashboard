@@ -146,6 +146,7 @@ Application behavior settings are loaded from the `app_settings` table (not from
 ### Notifications
 
 - Header bell dropdown with unread badge
+- System-generated login update notifications with HTML-formatted summaries
 - Mark read, mark all read, delete, delete all
 - Realtime sync polling
 - Toast display for incoming notifications

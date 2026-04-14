@@ -185,7 +185,7 @@ function getNotificationsPayload(PDO $pdo, $userId, $limit = 25) {
 		'SELECT n.id, n.title, n.message, n.notification_type, n.is_read,
 		        DATE_FORMAT(n.created_at, "%Y-%m-%d") AS `date`, DATE_FORMAT(n.created_at, "%H:%i:%s") AS `time`,
 		        n.sent_by_user_id,
-		        COALESCE(NULLIF(u.display_name, ""), NULLIF(u.username, ""), u.email) AS sent_by_display_name
+		        COALESCE(NULLIF(u.display_name, ""), NULLIF(u.username, ""), u.email, "System") AS sent_by_display_name
 		 FROM notifications n
 		 LEFT JOIN users u ON u.id = n.sent_by_user_id
 		 WHERE n.user_id = :user_id
@@ -218,57 +218,6 @@ function getNotificationsPayload(PDO $pdo, $userId, $limit = 25) {
 		'items' => $items,
 	];
 }
-
-
-function createNotification(PDO $pdo, $userId, $title, $message, $type = 'info', $sentByUserId = null) {
-	ensureNotificationsTable($pdo);
-
-	$normalizedTitle = trim((string)$title);
-	$normalizedMessage = trim((string)$message);
-	$normalizedType = trim((string)$type);
-
-	if ($normalizedTitle === '' && $normalizedMessage === '') {
-		return ['success' => false, 'message' => 'Notification title or message is required'];
-	}
-	if ($normalizedTitle === '') {
-		$normalizedTitle = 'Notification';
-	}
-	if ($normalizedType === '') {
-		$normalizedType = 'info';
-	}
-
-	if (mb_strlen($normalizedTitle, 'UTF-8') > 64) {
-		return ['success' => false, 'message' => 'Notification title must not exceed 64 characters'];
-	}
-
-	$normalizedSentByUserId = null;
-	if ($sentByUserId !== null && $sentByUserId !== '') {
-		$parsedSentBy = (int)$sentByUserId;
-		if ($parsedSentBy > 0) {
-			$normalizedSentByUserId = $parsedSentBy;
-		}
-	}
-
-	$stmt = $pdo->prepare(
-		'INSERT INTO notifications (user_id, sent_by_user_id, title, message, notification_type, is_read, created_at)
-		 VALUES (:user_id, :sent_by_user_id, :title, :message, :notification_type, 0, :created_at)'
-	);
-	$ok = $stmt->execute([
-		':user_id' => $userId,
-		':sent_by_user_id' => $normalizedSentByUserId,
-		':title' => substr($normalizedTitle, 0, 160),
-		':message' => substr($normalizedMessage, 0, 1000),
-		':notification_type' => substr($normalizedType, 0, 50),
-		':created_at' => getDashboardSqlTimestamp(),
-	]);
-
-	if (!$ok) {
-		return ['success' => false, 'message' => 'Failed to save notification'];
-	}
-
-	return ['success' => true, 'id' => (int)$pdo->lastInsertId()];
-}
-
 
 function getSupportedHeaderWidgetKeys() {
 	return ['total_entries', 'total_edits', 'adds_today', 'deletes_today', 'local_time'];

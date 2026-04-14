@@ -18,6 +18,28 @@ let knownNotificationIds = new Set();
 let localTimeWidgetTimerId = null;
 const SUPPORTED_HEADER_WIDGET_KEYS = ['total_entries', 'total_edits', 'adds_today', 'deletes_today', 'local_time'];
 
+function escapeHtml(value) {
+	return String(value == null ? '' : value)
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;')
+		.replace(/'/g, '&#39;');
+}
+
+function renderNotificationMessageHtml(value) {
+	return escapeHtml(value)
+		.replace(/&lt;\/?(strong|em|b|i|u|p|ul|ol|li)&gt;/gi, function(match, tagName) {
+			const normalizedTagName = String(tagName || '').toLowerCase();
+			return match.indexOf('&lt;/') === 0 ? '</' + normalizedTagName + '>' : '<' + normalizedTagName + '>';
+		})
+		.replace(/&lt;br\s*\/?&gt;/gi, '<br>');
+}
+
+window.DashboardHtmlUtils = window.DashboardHtmlUtils || {};
+window.DashboardHtmlUtils.escapeHtml = escapeHtml;
+window.DashboardHtmlUtils.renderNotificationMessageHtml = renderNotificationMessageHtml;
+
 
 function getDefaultHeaderWidgetPreferences() {
 	return {
@@ -70,7 +92,6 @@ function setupLocalTimeWidgetClock() {
 	updateLocalTimeWidgetValue();
 	localTimeWidgetTimerId = setInterval(updateLocalTimeWidgetValue, 1000);
 }
-
 
 function normalizeHeaderWidgetPreferences(rawPreferences) {
 	const defaults = getDefaultHeaderWidgetPreferences();
@@ -351,6 +372,7 @@ function showToast(options) {
 		type: 'info',
 		title: '',
 		message: '',
+		messageHtml: '',
 		autoCloseMs: 3000,
 		showOkayButton: false,
 		onClose: null,
@@ -369,6 +391,8 @@ function showToast(options) {
 	}
 	if (settings.message) {
 		$content.append($('<p class="custom-toast-message"></p>').text(settings.message));
+	} else if (settings.messageHtml) {
+		$content.append($('<p class="custom-toast-message"></p>').html(settings.messageHtml));
 	}
 	$toast.append($content);
 
@@ -583,7 +607,7 @@ function renderHeaderNotifications() {
 
 		const messageEl = document.createElement('div');
 		messageEl.className = 'notification-item-message';
-		messageEl.textContent = String(notification.message || '');
+		messageEl.innerHTML = renderNotificationMessageHtml(String(notification.message || ''));
 
 		const timeEl = document.createElement('div');
 		timeEl.className = 'notification-item-time';
@@ -665,7 +689,7 @@ function showNotificationDetailsToast(notification) {
 		$content.append($('<h4 class="custom-toast-title"></h4>').text(settings.title));
 	}
 	if (settings.message) {
-		$content.append($('<p class="custom-toast-message"></p>').text(settings.message));
+		$content.append($('<p class="custom-toast-message"></p>').html(renderNotificationMessageHtml(settings.message)));
 	}
 
 	const $meta = $('<div class="custom-toast-meta"></div>');
@@ -720,7 +744,7 @@ function showIncomingNotificationToast(notification) {
 	showToast({
 		type: 'info',
 		title: String(notification.title || 'New Notification'),
-		message: String(notification.message || ''),
+		messageHtml: renderNotificationMessageHtml(String(notification.message || '')),
 		autoCloseMs: 2600,
 		showOkayButton: false
 	});

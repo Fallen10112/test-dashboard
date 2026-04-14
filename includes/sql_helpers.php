@@ -2038,6 +2038,91 @@ function resetUserSessionsTable(PDO $pdo) {
 	$pdo->exec('TRUNCATE TABLE user_sessions');
 }
 
+
+function getLoginUpdateNotificationSummary(PDO $pdo, $sinceTimestamp, $untilTimestamp) {
+	ensureAuditLogSchema($pdo);
+
+	$safeSinceTimestamp = trim((string)$sinceTimestamp);
+	$safeUntilTimestamp = trim((string)$untilTimestamp);
+	if ($safeSinceTimestamp === '' || $safeUntilTimestamp === '') {
+		return [
+			'entries_added' => 0,
+			'lines_deleted' => 0,
+		];
+	}
+
+	$stmt = $pdo->prepare(
+		'SELECT
+			COUNT(DISTINCT CASE WHEN record_type = "record" AND action = "create" AND record_id IS NOT NULL THEN record_id END) AS entries_added,
+			COUNT(DISTINCT CASE WHEN record_type = "record" AND action = "delete" AND record_id IS NOT NULL THEN record_id END) AS lines_deleted
+		 FROM audit_log
+		 WHERE created_at > :since_at
+		   AND created_at <= :until_at
+		   AND record_type = "record"
+		   AND action IN ("create", "delete")'
+	);
+	$stmt->execute([
+		':since_at' => $safeSinceTimestamp,
+		':until_at' => $safeUntilTimestamp,
+	]);
+	$row = $stmt->fetch();
+
+	return [
+		'entries_added' => (int)($row['entries_added'] ?? 0),
+		'lines_deleted' => (int)($row['lines_deleted'] ?? 0),
+	];
+}
+
+
+function createNotification(PDO $pdo, $userId, $title, $message, $type = 'info', $sentByUserId = null) {
+	ensureNotificationsTable($pdo);
+
+	$normalizedTitle = trim((string)$title);
+	$normalizedMessage = trim((string)$message);
+	$normalizedType = trim((string)$type);
+
+	if ($normalizedTitle === '' && $normalizedMessage === '') {
+		return ['success' => false, 'message' => 'Notification title or message is required'];
+	}
+	if ($normalizedTitle === '') {
+		$normalizedTitle = 'Notification';
+	}
+	if ($normalizedType === '') {
+		$normalizedType = 'info';
+	}
+
+	if (mb_strlen($normalizedTitle, 'UTF-8') > 64) {
+		return ['success' => false, 'message' => 'Notification title must not exceed 64 characters'];
+	}
+
+	$normalizedSentByUserId = null;
+	if ($sentByUserId !== null && $sentByUserId !== '') {
+		$parsedSentBy = (int)$sentByUserId;
+		if ($parsedSentBy > 0) {
+			$normalizedSentByUserId = $parsedSentBy;
+		}
+	}
+
+	$stmt = $pdo->prepare(
+		'INSERT INTO notifications (user_id, sent_by_user_id, title, message, notification_type, is_read, created_at)
+		 VALUES (:user_id, :sent_by_user_id, :title, :message, :notification_type, 0, :created_at)'
+	);
+	$ok = $stmt->execute([
+		':user_id' => $userId,
+		':sent_by_user_id' => $normalizedSentByUserId,
+		':title' => substr($normalizedTitle, 0, 160),
+		':message' => substr($normalizedMessage, 0, 1000),
+		':notification_type' => substr($normalizedType, 0, 50),
+		':created_at' => getDashboardSqlTimestamp(),
+	]);
+
+	if (!$ok) {
+		return ['success' => false, 'message' => 'Failed to save notification'];
+	}
+
+	return ['success' => true, 'id' => (int)$pdo->lastInsertId()];
+}
+
 function resetNotificationsTable(PDO $pdo) {
 	if (!dashboardTableExists($pdo, 'notifications')) {
 		return true;

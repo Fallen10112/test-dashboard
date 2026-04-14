@@ -163,7 +163,7 @@ function loginUser(string $identifier, string $password): bool {
 	try {
 		$pdo = getDashboardPdo();
 		$stmt = $pdo->prepare(
-			'SELECT id, password_hash, display_name, status
+			'SELECT id, password_hash, display_name, status, created_at, last_login_at
 			   FROM users
 			  WHERE (email = :identifier OR username = :identifier2)
 			    AND deleted_at IS NULL
@@ -191,6 +191,34 @@ function loginUser(string $identifier, string $password): bool {
 			    ->execute([':h' => $newHash, ':id' => $user['id']]);
 		}
 
+		$loginAt = getDashboardSqlTimestamp();
+		$statsWindowStart = trim((string)($user['last_login_at'] ?? ''));
+		if ($statsWindowStart === '') {
+			$statsWindowStart = trim((string)($user['created_at'] ?? ''));
+		}
+		try {
+			if ($statsWindowStart !== '') {
+				$summary = getLoginUpdateNotificationSummary($pdo, $statsWindowStart, $loginAt);
+				$summaryParts = [
+					'<strong>Entries added:</strong> ' . number_format((int)($summary['entries_added'] ?? 0)),
+					'<strong>Lines deleted:</strong> ' . number_format((int)($summary['lines_deleted'] ?? 0)),
+				];
+				if (trim((string)($user['last_login_at'] ?? '')) === '') {
+					$summaryParts[] = '<strong>Window:</strong> since your account was created';
+				}
+
+				createNotification(
+					$pdo,
+					(int)$user['id'],
+					'Updates since your last log on...',
+					implode('<br>', $summaryParts),
+					'info',
+					null
+				);
+			}
+		} catch (Throwable $e) {
+		}
+
 		$token     = bin2hex(random_bytes(32));
 		$tokenHash = hash('sha256', $token);
 		$expiresAt = date('Y-m-d H:i:s', time() + AUTH_SESSION_LIFETIME);
@@ -215,15 +243,19 @@ function loginUser(string $identifier, string $password): bool {
 			':ua'     => $ua,
 		]);
 
-		$pdo->prepare('UPDATE users SET last_login_at = NOW(), updated_at = NOW() WHERE id = :id')
-		    ->execute([':id' => $user['id']]);
+		$pdo->prepare('UPDATE users SET last_login_at = :last_login_at, updated_at = :updated_at WHERE id = :id')
+		    ->execute([
+		    	':last_login_at' => $loginAt,
+		    	':updated_at' => $loginAt,
+		    	':id' => $user['id'],
+		    ]);
 
-			writeAuditEvent($pdo, [
+		writeAuditEvent($pdo, [
 			'record_type' => 'auth',
 			'record_id' => null,
 			'action' => 'login',
 			'details' => 'Signed out -> Signed in successfully',
-				'source_user_id' => (int)$user['id'],
+			'source_user_id' => (int)$user['id'],
 		]);
 
 		startAuthSession();

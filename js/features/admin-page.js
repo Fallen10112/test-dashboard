@@ -562,6 +562,22 @@ function setupAdminNotificationsManagementHandlers() {
 			return;
 		}
 
+		var renderNotificationMessageHtml = window.DashboardHtmlUtils && typeof window.DashboardHtmlUtils.renderNotificationMessageHtml === 'function'
+			? window.DashboardHtmlUtils.renderNotificationMessageHtml
+			: function(value) {
+				return String(value == null ? '' : value)
+					.replace(/&/g, '&amp;')
+					.replace(/</g, '&lt;')
+					.replace(/>/g, '&gt;')
+					.replace(/"/g, '&quot;')
+					.replace(/'/g, '&#39;')
+					.replace(/&lt;\/?(strong|em|b|i|u|p|ul|ol|li)&gt;/gi, function(match, tagName) {
+						var normalizedTagName = String(tagName || '').toLowerCase();
+						return match.indexOf('&lt;/') === 0 ? '</' + normalizedTagName + '>' : '<' + normalizedTagName + '>';
+					})
+					.replace(/&lt;br\s*\/?&gt;/gi, '<br>');
+			};
+
 		notifications.forEach(function(notification) {
 			var row = document.createElement('tr');
 
@@ -586,7 +602,7 @@ function setupAdminNotificationsManagementHandlers() {
 
 			var messageCell = document.createElement('td');
 			messageCell.className = 'notification-message-cell';
-			messageCell.textContent = String(notification.message || '');
+			messageCell.innerHTML = renderNotificationMessageHtml(String(notification.message || ''));
 
 			var readCell = document.createElement('td');
 			readCell.className = 'notification-read-cell';
