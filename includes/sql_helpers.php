@@ -344,14 +344,26 @@ function generateRandomPasswordPlaintext($length = 16) {
 	return $password;
 }
 
+function dashboardPdoCacheKey(PDO $pdo) {
+	return function_exists('spl_object_id') ? (string)spl_object_id($pdo) : spl_object_hash($pdo);
+}
+
 function dashboardTableExists(PDO $pdo, $tableName) {
+	static $cache = [];
+	$cacheKey = dashboardPdoCacheKey($pdo) . '|table|' . trim((string)$tableName);
+	if (array_key_exists($cacheKey, $cache)) {
+		return $cache[$cacheKey];
+	}
+
 	$table = trim((string)$tableName);
 	if ($table === '') {
+		$cache[$cacheKey] = false;
 		return false;
 	}
 	$stmt = $pdo->prepare('SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = :table_name LIMIT 1');
 	$stmt->execute([':table_name' => $table]);
-	return (bool)$stmt->fetchColumn();
+	$cache[$cacheKey] = (bool)$stmt->fetchColumn();
+	return $cache[$cacheKey];
 }
 
 function getRequestIpAddress() {
@@ -371,6 +383,12 @@ function getRequestUserAgent() {
 }
 
 function doesTableColumnExist(PDO $pdo, $tableName, $columnName) {
+	static $cache = [];
+	$cacheKey = dashboardPdoCacheKey($pdo) . '|column|' . trim((string)$tableName) . '|' . trim((string)$columnName);
+	if (array_key_exists($cacheKey, $cache)) {
+		return $cache[$cacheKey];
+	}
+
 	$stmt = $pdo->prepare(
 		'SELECT 1
 		 FROM information_schema.COLUMNS
@@ -383,10 +401,17 @@ function doesTableColumnExist(PDO $pdo, $tableName, $columnName) {
 		':table_name' => (string)$tableName,
 		':column_name' => (string)$columnName,
 	]);
-	return (bool)$stmt->fetchColumn();
+	$cache[$cacheKey] = (bool)$stmt->fetchColumn();
+	return $cache[$cacheKey];
 }
 
 function doesTableIndexExist(PDO $pdo, $tableName, $indexName) {
+	static $cache = [];
+	$cacheKey = dashboardPdoCacheKey($pdo) . '|index|' . trim((string)$tableName) . '|' . trim((string)$indexName);
+	if (array_key_exists($cacheKey, $cache)) {
+		return $cache[$cacheKey];
+	}
+
 	$stmt = $pdo->prepare(
 		'SELECT 1
 		 FROM information_schema.STATISTICS
@@ -399,7 +424,8 @@ function doesTableIndexExist(PDO $pdo, $tableName, $indexName) {
 		':table_name' => (string)$tableName,
 		':index_name' => (string)$indexName,
 	]);
-	return (bool)$stmt->fetchColumn();
+	$cache[$cacheKey] = (bool)$stmt->fetchColumn();
+	return $cache[$cacheKey];
 }
 
 function ensureActivityLogSchema(PDO $pdo) {
@@ -656,6 +682,12 @@ function getPermissionActionDefinitions() {
 }
 
 function ensurePermissionsSchema(PDO $pdo) {
+	static $ensured = [];
+	$cacheKey = dashboardPdoCacheKey($pdo);
+	if (isset($ensured[$cacheKey])) {
+		return;
+	}
+
 	$pdo->exec(
 		'CREATE TABLE IF NOT EXISTS resources (
 			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -768,8 +800,14 @@ function ensurePermissionsSchema(PDO $pdo) {
 }
 
 function getPermissionResourceByKey(PDO $pdo, $resourceKey) {
+	static $cache = [];
 	$key = trim((string)$resourceKey);
+	$cacheKey = dashboardPdoCacheKey($pdo) . '|resource|' . $key;
+	if (array_key_exists($cacheKey, $cache)) {
+		return $cache[$cacheKey];
+	}
 	if ($key === '' || !dashboardTableExists($pdo, 'resources')) {
+		$cache[$cacheKey] = null;
 		return null;
 	}
 
@@ -777,15 +815,23 @@ function getPermissionResourceByKey(PDO $pdo, $resourceKey) {
 	$stmt->execute([':resource_key' => $key]);
 	$row = $stmt->fetch();
 	if (!$row) {
+		$cache[$cacheKey] = null;
 		return null;
 	}
 
-	return ['id' => (int)($row['id'] ?? 0), 'key' => (string)($row['resource_key'] ?? ''), 'display_name' => (string)($row['display_name'] ?? ''), 'description' => (string)($row['description'] ?? '')];
+	$cache[$cacheKey] = ['id' => (int)($row['id'] ?? 0), 'key' => (string)($row['resource_key'] ?? ''), 'display_name' => (string)($row['display_name'] ?? ''), 'description' => (string)($row['description'] ?? '')];
+	return $cache[$cacheKey];
 }
 
 function getPermissionByKey(PDO $pdo, $permissionKey) {
+	static $cache = [];
 	$key = trim((string)$permissionKey);
+	$cacheKey = dashboardPdoCacheKey($pdo) . '|permission|' . $key;
+	if (array_key_exists($cacheKey, $cache)) {
+		return $cache[$cacheKey];
+	}
 	if ($key === '' || !dashboardTableExists($pdo, 'permissions')) {
+		$cache[$cacheKey] = null;
 		return null;
 	}
 
@@ -793,15 +839,23 @@ function getPermissionByKey(PDO $pdo, $permissionKey) {
 	$stmt->execute([':permission_key' => $key]);
 	$row = $stmt->fetch();
 	if (!$row) {
+		$cache[$cacheKey] = null;
 		return null;
 	}
 
-	return ['id' => (int)($row['id'] ?? 0), 'key' => (string)($row['permission_key'] ?? ''), 'display_name' => (string)($row['display_name'] ?? ''), 'description' => (string)($row['description'] ?? '')];
+	$cache[$cacheKey] = ['id' => (int)($row['id'] ?? 0), 'key' => (string)($row['permission_key'] ?? ''), 'display_name' => (string)($row['display_name'] ?? ''), 'description' => (string)($row['description'] ?? '')];
+	return $cache[$cacheKey];
 }
 
 function getUserRoleIds(PDO $pdo, $userId) {
+	static $cache = [];
 	$normalizedUserId = (int)$userId;
+	$cacheKey = dashboardPdoCacheKey($pdo) . '|user_roles|' . $normalizedUserId;
+	if (array_key_exists($cacheKey, $cache)) {
+		return $cache[$cacheKey];
+	}
 	if ($normalizedUserId < 1 || !dashboardTableExists($pdo, 'user_roles')) {
+		$cache[$cacheKey] = [];
 		return [];
 	}
 
@@ -825,18 +879,26 @@ function getUserRoleIds(PDO $pdo, $userId) {
 		}
 	}
 
-	return array_values(array_unique($roleIds));
+	$cache[$cacheKey] = array_values(array_unique($roleIds));
+	return $cache[$cacheKey];
 }
 
 function getUserPermissionOverride(PDO $pdo, $userId, $resourceKey, $permissionKey) {
+	static $cache = [];
 	$normalizedUserId = (int)$userId;
+	$cacheKey = dashboardPdoCacheKey($pdo) . '|user_override|' . $normalizedUserId . '|' . trim((string)$resourceKey) . '|' . trim((string)$permissionKey);
+	if (array_key_exists($cacheKey, $cache)) {
+		return $cache[$cacheKey];
+	}
 	if ($normalizedUserId < 1 || !dashboardTableExists($pdo, 'user_permissions')) {
+		$cache[$cacheKey] = null;
 		return null;
 	}
 
 	$resource = getPermissionResourceByKey($pdo, $resourceKey);
 	$permission = getPermissionByKey($pdo, $permissionKey);
 	if (!$resource || !$permission) {
+		$cache[$cacheKey] = null;
 		return null;
 	}
 
@@ -844,28 +906,38 @@ function getUserPermissionOverride(PDO $pdo, $userId, $resourceKey, $permissionK
 	$stmt->execute([':user_id' => $normalizedUserId, ':resource_id' => (int)$resource['id'], ':permission_id' => (int)$permission['id']]);
 	$row = $stmt->fetch();
 	if (!$row) {
+		$cache[$cacheKey] = null;
 		return null;
 	}
 
-	return ((int)($row['is_allowed'] ?? 0)) === 1;
+	$cache[$cacheKey] = ((int)($row['is_allowed'] ?? 0)) === 1;
+	return $cache[$cacheKey];
 }
 
 function getRolePermissionGrant(PDO $pdo, $roleId, $resourceKey, $permissionKey) {
+	static $cache = [];
 	$normalizedRoleId = (int)$roleId;
+	$cacheKey = dashboardPdoCacheKey($pdo) . '|role_grant|' . $normalizedRoleId . '|' . trim((string)$resourceKey) . '|' . trim((string)$permissionKey);
+	if (array_key_exists($cacheKey, $cache)) {
+		return $cache[$cacheKey];
+	}
 	if ($normalizedRoleId < 1 || !dashboardTableExists($pdo, 'role_permissions')) {
+		$cache[$cacheKey] = false;
 		return false;
 	}
 
 	$resource = getPermissionResourceByKey($pdo, $resourceKey);
 	$permission = getPermissionByKey($pdo, $permissionKey);
 	if (!$resource || !$permission) {
+		$cache[$cacheKey] = false;
 		return false;
 	}
 
 	$stmt = $pdo->prepare('SELECT 1 FROM role_permissions WHERE role_id = :role_id AND resource_id = :resource_id AND permission_id = :permission_id LIMIT 1');
 	$stmt->execute([':role_id' => $normalizedRoleId, ':resource_id' => (int)$resource['id'], ':permission_id' => (int)$permission['id']]);
 
-	return (bool)$stmt->fetchColumn();
+	$cache[$cacheKey] = (bool)$stmt->fetchColumn();
+	return $cache[$cacheKey];
 }
 
 function getRolePermissionsByRoleId(PDO $pdo, $roleId) {
@@ -1362,6 +1434,7 @@ function filterRolePermissionGrantsForUser(PDO $pdo, $userId, array $grants) {
 }
 
 function userHasPermission(PDO $pdo, $userId, $resourceKey, $permissionKey) {
+	static $cache = [];
 	$normalizedUserId = (int)$userId;
 	if ($normalizedUserId < 1) {
 		return false;
@@ -1373,19 +1446,28 @@ function userHasPermission(PDO $pdo, $userId, $resourceKey, $permissionKey) {
 		return false;
 	}
 
+	$cacheKey = dashboardPdoCacheKey($pdo) . '|' . $normalizedUserId . '|' . $resourceKey . '|' . $permissionKey;
+	if (array_key_exists($cacheKey, $cache)) {
+		return $cache[$cacheKey];
+	}
+
 	$override = getUserPermissionOverride($pdo, $normalizedUserId, $resourceKey, $permissionKey);
 	if ($override !== null) {
 		if (!$override) {
+			$cache[$cacheKey] = false;
 			return false;
 		}
 		if ($resourceKey === 'widgets' && $permissionKey === 'customize' && !userHasPermission($pdo, $normalizedUserId, 'widgets', 'read')) {
+			$cache[$cacheKey] = false;
 			return false;
 		}
+		$cache[$cacheKey] = true;
 		return true;
 	}
 
 	$roleIds = getUserRoleIds($pdo, $normalizedUserId);
 	if (empty($roleIds)) {
+		$cache[$cacheKey] = false;
 		return false;
 	}
 
@@ -1397,13 +1479,16 @@ function userHasPermission(PDO $pdo, $userId, $resourceKey, $permissionKey) {
 			continue;
 		}
 		if ($resourceKey === 'widgets' && $permissionKey === 'customize') {
+			$cache[$cacheKey] = true;
 			return true;
 		}
 		if (getRolePermissionGrant($pdo, $roleId, $resourceKey, $permissionKey)) {
+			$cache[$cacheKey] = true;
 			return true;
 		}
 	}
 
+	$cache[$cacheKey] = false;
 	return false;
 }
 
@@ -1838,8 +1923,14 @@ function getRoleById(PDO $pdo, $roleId) {
 
 
 function getUserPrimaryRole(PDO $pdo, $userId) {
+	static $cache = [];
 	$normalizedUserId = (int)$userId;
+	$cacheKey = dashboardPdoCacheKey($pdo) . '|primary_role|' . $normalizedUserId;
+	if (array_key_exists($cacheKey, $cache)) {
+		return $cache[$cacheKey];
+	}
 	if ($normalizedUserId < 1 || !dashboardTableExists($pdo, 'user_roles') || !dashboardTableExists($pdo, 'roles')) {
+		$cache[$cacheKey] = null;
 		return null;
 	}
 
@@ -1869,14 +1960,16 @@ function getUserPrimaryRole(PDO $pdo, $userId) {
 	}
 
 	if (!$row) {
+		$cache[$cacheKey] = null;
 		return null;
 	}
 
-	return [
+	$cache[$cacheKey] = [
 		'id' => (int)($row['id'] ?? 0),
 		'name' => (string)($row['name'] ?? ''),
 		'description' => (string)($row['description'] ?? ''),
 	];
+	return $cache[$cacheKey];
 }
 
 
