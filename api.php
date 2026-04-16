@@ -719,6 +719,7 @@ if ($method === 'OPTIONS') {
 }
 
 requireApiSessionAuthentication();
+closeAuthSessionIfOpen();
 
 try {
 	$pdo = getDashboardPdo();

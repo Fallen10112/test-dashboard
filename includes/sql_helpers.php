@@ -709,10 +709,43 @@ function getPermissionActionDefinitions() {
 	];
 }
 
+function getPermissionsSchemaBootstrapFlagKey() {
+	return 'permissions_schema_bootstrapped';
+}
+
+function isPermissionsSchemaBootstrapped(PDO $pdo) {
+	static $cache = [];
+	$cacheKey = dashboardPdoCacheKey($pdo);
+	if (array_key_exists($cacheKey, $cache)) {
+		return $cache[$cacheKey];
+	}
+
+	try {
+		$flagValue = strtolower(trim((string)getAppSettingValue($pdo, getPermissionsSchemaBootstrapFlagKey(), 'false')));
+		$cache[$cacheKey] = ($flagValue === 'true' || $flagValue === '1' || $flagValue === 'yes');
+	} catch (Throwable $e) {
+		$cache[$cacheKey] = false;
+	}
+
+	return $cache[$cacheKey];
+}
+
+function markPermissionsSchemaBootstrapped(PDO $pdo) {
+	try {
+		upsertAppSetting($pdo, getPermissionsSchemaBootstrapFlagKey(), 'true');
+	} catch (Throwable $e) {
+	}
+}
+
 function ensurePermissionsSchema(PDO $pdo) {
 	static $ensured = [];
 	$cacheKey = dashboardPdoCacheKey($pdo);
 	if (isset($ensured[$cacheKey])) {
+		return;
+	}
+
+	if (isPermissionsSchemaBootstrapped($pdo)) {
+		$ensured[$cacheKey] = true;
 		return;
 	}
 
@@ -825,6 +858,8 @@ function ensurePermissionsSchema(PDO $pdo) {
 	}
 
 	seedDefaultRolePermissions($pdo);
+	markPermissionsSchemaBootstrapped($pdo);
+	$ensured[$cacheKey] = true;
 }
 
 function getPermissionResourceByKey(PDO $pdo, $resourceKey) {

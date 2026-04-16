@@ -162,8 +162,15 @@ function getAuthInvalidationReason(): ?string {
 }
 
 function clearAuthSessionState(): void {
+	startAuthSession();
 	unset($_SESSION['auth_token'], $_SESSION['auth_user_id']);
 	session_regenerate_id(true);
+}
+
+function closeAuthSessionIfOpen(): void {
+	if (session_status() === PHP_SESSION_ACTIVE) {
+		session_write_close();
+	}
 }
 
 function getCsrfToken(): string {
