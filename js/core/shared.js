@@ -9,6 +9,9 @@ let sessionVisibilityHandlerRef = null;
 let notificationPollTimerId = null;
 let notificationPollFnRef = null;
 let notificationVisibilityHandlerRef = null;
+let isHeaderMetricsRequestInFlight = false;
+let isHeaderNotificationsRequestInFlight = false;
+let isSessionStatusRequestInFlight = false;
 
 
 let headerNotifications = [];
@@ -850,6 +853,11 @@ function setHeaderNotifications(notifications, unreadCount) {
 
 
 function loadHeaderNotificationsFromServer() {
+	if (isHeaderNotificationsRequestInFlight) {
+		return $.Deferred().resolve().promise();
+	}
+
+	isHeaderNotificationsRequestInFlight = true;
 	return $.ajax({
 		url: '../api.php?action=notifications&limit=25',
 		type: 'GET',
@@ -860,6 +868,8 @@ function loadHeaderNotificationsFromServer() {
 		}
 	}).fail(function(xhr) {
 		handleSessionAuthFailure(xhr);
+	}).always(function() {
+		isHeaderNotificationsRequestInFlight = false;
 	});
 }
 
@@ -1140,13 +1150,19 @@ function setupSessionEnforcementPoller() {
 		if (document.visibilityState === 'hidden' || isHandlingForcedLogout) {
 			return;
 		}
+		if (isSessionStatusRequestInFlight) {
+			return;
+		}
 
+		isSessionStatusRequestInFlight = true;
 		$.ajax({
 			url: '../api.php?action=session_status',
 			type: 'GET',
 			dataType: 'json'
 		}).fail(function(xhr) {
 			handleSessionAuthFailure(xhr);
+		}).always(function() {
+			isSessionStatusRequestInFlight = false;
 		});
 	};
 	sessionPollFnRef = poll;
@@ -1164,6 +1180,11 @@ function setupSessionEnforcementPoller() {
 
 
 function loadHeaderMetrics() {
+	if (isHeaderMetricsRequestInFlight) {
+		return $.Deferred().resolve().promise();
+	}
+
+	isHeaderMetricsRequestInFlight = true;
 	$.ajax({
 		url: '../api.php?action=header_metrics',
 		type: 'GET',
@@ -1179,6 +1200,8 @@ function loadHeaderMetrics() {
 		setMetricValue('#metric-total-edits', '--');
 		setMetricValue('#metric-adds-today', '--');
 		setMetricValue('#metric-deletes-today', '--');
+	}).always(function() {
+		isHeaderMetricsRequestInFlight = false;
 	});
 }
 
