@@ -429,6 +429,11 @@ function doesTableIndexExist(PDO $pdo, $tableName, $indexName) {
 }
 
 function ensureActivityLogSchema(PDO $pdo) {
+	static $ensured = false;
+	if ($ensured) {
+		return;
+	}
+
 	$pdo->exec(
 		'CREATE TABLE IF NOT EXISTS activity_log (
 			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -455,6 +460,8 @@ function ensureActivityLogSchema(PDO $pdo) {
 	if (!doesTableIndexExist($pdo, 'activity_log', 'idx_activity_source')) {
 		$pdo->exec('ALTER TABLE activity_log ADD INDEX idx_activity_source (source_user_id)');
 	}
+
+	$ensured = true;
 }
 
 
@@ -478,6 +485,27 @@ function ensureNotificationsTable(PDO $pdo) {
 			CONSTRAINT fk_notifications_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
 	);
+}
+
+function ensureRecordsQuerySchema(PDO $pdo) {
+	static $ensured = false;
+	if ($ensured) {
+		return;
+	}
+
+	if (!dashboardTableExists($pdo, 'records')) {
+		$ensured = true;
+		return;
+	}
+
+	if (!doesTableIndexExist($pdo, 'records', 'idx_records_deleted_at')) {
+		$pdo->exec('ALTER TABLE records ADD INDEX idx_records_deleted_at (deleted_at)');
+	}
+	if (!doesTableIndexExist($pdo, 'records', 'idx_records_deleted_at_id')) {
+		$pdo->exec('ALTER TABLE records ADD INDEX idx_records_deleted_at_id (deleted_at, id)');
+	}
+
+	$ensured = true;
 }
 
 function forceDeleteUserHard(PDO $pdo, $targetUserId, $currentUserId) {

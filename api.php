@@ -493,12 +493,15 @@ function getAuditPayload(PDO $pdo) {
 
 
 function getHeaderMetricsPayload(PDO $pdo) {
+	ensureRecordsQuerySchema($pdo);
 	ensureAuditLogSchema($pdo);
 
 	$totalEntriesStmt = $pdo->query('SELECT COUNT(*) FROM records WHERE deleted_at IS NULL');
 	$totalEntries = (int)$totalEntriesStmt->fetchColumn();
 
 	$today = substr(getDashboardSqlTimestamp(), 0, 10);
+	$todayStart = $today . ' 00:00:00';
+	$todayEnd = $today . ' 23:59:59';
 	$totalEditsStmt = $pdo->query('SELECT COUNT(*) FROM audit_log WHERE record_type = "record" AND action = "update"');
 	$totalEdits = (int)$totalEditsStmt->fetchColumn();
 
@@ -508,11 +511,13 @@ function getHeaderMetricsPayload(PDO $pdo) {
 		 WHERE record_type = :record_type
 		   AND action = "create"
 		   AND record_id IS NOT NULL
-		   AND DATE(created_at) = :today'
+		   AND created_at >= :today_start
+		   AND created_at <= :today_end'
 	);
 	$addsTodayStmt->execute([
 		':record_type' => 'record',
-		':today' => $today,
+		':today_start' => $todayStart,
+		':today_end' => $todayEnd,
 	]);
 	$addsToday = (int)$addsTodayStmt->fetchColumn();
 
@@ -522,11 +527,13 @@ function getHeaderMetricsPayload(PDO $pdo) {
 		 WHERE record_type = :record_type
 		   AND action = "delete"
 		   AND record_id IS NOT NULL
-		   AND DATE(created_at) = :today'
+		   AND created_at >= :today_start
+		   AND created_at <= :today_end'
 	);
 	$deletesTodayStmt->execute([
 		':record_type' => 'record',
-		':today' => $today,
+		':today_start' => $todayStart,
+		':today_end' => $todayEnd,
 	]);
 	$deletesToday = (int)$deletesTodayStmt->fetchColumn();
 
@@ -635,6 +642,7 @@ function addAuditEntry(PDO $pdo, $changeType, $recordId, $fieldName, $oldValue, 
 
 
 function buildDataPagePayload(PDO $pdo, $includeAllFilteredItems = false) {
+	ensureRecordsQuerySchema($pdo);
 	$params = getDataQueryParams();
 	$search = $params['search'];
 	$sortColumn = $params['sortColumn'];
